@@ -1,0 +1,403 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>hpy.ds module &#8212; hpy 0.0.1 documentation</title>
+    <link rel="stylesheet" href="_static/classic.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" /> 
+  </head><body>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">hpy 0.0.1 documentation</a> &#187;</li> 
+      </ul>
+    </div>  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="module-hpy.ds">
+<span id="hpy-ds-module"></span><h1>hpy.ds module<a class="headerlink" href="#module-hpy.ds" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="hpy-ds-py">
+<h2>hpy.ds.py<a class="headerlink" href="#hpy-ds-py" title="Permalink to this headline">¶</a></h2>
+<p>Contains DataScience functions extending on pandas and sklearn</p>
+<dl class="function">
+<dt id="hpy.ds.acc">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">acc</code><span class="sig-paren">(</span><em class="sig-param">y_true</em>, <em class="sig-param">y_pred</em>, <em class="sig-param">df=None</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.acc" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.butter_pass">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">butter_pass</code><span class="sig-paren">(</span><em class="sig-param">cutoff</em>, <em class="sig-param">fs</em>, <em class="sig-param">order</em>, <em class="sig-param">btype</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.butter_pass" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.butter_pass_filter">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">butter_pass_filter</code><span class="sig-paren">(</span><em class="sig-param">data</em>, <em class="sig-param">cutoff</em>, <em class="sig-param">fs</em>, <em class="sig-param">order</em>, <em class="sig-param">btype</em>, <em class="sig-param">shift=False</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.butter_pass_filter" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.change_span">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">change_span</code><span class="sig-paren">(</span><em class="sig-param">s</em>, <em class="sig-param">steps=5</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.change_span" title="Permalink to this definition">¶</a></dt>
+<dd><blockquote>
+<div><p>return a True/False series around a changepoint, used for filtering stepwise data series in a pandas df
+must be properly sorted!</p>
+</div></blockquote>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>s</strong> – pandas series or similar</p></li>
+<li><p><strong>steps</strong> – number of steps around the changepoint to flag as true</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.cm">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">cm</code><span class="sig-paren">(</span><em class="sig-param">y_true</em>, <em class="sig-param">y_pred</em>, <em class="sig-param">df=None</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.cm" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.col_to_front">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">col_to_front</code><span class="sig-paren">(</span><em class="sig-param">df</em>, <em class="sig-param">cols</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.col_to_front" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.corr">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">corr</code><span class="sig-paren">(</span><em class="sig-param">*args</em>, <em class="sig-param">f=None</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.corr" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.df_agg">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">df_agg</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">group</em>, <em class="sig-param">df</em>, <em class="sig-param">hue=None</em>, <em class="sig-param">agg=None</em>, <em class="sig-param">n_quantiles=10</em>, <em class="sig-param">na_to_med=False</em>, <em class="sig-param">p=True</em>, <em class="sig-param">p_test='mean'</em>, <em class="sig-param">sort_by_count=False</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.df_agg" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.df_count">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">df_count</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">df</em>, <em class="sig-param">hue=None</em>, <em class="sig-param">sort_by_count=True</em>, <em class="sig-param">top_nr=5</em>, <em class="sig-param">x_int=None</em>, <em class="sig-param">x_min=None</em>, <em class="sig-param">x_max=None</em>, <em class="sig-param">other_name='other'</em>, <em class="sig-param">na='drop'</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.df_count" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.df_group_hue">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">df_group_hue</code><span class="sig-paren">(</span><em class="sig-param">df</em>, <em class="sig-param">group</em>, <em class="sig-param">hue=None</em>, <em class="sig-param">x=None</em>, <em class="sig-param">n_quantiles=10</em>, <em class="sig-param">na_to_med=False</em>, <em class="sig-param">keep=True</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.df_group_hue" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.df_merge">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">df_merge</code><span class="sig-paren">(</span><em class="sig-param">*args</em>, <em class="sig-param">ignore_index=True</em>, <em class="sig-param">sort=False</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.df_merge" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.df_p">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">df_p</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">group</em>, <em class="sig-param">df</em>, <em class="sig-param">hue=None</em>, <em class="sig-param">agg_func='mean'</em>, <em class="sig-param">agg=False</em>, <em class="sig-param">n_quantiles=10</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.df_p" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.df_precision_filter">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">df_precision_filter</code><span class="sig-paren">(</span><em class="sig-param">df</em>, <em class="sig-param">col</em>, <em class="sig-param">precision</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.df_precision_filter" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.df_rmsd">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">df_rmsd</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">df</em>, <em class="sig-param">groups=None</em>, <em class="sig-param">hue=None</em>, <em class="sig-param">hue_order=None</em>, <em class="sig-param">sort_by_hue=True</em>, <em class="sig-param">n_quantiles=10</em>, <em class="sig-param">include_rmsd=True</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.df_rmsd" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.df_score">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">df_score</code><span class="sig-paren">(</span><em class="sig-param">df</em>, <em class="sig-param">target</em>, <em class="sig-param">model_names=None</em>, <em class="sig-param">scores=None</em>, <em class="sig-param">pivot=True</em>, <em class="sig-param">scale=None</em>, <em class="sig-param">groupby=None</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.df_score" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.df_split">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">df_split</code><span class="sig-paren">(</span><em class="sig-param">df</em>, <em class="sig-param">split_by</em>, <em class="sig-param">out_type='dict'</em>, <em class="sig-param">print_key=False</em>, <em class="sig-param">sep='_'</em>, <em class="sig-param">key_sep='=='</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.df_split" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.drop_duplicate_cols">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">drop_duplicate_cols</code><span class="sig-paren">(</span><em class="sig-param">df</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.drop_duplicate_cols" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.drop_zero_cols">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">drop_zero_cols</code><span class="sig-paren">(</span><em class="sig-param">df</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.drop_zero_cols" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.f1_pr">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">f1_pr</code><span class="sig-paren">(</span><em class="sig-param">y_true</em>, <em class="sig-param">y_pred</em>, <em class="sig-param">df=None</em>, <em class="sig-param">target=None</em>, <em class="sig-param">factor=100</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.f1_pr" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.f_score">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">f_score</code><span class="sig-paren">(</span><em class="sig-param">y_true</em>, <em class="sig-param">y_pred</em>, <em class="sig-param">df=None</em>, <em class="sig-param">dropna=False</em>, <em class="sig-param">f=&lt;function r2_score&gt;</em>, <em class="sig-param">groupby=None</em>, <em class="sig-param">f_name=None</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.f_score" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.flatten">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">flatten</code><span class="sig-paren">(</span><em class="sig-param">lst</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.flatten" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.get_accuracy">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">get_accuracy</code><span class="sig-paren">(</span><em class="sig-param">class_true</em>, <em class="sig-param">class_pred</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.get_accuracy" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.get_coefs">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">get_coefs</code><span class="sig-paren">(</span><em class="sig-param">model</em>, <em class="sig-param">y</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.get_coefs" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.get_df_corr">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">get_df_corr</code><span class="sig-paren">(</span><em class="sig-param">df</em>, <em class="sig-param">target=None</em>, <em class="sig-param">groupby=None</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.get_df_corr" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.get_duplicate_cols">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">get_duplicate_cols</code><span class="sig-paren">(</span><em class="sig-param">df</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.get_duplicate_cols" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.get_feature_importance">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">get_feature_importance</code><span class="sig-paren">(</span><em class="sig-param">model</em>, <em class="sig-param">predictors</em>, <em class="sig-param">features_to_sum=None</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.get_feature_importance" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.get_feature_importance_rf">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">get_feature_importance_rf</code><span class="sig-paren">(</span><em class="sig-param">model</em>, <em class="sig-param">predictors</em>, <em class="sig-param">features_to_sum=None</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.get_feature_importance_rf" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.get_feature_importance_xgb">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">get_feature_importance_xgb</code><span class="sig-paren">(</span><em class="sig-param">model</em>, <em class="sig-param">predictors</em>, <em class="sig-param">features_to_sum=None</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.get_feature_importance_xgb" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.grouped_interpolate">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">grouped_interpolate</code><span class="sig-paren">(</span><em class="sig-param">df</em>, <em class="sig-param">col</em>, <em class="sig-param">groupby</em>, <em class="sig-param">method=None</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.grouped_interpolate" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.grouped_lfit">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">grouped_lfit</code><span class="sig-paren">(</span><em class="sig-param">df</em>, <em class="sig-param">x</em>, <em class="sig-param">y</em>, <em class="sig-param">groupby</em>, <em class="sig-param">do_print=False</em>, <em class="sig-param">display_rank_warning=True</em>, <em class="sig-param">return_df=False</em>, <em class="sig-param">catch_error=False</em>, <em class="sig-param">error_log=True</em>, <em class="sig-param">print_prefix=''</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.grouped_lfit" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.highlight_max">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">highlight_max</code><span class="sig-paren">(</span><em class="sig-param">df: pandas.core.frame.DataFrame</em>, <em class="sig-param">color: str = 'xkcd:cyan'</em><span class="sig-paren">)</span> &#x2192; object<a class="headerlink" href="#hpy.ds.highlight_max" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.highlight_max_min">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">highlight_max_min</code><span class="sig-paren">(</span><em class="sig-param">df: pandas.core.frame.DataFrame</em>, <em class="sig-param">max_color: str = 'xkcd:cyan'</em>, <em class="sig-param">min_color: str = 'xkcd:light red'</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.highlight_max_min" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.highlight_min">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">highlight_min</code><span class="sig-paren">(</span><em class="sig-param">df: pandas.core.frame.DataFrame</em>, <em class="sig-param">color: str = 'xkcd:light red'</em><span class="sig-paren">)</span> &#x2192; object<a class="headerlink" href="#hpy.ds.highlight_min" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.kde">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">kde</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">df=None</em>, <em class="sig-param">x_range=None</em>, <em class="sig-param">perc_cutoff=0.1</em>, <em class="sig-param">range_cutoff=None</em>, <em class="sig-param">x_steps=1000</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.kde" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.lfit">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">lfit</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">y=None</em>, <em class="sig-param">w=None</em>, <em class="sig-param">do_print=False</em>, <em class="sig-param">i=0</em>, <em class="sig-param">i_max=0</em>, <em class="sig-param">catch_error=False</em>, <em class="sig-param">trigger_warning=True</em>, <em class="sig-param">return_df=False</em>, <em class="sig-param">extrapolate=None</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.lfit" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.lr">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">lr</code><span class="sig-paren">(</span><em class="sig-param">df</em>, <em class="sig-param">x</em>, <em class="sig-param">y</em>, <em class="sig-param">groupby=None</em>, <em class="sig-param">t_unit='D'</em>, <em class="sig-param">do_print=True</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.lr" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.mae">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">mae</code><span class="sig-paren">(</span><em class="sig-param">*args</em>, <em class="sig-param">f=None</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.mae" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.mahalanobis">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">mahalanobis</code><span class="sig-paren">(</span><em class="sig-param">point</em>, <em class="sig-param">df=None</em>, <em class="sig-param">params=None</em>, <em class="sig-param">do_print=True</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.mahalanobis" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.medae">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">medae</code><span class="sig-paren">(</span><em class="sig-param">*args</em>, <em class="sig-param">f=None</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.medae" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.multi_melt">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">multi_melt</code><span class="sig-paren">(</span><em class="sig-param">df</em>, <em class="sig-param">cols</em>, <em class="sig-param">suffixes</em>, <em class="sig-param">id_vars</em>, <em class="sig-param">var_name='variable'</em>, <em class="sig-param">sep='_'</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.multi_melt" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.numeric_to_group">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">numeric_to_group</code><span class="sig-paren">(</span><em class="sig-param">pd_series</em>, <em class="sig-param">step=None</em>, <em class="sig-param">outer_limit=4</em>, <em class="sig-param">suffix=None</em>, <em class="sig-param">use_abs=False</em>, <em class="sig-param">use_standard_scaler=True</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.numeric_to_group" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.optimize_pd">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">optimize_pd</code><span class="sig-paren">(</span><em class="sig-param">df</em>, <em class="sig-param">c_int=True</em>, <em class="sig-param">c_float=True</em>, <em class="sig-param">c_cat=True</em>, <em class="sig-param">cat_frac=0.5</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.optimize_pd" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.order_cols">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">order_cols</code><span class="sig-paren">(</span><em class="sig-param">df</em>, <em class="sig-param">cols</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.order_cols" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.outlier_to_nan">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">outlier_to_nan</code><span class="sig-paren">(</span><em class="sig-param">df_in</em>, <em class="sig-param">col_to_filter</em>, <em class="sig-param">groupby</em>, <em class="sig-param">std_cutoff=3</em>, <em class="sig-param">reps=1</em>, <em class="sig-param">do_print=False</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.outlier_to_nan" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.pass_by_group">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">pass_by_group</code><span class="sig-paren">(</span><em class="sig-param">df_in</em>, <em class="sig-param">col_to_filter</em>, <em class="sig-param">groupby</em>, <em class="sig-param">btype</em>, <em class="sig-param">shift=False</em>, <em class="sig-param">cutoff=1</em>, <em class="sig-param">fs=20</em>, <em class="sig-param">order=5</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.pass_by_group" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.qagg">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">qagg</code><span class="sig-paren">(</span><em class="sig-param">df: pandas.core.frame.DataFrame</em>, <em class="sig-param">groupby</em>, <em class="sig-param">columns=None</em>, <em class="sig-param">agg=None</em>, <em class="sig-param">reset_index=True</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.qagg" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.qf">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">qf</code><span class="sig-paren">(</span><em class="sig-param">df</em>, <em class="sig-param">filter_df</em>, <em class="sig-param">filter_iloc=0</em>, <em class="sig-param">remove_unused_categories=True</em>, <em class="sig-param">reset_index=True</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.qf" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.quantile_split">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">quantile_split</code><span class="sig-paren">(</span><em class="sig-param">s</em>, <em class="sig-param">n</em>, <em class="sig-param">signif=2</em>, <em class="sig-param">na_to_med=False</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.quantile_split" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.r2">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">r2</code><span class="sig-paren">(</span><em class="sig-param">*args</em>, <em class="sig-param">f=&lt;function r2_score&gt;</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.r2" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.rank">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">rank</code><span class="sig-paren">(</span><em class="sig-param">df</em>, <em class="sig-param">rank_by</em>, <em class="sig-param">groupby=None</em>, <em class="sig-param">score_ascending=True</em>, <em class="sig-param">sort_by=None</em>, <em class="sig-param">sort_by_ascending=None</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.rank" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.rel_acc">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">rel_acc</code><span class="sig-paren">(</span><em class="sig-param">y_true</em>, <em class="sig-param">y_pred</em>, <em class="sig-param">df=None</em>, <em class="sig-param">target_class=None</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.rel_acc" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.resample">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">resample</code><span class="sig-paren">(</span><em class="sig-param">df</em>, <em class="sig-param">rule=1</em>, <em class="sig-param">on=None</em>, <em class="sig-param">groupby=None</em>, <em class="sig-param">agg='mean'</em>, <em class="sig-param">columns=None</em>, <em class="sig-param">adj_column_names=True</em>, <em class="sig-param">factor=1</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.resample" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.rmsd">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">rmsd</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">df</em>, <em class="sig-param">group</em>, <em class="sig-param">return_df_paired=False</em>, <em class="sig-param">agg_func='median'</em>, <em class="sig-param">standardize=False</em>, <em class="sig-param">to_abs=False</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.rmsd" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.rmse">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">rmse</code><span class="sig-paren">(</span><em class="sig-param">*args</em>, <em class="sig-param">f=None</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.rmse" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.stdae">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">stdae</code><span class="sig-paren">(</span><em class="sig-param">*args</em>, <em class="sig-param">f=None</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.stdae" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.time_reg">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">time_reg</code><span class="sig-paren">(</span><em class="sig-param">df</em>, <em class="sig-param">t='t'</em>, <em class="sig-param">y='y'</em>, <em class="sig-param">t_unit='D'</em>, <em class="sig-param">window=10</em>, <em class="sig-param">slope_diff_cutoff=0.1</em>, <em class="sig-param">int_diff_cutoff=3</em>, <em class="sig-param">return_df_fit=False</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.time_reg" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.top_n">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">top_n</code><span class="sig-paren">(</span><em class="sig-param">s</em>, <em class="sig-param">n</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.top_n" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="hpy.ds.top_n_coding">
+<code class="sig-prename descclassname">hpy.ds.</code><code class="sig-name descname">top_n_coding</code><span class="sig-paren">(</span><em class="sig-param">s</em>, <em class="sig-param">n</em>, <em class="sig-param">other_name='other'</em>, <em class="sig-param">na_to_other=False</em><span class="sig-paren">)</span><a class="headerlink" href="#hpy.ds.top_n_coding" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#">hpy.ds module</a><ul>
+<li><a class="reference internal" href="#hpy-ds-py">hpy.ds.py</a></li>
+</ul>
+</li>
+</ul>
+
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/hpy.ds.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="genindex.html" title="General Index"
+             >index</a></li>
+        <li class="right" >
+          <a href="py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="nav-item nav-item-0"><a href="index.html">hpy 0.0.1 documentation</a> &#187;</li> 
+      </ul>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2019, Henrik Hanssen.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.2.
+    </div>
+  </body>
+</html>

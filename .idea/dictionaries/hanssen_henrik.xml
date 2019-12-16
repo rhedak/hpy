@@ -12,10 +12,13 @@
       <w>bubblecountplot</w>
       <w>bubbleplot</w>
       <w>cbar</w>
+      <w>ceiled</w>
       <w>changepoint</w>
       <w>cmap</w>
       <w>coef</w>
       <w>coefs</w>
+      <w>concats</w>
+      <w>concatting</w>
       <w>corrplot</w>
       <w>corrs</w>
       <w>countplot</w>
@@ -26,6 +29,7 @@
       <w>facecolor</w>
       <w>figsize</w>
       <w>formated</w>
+      <w>formating</w>
       <w>fprint</w>
       <w>frac</w>
       <w>fwhm</w>
@@ -70,6 +74,7 @@
       <w>printf</w>
       <w>prio</w>
       <w>ptypes</w>
+      <w>pytest</w>
       <w>qagg</w>
       <w>quantile</w>
       <w>quantiles</w>
@@ -85,10 +90,12 @@
       <w>scipy</w>
       <w>scoreplot</w>
       <w>seaborn</w>
+      <w>seedable</w>
       <w>signif</w>
       <w>sklearn</w>
       <w>stdae</w>
       <w>stemplot</w>
+      <w>strftime</w>
       <w>subax</w>
       <w>tdelta</w>
       <w>ticklabels</w>
