@@ -755,6 +755,91 @@ def force_model(model):
 
     return _model
 
+
+# get coefficients of a linear regression in a sorted data frame
+def get_coefs(model, y):
+    _df = pd.DataFrame()
+
+    _coef = model.coef_.tolist()
+    _coef.append(model.intercept_)
+
+    _df['feature'] = y + ['intercept']
+    _df['coef'] = _coef
+
+    _df = _df.sort_values(['coef'], ascending=False).reset_index(drop=True)
+
+    _df['coef'] = np.round(_df['coef'], 5)
+
+    return _df
+
+
+# get feature importance of a decision tree like model in a sorted data frame
+def get_feature_importance(model, predictors, features_to_sum=None):
+    try:
+        _df = get_feature_importance_rf(model, predictors, features_to_sum)
+        # this is supposed to also work for XGBoost but it was broken in a recent release
+        # so below serves as fallback
+    except ValueError:
+        _df = get_feature_importance_xgb(model, predictors, features_to_sum)
+
+    return _df
+
+
+def get_feature_importance_rf(model, predictors, features_to_sum=None):
+    _feature_importances = model.feature_importances_
+
+    _df = pd.DataFrame()
+
+    _df['feature'] = predictors
+    _df['importance'] = _feature_importances
+
+    if features_to_sum is not None:
+
+        for _key in list(features_to_sum.keys()):
+            _df['feature'] = np.where(_df['feature'].isin(features_to_sum[_key]), _key, _df['feature'])
+            _df = _df.groupby('feature').sum().reset_index()
+
+    _df = _df.sort_values(['importance'], ascending=False).reset_index(drop=True)
+
+    _df['importance'] = np.round(_df['importance'], 5)
+
+    return _df
+
+
+# get feature importance of a decision tree like model in a sorted data frame
+def get_feature_importance_xgb(model, predictors, features_to_sum=None):
+    # get f_score
+    _f_score = model.get_booster().get_fscore()
+
+    # init df to return
+    _df = pd.DataFrame()
+
+    # get predictor code
+    _df['feature_code'] = list(_f_score.keys())
+    _df['feature_code'] = _df['feature_code'].str[1:].astype(int)
+
+    # code importance
+    _df['importance_abs'] = list(_f_score.values())
+    _df['importance'] = _df['importance_abs'] / _df['importance_abs'].sum()
+
+    _df = _df.sort_values(['feature_code']).reset_index(drop=True)
+
+    _df['feature'] = [predictors[x] for x in range(len(predictors)) if x in _df['feature_code']]
+
+    if features_to_sum is not None:
+
+        for _key in list(features_to_sum.keys()):
+            _df['feature'] = np.where(_df['feature'].isin(features_to_sum[_key]), _key, _df['feature'])
+            _df = _df.groupby('feature').sum().reset_index()
+
+    _df = _df.sort_values(['importance'], ascending=False).reset_index(drop=True)
+
+    _df['importance'] = np.round(_df['importance'], 5)
+
+    _df = _df[['feature', 'importance']]
+
+    return _df
+
 # TODO - make these members of Models
 # def grid_search(model, grid, target, n_random=100, n_random_state=0, goal='acc_test', f=cla, opt_class=None,
 #                 opt_score_type=None, ascending=None, do_print=True, display_score=False, float_format=',.4f',

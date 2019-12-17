@@ -41,7 +41,6 @@ rcParams = {
         'dark peach', 'xkcd:shocking pink'
     ],
     'hatches': ['/', '\\', '|', '-', '+', 'x', 'o', 'O', '.', '*'],
-    'figsize': (16, 9 / 2),
     'figsize_square': (8, 8),
     'fig_width': 8,
     'fig_height': 8
@@ -329,10 +328,10 @@ def pairwise_corrplot(df, corr_cutoff=.5, ncols=4, hue=None, width=rcParams['fig
 def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=None, hue_sort_type='count',
              hue_round=1, face_color='cyan', gauss_color='black', edgecolor='gray', alpha=None, bins=40, perc=None,
              top_nr=5, other_name='other', title=True, title_prefix='', value_name='column_value',
-             sigma_cutoff=3, figsize=rcParams['figsize'], show_hist=True, distfit='kde', show_grid=False,
+             sigma_cutoff=3, figsize=plt.rcParams['figure.figsize'], show_hist=True, distfit='kde', show_grid=False,
              legend=True, legend_loc='bottom', legend_space=None, legend_ncol=1, agg_func='mean',
              number_format='.2f', kde_steps=1000, max_n=100000, random_state=None, sample_warn=True, xlim=None,
-             distfit_line=None, ax=None, **kwargs):
+             distfit_line=None, label_style='mu_sigma', ax=None, **kwargs):
     if pattern is None:
         pattern = rcParams['palette']
     if not top_nr:
@@ -454,7 +453,10 @@ def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=No
         else:
             _mu_symbol = r'\ \nu'
 
-        _label = r'{}: $ {}={},\ \sigma={}$'.format(_f_x_label, _mu_symbol, _mu_label, _sigma_label)
+        if label_style == 'mu_sigma':
+            _label = r'{}: $ {}={},\ \sigma={}$'.format(_f_x_label, _mu_symbol, _mu_label, _sigma_label)
+        else:
+            _label = _f_x_label
 
         if show_hist:
             _hist_n, _hist_bins = _f_ax.hist(_df_i[_f_x], _f_bins, density=perc, facecolor=_f_facecolor,
@@ -1125,7 +1127,7 @@ def four_comp_plot(data, x_1, y_1, x_2, y_2, hue_1=None, hue_2=None,
 
 
 # facet wrap like ggplot
-def facet_wrap(func, data, facet, *args, col_wrap=4, width=4, height=9 / 2, catch_error=False,
+def facet_wrap(func, data, facet, *args, col_wrap=4, width=4, height=9 / 2, catch_error=True,
                return_fig_ax=False, tight_layout=False, legend_out=False, sharex=False, sharey=False, show_xlabel=True,
                x_tick_rotation=None, y_tick_rotation=None, ax_title='set', order=None, suptitle=None,
                linebreak_x_kws=None, linebreak_y_kws=None, subplots_kws=None, subplots_adjust_kws=None, **kwargs):
@@ -1193,8 +1195,7 @@ def facet_wrap(func, data, facet, *args, col_wrap=4, width=4, height=9 / 2, catc
         # for list set target to be in line with facet to ensure proper naming
         if _type_list:
             _df_facet = _df.copy()
-            _args = [_facet_i]
-            # _df_facet = _df_facet.rename({'value':_target},axis=1)
+            _args = [_facet_i] + list(args)
         else:
             _df_facet = _df[_df[_facet] == _facet_i]
             _args = args
@@ -1202,13 +1203,14 @@ def facet_wrap(func, data, facet, *args, col_wrap=4, width=4, height=9 / 2, catc
         # apply function on target (try catch)
         if catch_error:
             try:
-                func(*args, data=_df_facet, ax=_ax, **kwargs)
-            except ValueError:
-                warnings.warn('could not plot facet {}, skipping. For details use catch_error=False'.format(_facet_i))
+                func(*_args, data=_df_facet, ax=_ax, **kwargs)
+            except Exception as _exc:
+                warnings.warn('could not plot facet {} with exception {}, skipping. '
+                              'For details use catch_error=False'.format(_exc,_facet_i))
                 _ax.set_axis_off()
                 continue
         else:
-            func(*args, data=_df_facet, ax=_ax, **kwargs)
+            func(*_args, data=_df_facet, ax=_ax, **kwargs)
 
         # set axis title to facet or hide it or do nothing (depending on preference)
         if ax_title == 'set':
@@ -1863,7 +1865,7 @@ def aggplot(x, data, group, hue=None, width=16, height=9 / 2,
 
 
 def aggplot2d(x, y, data, aggfunc='mean', ax=None, x_int=None, time_int=None,
-              figsize=rcParams['figsize'], color=rcParams['palette'][0], as_abs=False):
+              figsize=plt.rcParams['figure.figsize'], color=rcParams['palette'][0], as_abs=False):
     # time int should be something like '<M8[D]'
     # D can be any datetime unit from numpy https://docs.scipy.org/doc/numpy-1.13.0/reference/arrays.datetime.html
 
@@ -1911,28 +1913,6 @@ def aggplot2dy(y, x, **kwargs):
     return aggplot2d(x=x, y=y, **kwargs)
 
 
-# fill a pandas dataframe with na rows between groups (for plotting)
-def add_na_rows(df, group):
-    # avoid inplace operations
-    _df = df.copy()
-
-    # convert to Int64 to be able to hold NaN
-    for _col in list(_df.select_dtypes(int)):
-        _df[_col] = _df[_col].astype('Int64')
-
-    # init na df
-    _df_na = _df.head(1).copy()
-    for _col in _df_na.columns:
-        _df_na[_col].values[:] = np.nan
-
-    for _row in list(range(len(_df) - 1, 0, -1)):
-
-        if _df[group].iloc[_row] != _df[group].iloc[_row - 1]:
-            _df = pd.concat([_df[:_row], _df_na, _df[_row:]], ignore_index=True, sort=False)
-
-    return _df
-
-
 def insert_linebreak(s, pos=None, frac=None, max_breaks=None):
     _s = deepcopy(s)
 
@@ -1978,7 +1958,7 @@ def ax_tick_linebreaks(ax=None, x=True, y=True, **kwargs):
 
 
 def annotate_barplot(ax=None, x=None, y=None, ci=True, ci_newline=True, adj_ylim=.05, nr_format=',.2f', ha='center',
-                     va='center', **kwargs):
+                     va='center', offset=plt.rcParams['font.size'], **kwargs):
     logging.getLogger().setLevel(logging.CRITICAL)
 
     if ax is None:
@@ -1989,10 +1969,10 @@ def annotate_barplot(ax=None, x=None, y=None, ci=True, ci_newline=True, adj_ylim
 
     if ci_newline:
         _ci_sep = '\n'
-        _offset = 15
+        _offset = offset + 5
     else:
         _ci_sep = ''
-        _offset = 10
+        _offset = offset
 
     for _it, _patch in enumerate(ax.patches):
 
@@ -2062,7 +2042,7 @@ def annotate_barplot(ax=None, x=None, y=None, ci=True, ci_newline=True, adj_ylim
 # animate a plot (wrapper for FuncAnimation to be used with pandas dfs)
 def animplot(data=None, x='x', y='y', t='t', lines=None, max_interval=None, interval=200, html=True, title=True,
              title_prefix='', t_format=None,
-             fig=None, ax=None, figsize=rcParams['figsize'], color=None, label=None, legend=False, legend_out=False,
+             fig=None, ax=None, figsize=plt.rcParams['figure.figsize'], color=None, label=None, legend=False, legend_out=False,
              legend_kws=None, xlim=None, y_lim=None, ax_facecolor=None, grid=False,
              vline=None, **kwargs):
     # example for lines (a list of dicts)
@@ -2416,7 +2396,7 @@ def custom_legend(colors, labels, do_show=True):
         return _handles
 
 
-def lcurveplot(train, test, labels=None, legend='upper right', ax=None, figsize=rcParams['figsize']):
+def lcurveplot(train, test, labels=None, legend='upper right', ax=None, figsize=plt.rcParams['figure.figsize']):
     if labels is None:
         if 'name' in dir(train):
             _label_train = train.name
@@ -2475,7 +2455,7 @@ def dic_to_lcurveplot(dic, width=16, height=9 / 2, **kwargs):
 
 
 # re implementation of stemplot because customization sucks
-def stemplot(x, y, data=None, ax=None, figsize=rcParams['figsize'], color=rcParams['palette'][0], baseline=0,
+def stemplot(x, y, data=None, ax=None, figsize=plt.rcParams['figure.figsize'], color=rcParams['palette'][0], baseline=0,
              kwline=None, **kwargs):
     if kwline is None:
         kwline = {}
@@ -2516,7 +2496,7 @@ def stemplot(x, y, data=None, ax=None, figsize=rcParams['figsize'], color=rcPara
 
 
 def from_to_plot(data: pd.DataFrame, x_from='x_from', x_to='x_to', y_from=0, y_to=1, palette=None, label=None,
-                 legend=True, legend_loc=None, ax=None, figsize=rcParams['figsize'], **kwargs):
+                 legend=True, legend_loc=None, ax=None, figsize=plt.rcParams['figure.figsize'], **kwargs):
     # defaults
     if ax is None:
         _, ax = plt.subplots(figsize=figsize)
@@ -2554,7 +2534,7 @@ def from_to_plot(data: pd.DataFrame, x_from='x_from', x_to='x_to', y_from=0, y_t
     return ax
 
 
-def vlineplot(data, palette=None, label=None, legend=True, legend_loc=None, ax=None, figsize=rcParams['figsize'],
+def vlineplot(data, palette=None, label=None, legend=True, legend_loc=None, ax=None, figsize=plt.rcParams['figure.figsize'],
               **kwargs):
     # defaults
     if ax is None:
@@ -2768,7 +2748,7 @@ def replace_yticklabels(ax, mapping):
 
 def kdeplot(x, data=None, *args, hue=None, hue_order=None, bins=40, adj_x_range=False, baseline=0, highlight_peaks=True,
             show_kde=True, show_hist=True, show_area=False, area_center='mean', ha='center', va='center',
-            legend_loc='upper right', palette=None, text_offset=15, nr_format=',.2f', figsize=rcParams['figsize'],
+            legend_loc='upper right', palette=None, text_offset=15, nr_format=',.2f', figsize=plt.rcParams['figure.figsize'],
             kwline=None, perc=False, facecolor=None, sigma_color='xkcd:blue', sigma_2_color='xkcd:cyan',
             kde_color='black', edgecolor='black', alpha=.5, ax=None, ax2=None, kwhist=None, **kwargs):
     # -- init
@@ -3084,7 +3064,7 @@ def histplot(x=None, data=None, hue=None, hue_order=None, ax=None, bins=30, use_
 def countplot(x=None, data=None, hue=None, ax=None, order='default', hue_order=None, normalize_x=False,
               normalize_hue=False, color=None, palette=None,
               x_tick_rotation=None, count_twinx=False, hide_legend=False, annotate=True,
-              annotate_digits=2, figsize=(16, 9 / 2),
+              annotate_format=',.2f', figsize=(16, 9 / 2),
               legend_kws=None, barplot_kws=None, count_twinx_kws=None, **kwargs):
     # normalize_x causes the sum of each x group to be 100 percent
     # normalize_hue (with normalize=False) causes the sum of each hue group to be 100 percent
@@ -3158,7 +3138,7 @@ def countplot(x=None, data=None, hue=None, ax=None, order='default', hue_order=N
 
     if annotate:
         # add annotation
-        annotate_barplot(_plot, digits=annotate_digits)
+        annotate_barplot(_plot, nr_format=annotate_format)
         # enlarge ylims
         _y_lim = list(ax.get_ylim())
         _y_lim[1] = _y_lim[1] * 1.1

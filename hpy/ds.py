@@ -7,6 +7,8 @@ Contains DataScience functions extending on pandas and sklearn
 """
 
 # standard imports
+from collections import Mapping
+
 import pandas.api.types as ptypes
 from sklearn.preprocessing import StandardScaler
 
@@ -26,14 +28,28 @@ from hpy.main import *
 
 
 # --- pandas styles
-def highlight_max(df: pd.DataFrame, color: str = 'xkcd:cyan') -> object:
+def highlight_max(df: pd.DataFrame, color: str = 'xkcd:cyan') -> pd.DataFrame:
+    """
+    highlights the largest value in each column of a pandas DataFrame
+
+    :param df: pandas DataFrame
+    :param color: color used for highlighting
+    :return: the pandas DataFrame with the style applied to it
+    """
     def cond_max(s: pd.Series):
         return ['background-color: {}'.format(color) if v else '' for v in s == s.max()]
 
     return df.style.apply(cond_max)
 
 
-def highlight_min(df: pd.DataFrame, color: str = 'xkcd:light red') -> object:
+def highlight_min(df: pd.DataFrame, color: str = 'xkcd:light red') -> pd.DataFrame:
+    """
+    highlights the smallest value in each column of a pandas DataFrame
+
+    :param df: pandas DataFrame
+    :param color: color used for highlighting
+    :return: the pandas DataFrame with the style applied to it
+    """
     def cond_min(s: pd.Series):
         return ['background-color: {}'.format(color) if v else '' for v in s == s.min()]
 
@@ -41,6 +57,14 @@ def highlight_min(df: pd.DataFrame, color: str = 'xkcd:light red') -> object:
 
 
 def highlight_max_min(df: pd.DataFrame, max_color: str = 'xkcd:cyan', min_color: str = 'xkcd:light red'):
+    """
+    highlights the largest and smallest value in each column of a pandas DataFrame
+
+    :param df: pandas DataFrame
+    :param max_color: color used for highlighting largest value
+    :param min_color: color used for highlighting smallest value
+    :return: the pandas DataFrame with the style applied to it
+    """
     def cond_max_min(s):
 
         _out = []
@@ -60,9 +84,19 @@ def highlight_max_min(df: pd.DataFrame, max_color: str = 'xkcd:cyan', min_color:
 
 
 # --- functions
-# optimize memory usage of a pandas df, automatically downcast all var types and converts objects to categories
-def optimize_pd(df, c_int=True, c_float=True, c_cat=True, cat_frac=.5):
-    _df = df.copy()
+def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_cat: bool = True, cat_frac: bool = .5) \
+        -> pd.DataFrame:
+    """
+    optimize memory usage of a pandas df, automatically downcast all var types and converts objects to categories
+
+    :param df: pandas DataFrame to be optimized. Other objects are implicitly cast to DataFrame
+    :param c_int: whether to downcast integers
+    :param c_float: whether to downcast floats
+    :param c_cat: whether to cast objects to categories. Uses cat_frac as condition
+    :param cat_frac: if c_cat is True and the column has less than cat_frac unique values it will be cast to category
+    :return: the optimized pandas DataFrame
+    """
+    _df = pd.DataFrame(df).copy()
     del df
 
     # check for duplicate columns
@@ -109,8 +143,15 @@ def optimize_pd(df, c_int=True, c_float=True, c_cat=True, cat_frac=.5):
     return _df
 
 
-# get a data frame containing all pearson correlations in a melted format
-def get_df_corr(df, target=None, groupby=None):
+def get_df_corr(df: pd.DataFrame, target: str = None, groupby: Union[str, list] = None) -> pd.DataFrame:
+    """
+    returns a pandas DataFrame containing all pearson correlations in a melted format
+
+    :param df: input pandas DataFrame. Other objects are implicitly cast to DataFrame
+    :param target: if target is specified: returns only correlations that involve the target column
+    :param groupby: if groupby is specified: returns correlations for each level of the group
+    :return: pandas DataFrame containing all pearson correlations in a melted format
+    """
     # avoid inplace operations
     _df = df.copy()
     del df
@@ -174,33 +215,68 @@ def get_df_corr(df, target=None, groupby=None):
     return _df_corr
 
 
-# drop cols with all 0 or None values
-def drop_zero_cols(df):
+def drop_zero_cols(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Drop columns with all 0 or None Values from DataFrame. Useful after applying one hot encoding.
+
+    :param df: pandas DataFrame
+    :return: pandas DataFrame without 0 columns.
+    """
+    # noinspection PyUnresolvedReferences
     return df[df.columns[(df != 0).any()]]
 
 
-def get_duplicate_cols(df):
-    return df.columns.value_counts().where(lambda _: _ > 1).dropna().index.to_list()
+def get_duplicate_cols(df: pd.DataFrame) -> list:
+    """
+    Returns names of duplicate columns from a pandas DataFrame
+
+    :param df: pandas DataFrame
+    :return: List of column names that are duplicate
+    """
+    return df.columns.duplicated().to_list()
 
 
-def drop_duplicate_cols(df):
+def drop_duplicate_cols(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Drop duplicate columns from pandas DataFrame
+
+    :param df: pandas DataFrame
+    :return: panads DataFrame without the duplicates columns
+    """
     return df.loc[:, ~df.columns.duplicated()]
 
 
-def change_span(s, steps=5):
+def change_span(s: pd.Series, steps:int = 5) -> pd.Series :
     """
-        return a True/False series around a changepoint, used for filtering stepwise data series in a pandas df
-        must be properly sorted!
-    :param s: pandas series or similar
+    return a True/False series around a changepoint, used for filtering stepwise data series in a pandas df
+    must be properly sorted!
+
+    :param s: pandas Series or similar
     :param steps: number of steps around the changepoint to flag as true
-    :return:
+    :return: pandas Series of dtype Boolean
     """
-    return s.shift(-steps).ffill() != s.shift(steps).bfill()
+    return pd.Series(s.shift(-steps).ffill() != s.shift(steps).bfill())
 
 
-# this algorithm cuts off all points whose DELTA (avg diff to the prev and next point) is outside of the n std range
-def outlier_to_nan(df_in, col_to_filter, groupby, std_cutoff=3, reps=1, do_print=False):
-    _df_out = df_in.copy()
+def outlier_to_nan(df: pd.DataFrame, col: str, groupby: Union[list, str] = None, std_cutoff: np.number = 3,
+                   reps: int = 1, do_print: bool = False) -> pd.DataFrame:
+    """
+    this algorithm cuts off all points whose DELTA (avg diff to the prev and next point) is outside of the n std range
+
+    :param df: pandas DataFrame
+    :param col: column to be filtered
+    :param groupby: if provided: applies std filter by group
+    :param std_cutoff: the number of standard deviations outside of which to set values to None
+    :param reps: how many times to repeat the algorithm
+    :param do_print: whether to print steps to console
+    :return: pandas DataFrame with outliers set to nan
+    """
+    _df = df.copy()
+    del df
+
+    if groupby is None:
+        _df['__groupby'] = 1
+        groupby = '__groupby'
 
     for _rep in range(reps):
 
@@ -208,45 +284,56 @@ def outlier_to_nan(df_in, col_to_filter, groupby, std_cutoff=3, reps=1, do_print
             tprint('rep = ' + str(_rep + 1) + ' of ' + str(reps))
 
         # grouped by df
-        _df_out_grouped = _df_out.groupby(groupby)
+        _df_out_grouped = _df.groupby(groupby)
 
-        _df_out['_dummy'] = _df_out[col_to_filter]
+        _df['_dummy'] = _df[col]
         # use interpolation to treat missing values
-        _df_out['_dummy'] = _df_out_grouped['_dummy'].transform(pd.DataFrame.interpolate)
+        _df['_dummy'] = _df_out_grouped['_dummy'].transform(pd.DataFrame.interpolate)
 
         # calculate delta (mean of diff to previous and next value)
-        _df_out['_dummy_delta'] = .5 * (
-                np.abs(_df_out['_dummy'] - _df_out_grouped['_dummy'].shift(1).bfill()) +
-                np.abs(_df_out['_dummy'] - _df_out_grouped['_dummy'].shift(-1).ffill())
+        _df['_dummy_delta'] = .5 * (
+                np.abs(_df['_dummy'] - _df_out_grouped['_dummy'].shift(1).bfill()) +
+                np.abs(_df['_dummy'] - _df_out_grouped['_dummy'].shift(-1).ffill())
         )
 
         _df_mean = _df_out_grouped[['_dummy_delta']].mean().rename({'_dummy_delta': '_dummy_mean'}, axis=1)
         _df_std = _df_out_grouped[['_dummy_delta']].std().rename({'_dummy_delta': '_dummy_std'}, axis=1)
         _df_cutoff = _df_mean.join(_df_std).reset_index()
 
-        _df_out = pd.merge(_df_out, _df_cutoff, on=groupby, how='inner')
-        _df_out[col_to_filter] = np.where(
-            np.abs(_df_out['_dummy_delta'] - _df_out['_dummy_mean']) <= (std_cutoff * _df_out['_dummy_std']),
-            _df_out[col_to_filter], np.nan)
+        _df = pd.merge(_df, _df_cutoff, on=groupby, how='inner')
+        _df[col] = np.where(
+            np.abs(_df['_dummy_delta'] - _df['_dummy_mean']) <= (std_cutoff * _df['_dummy_std']),
+            _df[col], np.nan)
 
-        _df_out = _df_out.drop(['_dummy', '_dummy_mean', '_dummy_std', '_dummy_delta'], axis=1)
+        _df = _df.drop(['_dummy', '_dummy_mean', '_dummy_std', '_dummy_delta'], axis=1)
 
-    return _df_out
+    if '__groupby' in _df.columns:
+        _df = _df.drop('__groupby', axis=1)
 
-
-# highpass lowpass
-def butter_pass(cutoff, fs, order, btype):
-    _nyq = 0.5 * fs
-    _normal_cutoff = cutoff / _nyq
-    # noinspection PyTupleAssignmentBalance
-    _b, _a = signal.butter(order, _normal_cutoff, btype=btype, analog=False, output='ba')
-
-    return _b, _a
+    return _df
 
 
-def butter_pass_filter(data, cutoff, fs, order, btype, shift=False):
-    _valid_btype = ['high', 'low']
-    assert (btype in _valid_btype), 'btype must be one of {}'.format(_valid_btype)
+def butter_pass_filter(data: pd.Series, cutoff: int, fs: int, order: int, btype: str = None, shift: bool = False):
+    """
+    Implementation of a highpass / lowpass filter using scipy.signal.butter
+
+    :param data: pandas Series or 1d numpy Array
+    :param cutoff: cutoff
+    :param fs: critical frequencies
+    :param order: order of the fit
+    :param btype: The type of filter. Passed to scipy.signal.butter.  Default is ‘lowpass’.
+        One of {‘lowpass’, ‘highpass’, ‘bandpass’, ‘bandstop’}
+    :param shift: whether to shift the data to start at 0
+    :return: 1d numpy array containing the filtered data
+    """
+
+    def _f_butter_pass(_f_cutoff, _f_fs, _f_order, _f_btype):
+        _nyq = 0.5 * _f_fs
+        _normal_cutoff = _f_cutoff / _nyq
+        # noinspection PyTupleAssignmentBalance
+        __b, __a = signal.butter(_f_order, _normal_cutoff, btype=_f_btype, analog=False, output='ba')
+
+        return __b, __a
 
     _data = np.array(data)
 
@@ -257,7 +344,7 @@ def butter_pass_filter(data, cutoff, fs, order, btype, shift=False):
 
     _data -= _shift
 
-    _b, _a = butter_pass(cutoff=cutoff, fs=fs, order=order, btype=btype)
+    _b, _a = _f_butter_pass(_f_cutoff=cutoff, _f_fs=fs, _f_order=order, _f_btype=btype)
 
     _y = signal.lfilter(_b, _a, _data)
 
@@ -266,249 +353,183 @@ def butter_pass_filter(data, cutoff, fs, order, btype, shift=False):
     return _y
 
 
-def pass_by_group(df_in, col_to_filter, groupby, btype, shift=False, cutoff=1, fs=20, order=5):
-    _df_out = df_in.copy()
+def pass_by_group(df: pd.DataFrame, col: str, groupby: Union[str, list], btype: str, shift: bool = False,
+                  cutoff: int = 1, fs: int = 20, order: int = 5):
+    """
+    allows applying a butter_pass filter by group
 
-    _df_out_grouped = _df_out.groupby(groupby)
+    :param df: pandas DataFrame
+    :param col: column to filter
+    :param groupby: columns to groupby
+    :param btype: The type of filter. Passed to scipy.signal.butter.  Default is ‘lowpass’.
+        One of {‘lowpass’, ‘highpass’, ‘bandpass’, ‘bandstop’}
+    :param shift: shift: whether to shift the data to start at 0
+    :param cutoff: cutoff
+    :param fs: critical frequencies
+    :param order: order of the filter
+    :return: filtered DataFrame
+    """
+    _df = df.copy()
+    del df
+
+    _df_out_grouped = _df.groupby(groupby)
 
     # apply highpass filter
-    _df_out[col_to_filter] = np.concatenate(
-        _df_out_grouped[col_to_filter].apply(butter_pass_filter, cutoff, fs, order, btype, shift).values).flatten()
+    _df[col] = np.concatenate(
+        _df_out_grouped[col].apply(butter_pass_filter, cutoff, fs, order, btype, shift).values).flatten()
 
-    _df_out = _df_out.reset_index(drop=True)
+    _df = _df.reset_index(drop=True)
 
-    return _df_out
+    return _df
 
 
-# quick linear fit with numpy (for plotting)
-def lfit(x, y=None, w=None, do_print=False, i=0, i_max=0, catch_error=False, trigger_warning=True, return_df=False,
-         extrapolate=None):
-    if y is None:
-        _y = pd.Series(x).astype(float)
-        _x = pd.Series(range(len(_y))).astype(float)
+def lfit(x: Union[pd.Series, str], y: Union[pd.Series, str] = None, w: Union[pd.Series, str] = None,
+         df: pd.DataFrame = None, groupby: Union[list, str] = None, do_print: bool = True,
+         catch_error: bool = False, return_df: bool = False, extrapolate: bool = None):
+    """
+    quick linear fit with numpy
+
+    :param x: names of x variables in df or vector data, if y is None treated as target and fit against the index
+    :param y: names of y variables in df or vector data [optional]
+    :param w: names of weight variables in df or vector data [optional]
+    :param df: pandas DataFrame containing x,y,w data [optional]
+    :param groupby: If specified the linear fit is applied by group [optional]
+    :param do_print: whether to print steps to console
+    :param catch_error: whether to keep going in case of error [optional]
+    :param return_df: whether to return a DataFrame or Series [optional]
+    :param extrapolate: how many iteration to extrapolate [optional]
+    :return: if return_df is True: pandas DataFrame, else: pandas Series
+    """
+    if df is None:
+        if 'name' in dir(x):
+            _x_name = x.name
+        else:
+            _x_name = 'x'
+        if 'name' in dir(y):
+            _y_name = y.name
+        else:
+            _y_name = 'x'
+        if 'name' in dir(w):
+            _w_name = w.name
+        else:
+            _w_name = 'x'
+        _df = pd.DataFrame({
+            _x_name: x,
+            _y_name: y,
+            _w_name: w
+        })
     else:
-        _x = pd.Series(x).astype(float)
-        _y = pd.Series(y).astype(float)
-    _w = deepcopy(w)
-
-    if do_print:
-        progressbar(i=i, i_max=i_max, print_prefix='lfit ')
-
-    if ptypes.is_datetime64_any_dtype(_x):
-        _x = _x.astype(int)
-
-    _idx = np.isfinite(_x) & np.isfinite(_y)
-
-    if _w is not None:
-        _w_idx = _w[_idx]
-    else:
-        _w_idx = None
-
-    if catch_error:
-        try:
-            _fit = np.poly1d(np.polyfit(x=_x[_idx], y=_y[_idx], deg=1, w=_w_idx))
-        except ValueError:
-            if trigger_warning:
-                warnings.warn('error handled at step {}'.format(i))
-            _fit = None
-
-    else:
-        _fit = np.poly1d(np.polyfit(x=_x[_idx], y=_y[_idx], deg=1, w=_w_idx))
-
-    _x_diff = _x.diff().mean()
-    _x = list(_x)
-    _y = list(_y)
-
-    if _fit is None:
-        _y_fit = _y
-    else:
-
-        if extrapolate is not None:
-
-            for _ext in range(extrapolate):
-                _x.append(np.max(_x) + _x_diff)
-                _y.append(np.nan)
-
-        _y_fit = _fit(_x)
-
-    # so this works with numpy arrays or pd Series
-    if 'name' in dir(x):
-        _x_name = x.name
-    else:
-        _x_name = 'x'
-    if 'name' in dir(y):
-        _y_name = y.name
-    else:
-        _y_name = 'y'
-
+        _df = df.copy()
+        del df
+        _x_name = x
+        _y_name = y
+        _w_name = w
     _y_name_fit = '{}_fit'.format(_y_name)
 
-    df_fit = pd.DataFrame({_x_name: _x, _y_name: _y, _y_name_fit: _y_fit})
+    if groupby is None:
+        groupby = '__groupby'
+        _df[groupby] = 1
 
-    if return_df:
-        return df_fit
-    else:
-        return df_fit[_y_name_fit]
+    _it_max = _df[groupby].drop_duplicates().shape[0]
 
+    _df_fit = []
 
-# grouped version of above
-def grouped_lfit(df, x, y, groupby, do_print=False, display_rank_warning=True, return_df=False, catch_error=False,
-                 error_log=True, print_prefix='', **kwargs):
-    if not display_rank_warning:
-        # turn off rank warnings for linear fit
-        warnings.filterwarnings("ignore", category=np.RankWarning)
-
-    _i_max = len(df[groupby].drop_duplicates())
-    _i = 0
-
-    _dfs = []
-
-    # loop groups (used to be apply but was buggy)
-    for _index, _df in df.groupby(groupby):
-
-        _i += 1
+    for _it, (_index, _df_i) in enumerate(_df.groupby(groupby)):
 
         if do_print:
-            if (_i % 100 == 0) or (_i == _i_max):
-                tprint('{}lfit iteration {} / {}'.format(print_prefix, _i, _i_max))
+            progressbar(_it, _it_max, print_prefix=qformat(_index))
+
+        if y is None:
+            _x = _df_i.index
+            _y = _df_i[x]
+        else:
+            _x = _df_i[x]
+            _y = _df_i[y]
+        if w is not None:
+            _w = _df_i[w]
+        else:
+            _w = None
+
+        _x = _x.astype(float)
+        _y = _y.astype(float)
+        _w = _w.astype(float)
+
+        _idx = np.isfinite(_x) & np.isfinite(_y)
+
+        if _w is not None:
+            _w_idx = _w[_idx]
+        else:
+            _w_idx = None
 
         if catch_error:
             try:
-                _df_i = lfit(_df[x], _df[y], do_print=False, return_df=True, **kwargs)
-            except ValueError:
-                if error_log:
-                    print('error handled at {}'.format(_index))
-                _df_i = pd.DataFrame()
+                _fit = np.poly1d(np.polyfit(x=_x[_idx], y=_y[_idx], deg=1, w=_w_idx))
+            except Exception as _exc:
+                warnings.warn('handled exception: {}'.format(_exc))
+                _fit = None
         else:
-            _df_i = lfit(_df[x], _df[y], do_print=False, return_df=True, **kwargs)
+            _fit = np.poly1d(np.polyfit(x=_x[_idx], y=_y[_idx], deg=1, w=_w_idx))
 
-        # attach index information to output df
-        for _level_i in range(len(groupby)):
-            _groupby_var = groupby[_level_i]
-            _index_level = list(_index)[_level_i]
-            _df_i[_groupby_var] = _index_level
+        _x_diff = _x.diff().mean()
+        _x = list(_x)
+        _y = list(_y)
 
-        _dfs.append(_df_i)
+        if _fit is None:
+            _y_fit = _y
+        else:
 
-    _df_out = pd.concat(_dfs, ignore_index=True, sort=False)
+            if extrapolate is not None:
 
-    # reorder cols
-    _df_out = _df_out[groupby + [_x for _x in _df_out.columns if _x not in groupby]]
+                for _ext in range(extrapolate):
+                    _x.append(np.max(_x) + _x_diff)
+                    _y.append(np.nan)
 
-    if do_print:
-        tprint('lfit done')
+            _y_fit = _fit(_x)
+
+        _df_i[_x_name] = _x
+        _df_i[_y_name] = _y
+        _df_i[_y_name_fit] = _y_fit
+
+        _df_fit.append(_df_i)
+
+    _df_fit = df_merge(_df_fit)
 
     if return_df:
-        return _df_out
+        return _df_fit
     else:
-        return _df_out['{}_fit'.format(y)]
+        return _df_fit[_y_name_fit]
 
 
-# get coefficients of a linear regression in a sorted data frame
-def get_coefs(model, y):
-    _df = pd.DataFrame()
-
-    _coef = model.coef_.tolist()
-    _coef.append(model.intercept_)
-
-    _df['feature'] = y + ['intercept']
-    _df['coef'] = _coef
-
-    _df = _df.sort_values(['coef'], ascending=False).reset_index(drop=True)
-
-    _df['coef'] = np.round(_df['coef'], 5)
-
-    return _df
-
-
-# get feature importance of a decision tree like model in a sorted data frame
-def get_feature_importance(model, predictors, features_to_sum=None):
-    try:
-        _df = get_feature_importance_rf(model, predictors, features_to_sum)
-        # this is supposed to also work for XGBoost but it was broken in a recent release
-        # so below serves as fallback
-    except ValueError:
-        _df = get_feature_importance_xgb(model, predictors, features_to_sum)
-
-    return _df
-
-
-def get_feature_importance_rf(model, predictors, features_to_sum=None):
-    _feature_importances = model.feature_importances_
-
-    _df = pd.DataFrame()
-
-    _df['feature'] = predictors
-    _df['importance'] = _feature_importances
-
-    if features_to_sum is not None:
-
-        for _key in list(features_to_sum.keys()):
-            _df['feature'] = np.where(_df['feature'].isin(features_to_sum[_key]), _key, _df['feature'])
-            _df = _df.groupby('feature').sum().reset_index()
-
-    _df = _df.sort_values(['importance'], ascending=False).reset_index(drop=True)
-
-    _df['importance'] = np.round(_df['importance'], 5)
-
-    return _df
-
-
-# get feature importance of a decision tree like model in a sorted data frame
-def get_feature_importance_xgb(model, predictors, features_to_sum=None):
-    # get f_score
-    _f_score = model.get_booster().get_fscore()
-
-    # init df to return
-    _df = pd.DataFrame()
-
-    # get predictor code
-    _df['feature_code'] = list(_f_score.keys())
-    _df['feature_code'] = _df['feature_code'].str[1:].astype(int)
-
-    # code importance
-    _df['importance_abs'] = list(_f_score.values())
-    _df['importance'] = _df['importance_abs'] / _df['importance_abs'].sum()
-
-    _df = _df.sort_values(['feature_code']).reset_index(drop=True)
-
-    _df['feature'] = [predictors[x] for x in range(len(predictors)) if x in _df['feature_code']]
-
-    if features_to_sum is not None:
-
-        for _key in list(features_to_sum.keys()):
-            _df['feature'] = np.where(_df['feature'].isin(features_to_sum[_key]), _key, _df['feature'])
-            _df = _df.groupby('feature').sum().reset_index()
-
-    _df = _df.sort_values(['importance'], ascending=False).reset_index(drop=True)
-
-    _df['importance'] = np.round(_df['importance'], 5)
-
-    _df = _df[['feature', 'importance']]
-
-    return _df
-
-
-# quick filter based on ONE LINE of a target df
-def qf(df, filter_df, filter_iloc=0, remove_unused_categories=True, reset_index=True):
-    # avoid inplace operations
+def qf(df: pd.DataFrame, fltr: Union[pd.DataFrame, pd.Series, Mapping], remove_unused_categories: bool = True,
+       reset_index: bool = False):
+    """
+    quickly filter a DataFrame based on equal criteria. All columns of fltr present in df are filtered
+    to be equal to the first entry in filter_df.
+    :param df: pandas DataFrame to be filtered
+    :param fltr: filter condition as DataFrame or Mapping or Series
+    :param remove_unused_categories: whether to remove unused categories from categorical dtype after filtering
+    :param reset_index: whether to reset index after filtering
+    :return: filtered pandas DataFrame
+    """
     _df = df.copy()
+    del df
 
     # filter_df can also be a dictionary, in which case pd.DataFrame.from_dict will be applied
-    if isinstance(filter_df, collections.Mapping):
-        _filter_df = pd.DataFrame(filter_df, index=[0])
+    if isinstance(fltr, collections.Mapping):
+        _filter_df = pd.DataFrame(fltr, index=[0])
     # if the filter_df is a series, attempt to cast to data frame
-    elif isinstance(filter_df, pd.Series):
-        _filter_df = pd.DataFrame(filter_df).T
+    elif isinstance(fltr, pd.Series):
+        _filter_df = pd.DataFrame(fltr).T
     # assume it to be a DataFrame
     else:
-        _filter_df = filter_df.copy()
+        _filter_df = fltr.copy()
+        del fltr
 
     # drop columns not in
     _filter_df = _filter_df[list_intersection(_filter_df.columns, _df.columns)]
 
     # init filter
-    _filter_iloc = _filter_df.iloc[filter_iloc]
+    _filter_iloc = _filter_df.iloc[0]
 
     # create a dummy boolean of all trues with len of df
     _filter_condition = (_df.index == _df.index)
@@ -536,8 +557,15 @@ def qf(df, filter_df, filter_iloc=0, remove_unused_categories=True, reset_index=
     return _df
 
 
-# splits a numerical column into n quantiles
-def quantile_split(s, n, signif=2, na_to_med=False):
+def quantile_split(s: pd.Series, n: int, signif: int = 2, na_to_med: bool = False):
+    """
+    splits a numerical column into n quantiles. Useful for mapping numerical columns to categorical columns
+    :param s: pandas Series to be split
+    :param n: number of quantiles to split into
+    :param signif: number of significant digits to round to
+    :param na_to_med: whether to fill na values with median values
+    :return: pandas Series of dtype category
+    """
     if len(s.unique()) <= n:
         return s
 
@@ -588,7 +616,7 @@ def quantile_split(s, n, signif=2, na_to_med=False):
     return _s_out
 
 
-# shorthand accuracy
+# TODO - DOCUMENT
 def acc(y_true, y_pred, df=None):
     if df is None:
 
@@ -1904,7 +1932,7 @@ def numeric_to_group(pd_series, step=None, outer_limit=4, suffix=None, use_abs=F
 
 
 # select n elements form a categorical pandas series with the highest counts
-def top_n(s, n):
+def top_n(s: pd.Series, n: int) -> list:
     return list(s.value_counts().reset_index()['index'][:n])
 
 
