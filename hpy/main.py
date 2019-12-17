@@ -135,11 +135,9 @@ def tprint(*args, sep=' ', **kwargs):
     :param sep: separator
     :param kwargs: passed to print
     :return: None
-    :example:
-        >>>tprint('Hello World')
-        'Hello World'
-
     """
+    # TODO - EXAMPLES?
+    #  :example: >>>tprint('Hello World') 'Hello World'
     global global_tprint_len
 
     _string = ''
