@@ -135,6 +135,10 @@ def tprint(*args, sep=' ', **kwargs):
     :param sep: separator
     :param kwargs: passed to print
     :return: None
+    :example:
+        .. code-block:: python
+            tprint('Hello World')
+            'Hello World'
     """
     global global_tprint_len
 
@@ -216,7 +220,7 @@ def fprint(*args, file: str = '_print.txt', sep: str = ' ', mode: str = 'replace
         _txt.write(_string)
 
 
-def total_time(i: int, i_max: int) -> datetime.datetime:
+def total_time(i: int, i_max: int) -> datetime.timedelta:
     """
     Estimates total time of running operation by linear extrapolation using iteration counters.
 
@@ -230,7 +234,7 @@ def total_time(i: int, i_max: int) -> datetime.datetime:
     return _total_time
 
 
-def remaining_time(i: int, i_max: int) -> datetime.datetime:
+def remaining_time(i: int, i_max: int) -> datetime.timedelta:
     """
     Estimates remaining time of running operation by linear extrapolation using iteration counters.
 
@@ -253,8 +257,9 @@ def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', mid: str = None, 
     :param i_max: max iteration
     :param symbol: symbol that represents progress percentage
     :param mid: what to write in the middle of the progressbar, if mid is passed mode is ignored
-    :param mode: one of 'perc', 'total' or 'elapsed'. If perc is passed writes percentage. If 'remaining' or 'elapsed'
-        writes remaining or elapsed time respectively.
+    :param mode: {'perc', 'total', 'elapsed'}.
+        If perc is passed writes percentage. If 'remaining' or 'elapsed' writes remaining or elapsed time respectively.
+        [optional]
     :param print_prefix: what to write in front of the progressbar. Useful when calling progressbar multiple times
         from different functions.
     :param p_step: progressbar prints one symbol per p_step
@@ -331,7 +336,7 @@ def elapsed_time_init():
     global_t = datetime.datetime.now()
 
 
-def elapsed_time(do_return: bool = False, ref_t: datetime.datetime = None) -> datetime.datetime:
+def elapsed_time(do_return: bool = False, ref_t: datetime.datetime = None) -> datetime.timedelta:
     """
     Get the elapsed time since reference time ref_time.
 

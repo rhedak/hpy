@@ -23,7 +23,7 @@ copyright = '2019, Henrik Hanssen'
 author = 'Henrik Hanssen'
 
 # The full version, including alpha/beta/rc tags
-release = '0.0.1'
+release = '0.0.3'
 
 
 # -- General configuration ---------------------------------------------------

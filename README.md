@@ -1,7 +1,8 @@
 # HPY - Data Science convenience project
 
 
-Built with Python Package Template Project. 
+Built with [Python Package Template Project](https://github.com/AlexIoannides/py-package-template/). 
+
 My attempt at creating a convenient way to use different data science and machine learning operations and frameworks using one unified way.
 The main idea is to store data in pandas DataFrames and start from there.
 

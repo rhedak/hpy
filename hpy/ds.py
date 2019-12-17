@@ -21,7 +21,7 @@ except ImportError:
 from copy import deepcopy
 from scipy import stats, signal
 from scipy.spatial import distance
-from sklearn.metrics import r2_score, mean_squared_error
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, median_absolute_error
 
 # local imports
 from hpy.main import *
@@ -505,6 +505,7 @@ def qf(df: pd.DataFrame, fltr: Union[pd.DataFrame, pd.Series, Mapping], remove_u
     """
     quickly filter a DataFrame based on equal criteria. All columns of fltr present in df are filtered
     to be equal to the first entry in filter_df.
+
     :param df: pandas DataFrame to be filtered
     :param fltr: filter condition as DataFrame or Mapping or Series
     :param remove_unused_categories: whether to remove unused categories from categorical dtype after filtering
@@ -560,6 +561,7 @@ def qf(df: pd.DataFrame, fltr: Union[pd.DataFrame, pd.Series, Mapping], remove_u
 def quantile_split(s: pd.Series, n: int, signif: int = 2, na_to_med: bool = False):
     """
     splits a numerical column into n quantiles. Useful for mapping numerical columns to categorical columns
+
     :param s: pandas Series to be split
     :param n: number of quantiles to split into
     :param signif: number of significant digits to round to
@@ -616,8 +618,15 @@ def quantile_split(s: pd.Series, n: int, signif: int = 2, na_to_med: bool = Fals
     return _s_out
 
 
-# TODO - DOCUMENT
-def acc(y_true, y_pred, df=None):
+def acc(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None) -> float:
+    """
+    calculate accuracy for a categorical label
+
+    :param y_true: true values as name of df or vector data
+    :param y_pred: predicted values as name of df or vector data
+    :param df: pandas DataFrame containing true and predicted values [optional]
+    :return: accuracy a percentage
+    """
     if df is None:
 
         _y_true = y_true
@@ -632,8 +641,16 @@ def acc(y_true, y_pred, df=None):
     return _acc
 
 
-# relative accuracy of the prediction in comparison to predicting everything as the most common group
-def rel_acc(y_true, y_pred, df=None, target_class=None):
+def rel_acc(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None,
+            target_class: str = None):
+    """
+    relative accuracy of the prediction in comparison to predicting everything as the most common group
+    :param y_true: true values as name of df or vector data
+    :param y_pred: predicted values as name of df or vector data
+    :param df: pandas DataFrame containing true and predicted values [optional]
+    :param target_class: name of the target class, by default the most common one is used [otional]
+    :return: accuracy difference as percent
+    """
     if df is None:
 
         _y_true = 'y_true'
@@ -669,8 +686,14 @@ def rel_acc(y_true, y_pred, df=None, target_class=None):
     return _acc - _acc_mc
 
 
-# confusion matrix from pandas df
-def cm(y_true, y_pred, df=None):
+def cm(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFame = None) -> pd.DataFrame:
+    """
+    confusion matrix from pandas df
+    :param y_true: true values as name of df or vector data
+    :param y_pred: predicted values as name of df or vector data
+    :param df: pandas DataFrame containing true and predicted values [optional]
+    :return: Confusion matrix as pandas DataFrame
+    """
     if df is None:
 
         _y_true = deepcopy(y_true)
@@ -699,9 +722,19 @@ def cm(y_true, y_pred, df=None):
     return _cm
 
 
-# get true positive, true negative, missed positive and missed negative rate
+def f1_pr(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None, target: str = None,
+          factor: int = 100) -> pd.DataFrame:
+    """
+    get f1 score, true positive, true negative, missed positive and missed negative rate
 
-def f1_pr(y_true, y_pred, df=None, target=None, factor=100):
+    :param y_true: true values as name of df or vector data
+    :param y_pred: predicted values as name of df or vector data
+    :param df: pandas DataFrame containing true and predicted values [optional]
+    :param target: level for which to return the rates, by default all levels are returned [optional]
+    :param factor: factor by which to scale results, default 100 [optional]
+    :return: pandas DataFrame containing f1 score, true positive, true negative, missed positive
+        and missed negative rate
+    """
     if df is None:
 
         _y_true = deepcopy(y_true)
@@ -809,7 +842,20 @@ def f1_pr(y_true, y_pred, df=None, target=None, factor=100):
     return _f1_pr
 
 
-def f_score(y_true, y_pred, df=None, dropna=False, f=r2_score, groupby=None, f_name=None):
+def f_score(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None, dropna: bool = False,
+            f: Callable = r2_score, groupby: Union[list, str] = None, f_name: str = None) -> Union[pd.DataFrame, float]:
+    """
+    generic scoring function base on pandas DataFrame.
+
+    :param y_true: true values as name of df or vector data
+    :param y_pred: predicted values as name of df or vector data
+    :param df: pandas DataFrame containing true and predicted values [optional]
+    :param dropna: whether to dropna values [optional]
+    :param f: scoreing function to apply, default is sklearn.metrics.r2_score, should return a scalar value. [optional]
+    :param groupby: if supplied then the result is returned for each group level [optional]
+    :param f_name: name of the scoreing function, by default uses .__name__ property of fuction [optional]
+    :return: if groupby is supplied: pandas DataFrame, else: scalar value
+    """
     if df is None:
 
         _df = pd.DataFrame()
@@ -856,60 +902,97 @@ def f_score(y_true, y_pred, df=None, dropna=False, f=r2_score, groupby=None, f_n
 
 
 # shorthand r2
-def r2(*args, f=r2_score, **kwargs):
-    return f_score(*args, f=f, **kwargs)
+def r2(*args, **kwargs) -> Union[pd.DataFrame, float]:
+    """
+    wrapper for f_score using sklearn.metrics.r2_score
+
+    :param args: passed to f_score
+    :param kwargs: passed to f_score
+    :return: if groupby is supplied: pandas DataFrame, else: scalar value
+    """
+    return f_score(*args, f=r2_score, **kwargs)
 
 
-# shorthand rmse
-def rmse(*args, f=None, **kwargs):
-    def _f_rmse(x, y): return np.sqrt(mean_squared_error(x, y))
+def rmse(*args, **kwargs) -> Union[pd.DataFrame, float]:
+    """
+    wrapper for f_score using numpy.sqrt(skearn.metrics.mean_squared_error)
 
-    if f is None:
-        f = _f_rmse
+    :param args: passed to f_score
+    :param kwargs: passed to f_score
+    :return: if groupby is supplied: pandas DataFrame, else: scalar value
+    """
+    def _f_rmse(x, y):
+        return np.sqrt(mean_squared_error(x, y))
 
-    return f_score(*args, f=f, **kwargs)
-
-
-def mae(*args, f=None, **kwargs):
-    def _f_mae(x, y): return np.mean(np.abs(x - y))
-
-    if f is None:
-        f = _f_mae
-
-    return f_score(*args, f=f, **kwargs)
+    return f_score(*args, f=_f_rmse, **kwargs)
 
 
-def stdae(*args, f=None, **kwargs):
-    def _f_stdae(x, y): return np.std(np.abs(x - y))
+def mae(*args, **kwargs) -> Union[pd.DataFrame, float]:
+    """
+    wrapper for f_score using skearn.metrics.mean_absolute_error
 
-    if f is None:
-        f = _f_stdae
-
-    return f_score(*args, f=f, **kwargs)
-
-
-def medae(*args, f=None, **kwargs):
-    def _f_medae(x, y): return np.median(np.abs(x - y))
-
-    if f is None:
-        f = _f_medae
-
-    return f_score(*args, f=f, **kwargs)
+    :param args: passed to f_score
+    :param kwargs: passed to f_score
+    :return: if groupby is supplied: pandas DataFrame, else: scalar value
+    """
+    return f_score(*args, f=mean_absolute_error, **kwargs)
 
 
-def corr(*args, f=None, **kwargs):
-    def _f_corr(x, y): return x.corr(other=y)
+def stdae(*args, **kwargs) -> Union[pd.DataFrame, float]:
+    """
+    wrapper for f_score using the standard deviation of the absolute error
 
-    if f is None:
-        f = _f_corr
+    :param args: passed to f_score
+    :param kwargs: passed to f_score
+    :return: if groupby is supplied: pandas DataFrame, else: scalar value
+    """
+    def _f_stdae(x, y):
+        return np.std(np.abs(x - y))
 
-    return f_score(*args, f=f, **kwargs)
+    return f_score(*args, f=_f_stdae, **kwargs)
 
 
-def df_score(df, target, model_names=None, scores=None, pivot=True, scale=None,
-             groupby=None):
-    if model_names is None:
-        model_names = ['pred']
+def medae(*args, **kwargs) -> Union[pd.DataFrame, float]:
+    """
+    wrapper for f_score using skearn.metrics.median_absolute_error
+
+    :param args: passed to f_score
+    :param kwargs: passed to f_score
+    :return: if groupby is supplied: pandas DataFrame, else: scalar value
+    """
+    return f_score(*args, f=median_absolute_error, **kwargs)
+
+
+def corr(*args, **kwargs) -> Union[pd.DataFrame, float]:
+    """
+    wrapper for f_score using pandas.Series.corr
+
+    :param args: passed to f_score
+    :param kwargs: passed to f_score
+    :return: if groupby is supplied: pandas DataFrame, else: scalar value
+    """
+    def _f_corr(x, y): return pd.Series(x).corr(other=pd.Series(y))
+
+    return f_score(*args, f=_f_corr, **kwargs)
+
+
+def df_score(df: pd.DataFrame, y_true: str, pred_suffix: list = None, scores: list = None, pivot: bool = True,
+             scale: int = None, groupby: Union[list, str] = None) -> pd.DataFrame:
+    """
+    creates a DataFrame displaying various kind of scores
+
+    :param df: pandas DataFrame containing the true, pred data
+    :param y_true: name of the true variable inside df
+    :param pred_suffix: name of the predicted variable suffixes. Supports multiple predictions.
+        By default assumed suffix 'pred' [optional]
+    :param scores: scoring functions to be used [optional]
+    :param pivot: whether to pivot the DataFrame for easier readability [optional]
+    :param scale: a scale for multiplying the scores, default 1 [optional]
+    :param groupby: if supplied then the scores are calculated by group [optional]
+    :return: pandas DataFrame containing al the scores
+    """
+    if pred_suffix is None:
+        pred_suffix = ['pred']
     if scores is None:
         scores = ['r2', 'rmse', 'mae', 'stdae', 'medae']
     _df = df.copy()
@@ -921,8 +1004,8 @@ def df_score(df, target, model_names=None, scores=None, pivot=True, scale=None,
     else:
         _groupby = force_list(groupby)
 
-    _target = force_list(target)
-    _model_names = force_list(model_names)
+    _target = force_list(y_true)
+    _model_names = force_list(pred_suffix)
 
     if isinstance(scale, collections.Mapping):
         for _key, _value in scale.items():
