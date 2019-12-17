@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: hpy
-Version: 0.0.1
+Version: 0.0.2
 Summary: hpy - convenient data science
 Home-page: https://github.com/rhedak/hpy
 Author: Henrik Hanssen
@@ -9,13 +9,12 @@ License: Apache 2.0
 Description: # HPY - Data Science convenience project
         
         
-        Built with Python Package Template Project. 
+        Built with [Python Package Template Project](https://github.com/AlexIoannides/py-package-template/). 
+        
         My attempt at creating a convenient way to use different data science and machine learning operations and frameworks using one unified way.
         The main idea is to store data in pandas DataFrames and start from there.
         
         Also provides several extensions on pandas, matplotlib and seaborn for convenience.
-        
-        - 
         
         ## Installing
         
@@ -24,6 +23,10 @@ Description: # HPY - Data Science convenience project
         ```bash
         pip install git+https://github.com/rhedak/hpy
         ```
+        
+        ## Documentation
+        
+        Documentation is available at [https://hpy.readthedocs.io/](https://hpy.readthedocs.io/)
         
 Keywords: package development template
 Platform: UNKNOWN

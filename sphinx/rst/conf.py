@@ -12,19 +12,20 @@
 #
 import os
 import sys
-sys.path.append('/Users/hanssen.henrik/PycharmProjects/hpy/hpy/Users/hanssen.henrik/PycharmProjects/hpy/hpy')
-# sys.path.insert(0, os.path.abspath('.'))
-
+sys.path.append('/Users/hanssen.henrik/PycharmProjects/hpy/hpy')
 
 # -- Project information -----------------------------------------------------
 
 project = 'hpy'
+# noinspection PyShadowingBuiltins
 copyright = '2019, Henrik Hanssen'
 author = 'Henrik Hanssen'
 
 # The full version, including alpha/beta/rc tags
-release = '0.0.3'
-
+release = ''
+for _line in open("../../hpy/__version__.py", "r").read().split('\n'):
+    if '__version__' in _line and ' = ' in _line:
+        release = _line.split(' = ')[1].lstrip('\'').rstrip('\'')
 
 # -- General configuration ---------------------------------------------------
 

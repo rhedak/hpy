@@ -28,7 +28,7 @@ setup(
     include_package_data=True,
     python_requires=">=3.7.*",
     install_requires=['numpy', 'pandas', 'scipy', 'matplotlib', 'scikit-learn', 'seaborn', 'colour', 'pytest',
-                      'requests'],
+                      'requests', 'IPython', 'sphinx-automodapi'],
     license=about['__license__'],
     zip_safe=False,
     entry_points={
