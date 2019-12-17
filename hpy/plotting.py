@@ -399,7 +399,7 @@ def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=No
             alpha = .5
 
     # the actual plot
-    def _f_gaussian_histogram(_f_x, _f_data, _f_x_label, _f_facecolor, _f_distfit_color, _f_bins,
+    def _f_distplot(_f_x, _f_data, _f_x_label, _f_facecolor, _f_distfit_color, _f_bins,
                               _f_sigma_cutoff, _f_xlim, _f_distfit_line, _f_ax, _f_ax2):
 
         # make a copy to avoid inplace operations
@@ -559,7 +559,7 @@ def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=No
 
         if not is_list_like(bins):
             _x_step = (_x_max - _x_min) / bins
-            _bins = np.arange(_x_min, _x_max, _x_step)
+            _bins = np.arange(_x_min, _x_max + _x_step, _x_step)
 
             _plot_x_min = _df[_x].min() - _x_step
             _plot_x_max = _df[_x].max() + _x_step
@@ -569,7 +569,7 @@ def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=No
             _plot_x_max = np.max(bins)
 
         # just plot
-        ax, ax2 = _f_gaussian_histogram(_f_x=_x, _f_data=_df, _f_x_label=_x_name, _f_facecolor=face_color,
+        ax, ax2 = _f_distplot(_f_x=_x, _f_data=_df, _f_x_label=_x_name, _f_facecolor=face_color,
                                         _f_distfit_color=gauss_color,
                                         _f_bins=_bins, _f_sigma_cutoff=sigma_cutoff,
                                         _f_xlim=xlim, _f_distfit_line=distfit_line, _f_ax=ax, _f_ax2=ax2)
@@ -633,7 +633,7 @@ def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=No
         _plot_x_min = _df[_x].min() - _x_step
         _plot_x_max = _df[_x].max() + _x_step
 
-        _bins = np.arange(_x_min, _x_max, _x_step)
+        _bins = np.arange(_x_min, _x_max + _x_step, _x_step)
 
         for _it in range(len(_hues)):
 
@@ -655,7 +655,7 @@ def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=No
 
             _df_hue = _df[_df[hue] == _hue]
 
-            ax, ax2 = _f_gaussian_histogram(_f_x=_x, _f_data=_df_hue, _f_x_label=_hue, _f_facecolor=_color,
+            ax, ax2 = _f_distplot(_f_x=_x, _f_data=_df_hue, _f_x_label=_hue, _f_facecolor=_color,
                                             _f_distfit_color=_color, _f_bins=_bins,
                                             _f_sigma_cutoff=_sigma_cutoff_hues,
                                             _f_xlim=xlim, _f_distfit_line=_linestyle, _f_ax=ax, _f_ax2=ax2)
