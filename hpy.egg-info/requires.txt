@@ -7,3 +7,4 @@ seaborn
 colour
 pytest
 requests
+sphinx-automodapi
