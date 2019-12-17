@@ -30,9 +30,15 @@ global_tprint_len = 0  # for temporary printing
 # ----------------- classes and operators ------------------------
 
 class Infix:
-    """
-        Class for representing the pipe operator |__|
+    """Class for representing the pipe operator |__|
         The operator is based on the r %>% operator
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+
     """
     def __init__(self, function):
         self.__name__ = 'Infix'
@@ -60,45 +66,87 @@ __ = Infix(lambda _o, _f: _f(_o))
 
 # --- functions
 def today(date_format: str = '%Y_%m_%d') -> str:
-    """
-    Returns today's date as string
+    """Returns today's date as string
 
-    :param date_format: The formating string for the date. Passed to strftime
-    :return: Formated String
+    Parameters
+    ----------
+    date_format :
+        The formating string for the date. Passed to strftime
+    date_format: str :
+         (Default value = '%Y_%m_%d')
+
+    Returns
+    -------
+    type
+        Formated String
+
     """
     return datetime.datetime.today().strftime(date_format)
 
 
 # for pipe operator:
 def round1(x: float) -> float:
-    """
-    Wrapper for np.round with default digits 1
+    """Wrapper for np.round with default digits 1
 
-    :param x: float
-    :return: float
+    Parameters
+    ----------
+    x :
+        number to be rounded
+    x: float :
+        
+
+    Returns
+    -------
+    type
+        float
+
     """
     return np.round(x, 1)
 
 
 def round2(x: float) -> float:
-    """
-    Wrapper for np.round with default digits 2
+    """Wrapper for np.round with default digits 2
 
-    :param x: float
-    :return: float
+    Parameters
+    ----------
+    x :
+        number to be rounded
+    x: float :
+        
+
+    Returns
+    -------
+    type
+        float
+
     """
     return np.round(x, 2)
 
 
 # format bytes
 def size(byte: int, unit: str = 'MB', dec: int = 2) -> str:
-    """
-    Formats bytes as human readable string
+    """Formats bytes as human readable string
 
-    :param byte: The byte amount to be formated
-    :param unit: The unit to display the output in, supports 'KB', 'MB', 'GB' and 'TB'
-    :param dec: The number of decimals to use
-    :return: Formated bytes as string
+    Parameters
+    ----------
+    byte :
+        The byte amount to be formated
+    unit :
+        The unit to display the output in, supports 'KB', 'MB', 'GB' and 'TB'
+    dec :
+        The number of decimals to use
+    byte: int :
+        
+    unit: str :
+         (Default value = 'MB')
+    dec: int :
+         (Default value = 2)
+
+    Returns
+    -------
+    type
+        Formated bytes as string
+
     """
     _power = {'KB': 1, 'MB': 2, 'GB': 3, 'TB': 4}[unit]
 
@@ -107,13 +155,26 @@ def size(byte: int, unit: str = 'MB', dec: int = 2) -> str:
 
 # return memory usage more detailed than default
 def mem_usage(pandas_obj, *args, **kwargs) -> str:
-    """
-    Get memory usage of a pandas object
+    """Get memory usage of a pandas object
 
-    :param pandas_obj: Pandas object to get the memory usage of
-    :param args: passed to size()
-    :param kwargs: passed to size()
-    :return: memory usage of a pandas object formated as string
+    Parameters
+    ----------
+    pandas_obj :
+        Pandas object to get the memory usage of
+    args :
+        passed to size()
+    kwargs :
+        passed to size()
+    *args :
+        
+    **kwargs :
+        
+
+    Returns
+    -------
+    type
+        memory usage of a pandas object formated as string
+
     """
     if isinstance(pandas_obj, pd.DataFrame):
         _usage_b = pandas_obj.memory_usage(deep=True).sum()
@@ -126,18 +187,33 @@ def mem_usage(pandas_obj, *args, **kwargs) -> str:
 
 # print temporary text that will be overwritten by the next print
 def tprint(*args, sep=' ', **kwargs):
-    """
-    Wrapper for print() but with a carriage return at the end.
+    """Wrapper for print() but with a carriage return at the end.
     This results in the text being overwritten by the next print call.
     Can be used for progress bars and the like.
 
-    :param args: arguments to print
-    :param sep: separator
-    :param kwargs: passed to print
-    :return: None
+    Parameters
+    ----------
+    args : arguments to print
+        
+    sep : separator
+         (Default value = ' ')
+    kwargs : passed to print
+        
+    *args :
+        
+    **kwargs :
+        
+
+    Returns
+    -------
+    None
+        
+
+    Examples
+    --------
+    >>>tprint('Hello World')
+    'Hello World'
     """
-    # TODO - EXAMPLES?
-    #  :example: >>>tprint('Hello World') 'Hello World'
     global global_tprint_len
 
     _string = ''
@@ -168,18 +244,48 @@ def tprint(*args, sep=' ', **kwargs):
 # print to file
 def fprint(*args, file: str = '_print.txt', sep: str = ' ', mode: str = 'replace', append_sep: str = '\n',
            timestamp: bool = True, do_print: bool = False, do_tprint: bool = False):
-    """
-    Write the output of print to a file instead. Supports also writing to console.
+    """Write the output of print to a file instead. Supports also writing to console.
 
-    :param args: the arguments to print
-    :param file: the name of the file to print to
-    :param sep: separator
-    :param mode: weather to append or replace the contents of the file
-    :param append_sep: if mode=='append', use this separator
-    :param timestamp: weather to include a timestamp in the print statement
-    :param do_print: weather to also print to console
-    :param do_tprint: weather to also print to console using tprint
-    :return: None
+    Parameters
+    ----------
+    args :
+        the arguments to print
+    file :
+        the name of the file to print to
+    sep :
+        separator
+    mode :
+        weather to append or replace the contents of the file
+    append_sep :
+        if mode=='append', use this separator
+    timestamp :
+        weather to include a timestamp in the print statement
+    do_print :
+        weather to also print to console
+    do_tprint :
+        weather to also print to console using tprint
+    *args :
+        
+    file: str :
+         (Default value = '_print.txt')
+    sep: str :
+         (Default value = ' ')
+    mode: str :
+         (Default value = 'replace')
+    append_sep: str :
+         (Default value = '\n')
+    timestamp: bool :
+         (Default value = True)
+    do_print: bool :
+         (Default value = False)
+    do_tprint: bool :
+         (Default value = False)
+
+    Returns
+    -------
+    type
+        None
+
     """
     if file[-4:] != '.txt':
         file += '.txt'
@@ -218,12 +324,24 @@ def fprint(*args, file: str = '_print.txt', sep: str = ' ', mode: str = 'replace
 
 
 def total_time(i: int, i_max: int) -> datetime.timedelta:
-    """
-    Estimates total time of running operation by linear extrapolation using iteration counters.
+    """Estimates total time of running operation by linear extrapolation using iteration counters.
 
-    :param i: current iteration
-    :param i_max: max iteration
-    :return: datetime object representing estimated total time of operation
+    Parameters
+    ----------
+    i :
+        current iteration
+    i_max :
+        max iteration
+    i: int :
+        
+    i_max: int :
+        
+
+    Returns
+    -------
+    type
+        datetime object representing estimated total time of operation
+
     """
     _perc_f = i / i_max * 100
     _elapsed_time = elapsed_time(do_return=True)
@@ -232,12 +350,24 @@ def total_time(i: int, i_max: int) -> datetime.timedelta:
 
 
 def remaining_time(i: int, i_max: int) -> datetime.timedelta:
-    """
-    Estimates remaining time of running operation by linear extrapolation using iteration counters.
+    """Estimates remaining time of running operation by linear extrapolation using iteration counters.
 
-    :param i: current iteration
-    :param i_max: max iteration
-    :return: datetime object representing estimated remaining time of operation
+    Parameters
+    ----------
+    i :
+        current iteration
+    i_max :
+        max iteration
+    i: int :
+        
+    i_max: int :
+        
+
+    Returns
+    -------
+    type
+        datetime object representing estimated remaining time of operation
+
     """
     _elapsed_time = elapsed_time(do_return=True)
     _total_time = total_time(i, i_max)
@@ -247,23 +377,57 @@ def remaining_time(i: int, i_max: int) -> datetime.timedelta:
 
 def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', mid: str = None, mode: str = 'perc',
                 print_prefix: str = '', p_step: int = 1, printf: Callable = tprint, persist: bool = False, **kwargs):
-    """
-    Prints a progressbar for the currently running process based on iteration counters.
+    """Prints a progressbar for the currently running process based on iteration counters.
 
-    :param i: current iteration
-    :param i_max: max iteration
-    :param symbol: symbol that represents progress percentage
-    :param mid: what to write in the middle of the progressbar, if mid is passed mode is ignored
-    :param mode: {'perc', 'total', 'elapsed'}.
+    Parameters
+    ----------
+    i :
+        current iteration
+    i_max :
+        max iteration
+    symbol :
+        symbol that represents progress percentage
+    mid :
+        what to write in the middle of the progressbar, if mid is passed mode is ignored
+    mode :
+        perc', 'total', 'elapsed'}.
         If perc is passed writes percentage. If 'remaining' or 'elapsed' writes remaining or elapsed time respectively.
         [optional]
-    :param print_prefix: what to write in front of the progressbar. Useful when calling progressbar multiple times
+    print_prefix :
+        what to write in front of the progressbar. Useful when calling progressbar multiple times
         from different functions.
-    :param p_step: progressbar prints one symbol per p_step
-    :param printf: Using tprint by default. Use fprint to write to file instead.
-    :param persist: Whether to persist the progressbar after reaching 100 percent.
-    :param kwargs: Passed to print function
-    :return:
+    p_step :
+        progressbar prints one symbol per p_step
+    printf :
+        Using tprint by default. Use fprint to write to file instead.
+    persist :
+        Whether to persist the progressbar after reaching 100 percent.
+    kwargs :
+        Passed to print function
+    i: int :
+         (Default value = 1)
+    i_max: int :
+         (Default value = 1)
+    symbol: str :
+         (Default value = '=')
+    mid: str :
+         (Default value = None)
+    mode: str :
+         (Default value = 'perc')
+    print_prefix: str :
+         (Default value = '')
+    p_step: int :
+         (Default value = 1)
+    printf: Callable :
+         (Default value = tprint)
+    persist: bool :
+         (Default value = False)
+    **kwargs :
+        
+
+    Returns
+    -------
+
     """
     # uses tprint by default, pass fprint to write to file
 
@@ -324,22 +488,40 @@ def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', mid: str = None, 
 
 
 def elapsed_time_init():
-    """
-    Resets reference time for elapsed_time()
-
+    """Resets reference time for elapsed_time()
+    
     :return: None
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+
     """
     global global_t
     global_t = datetime.datetime.now()
 
 
 def elapsed_time(do_return: bool = False, ref_t: datetime.datetime = None) -> datetime.timedelta:
-    """
-    Get the elapsed time since reference time ref_time.
+    """Get the elapsed time since reference time ref_time.
 
-    :param do_return: Whether to return or print
-    :param ref_t: Reference time. If None is provided the time elapsed_time_init() was last called is used.
-    :return: In case of do_return: Datetime object containing the elapsed time. Else None.
+    Parameters
+    ----------
+    do_return :
+        Whether to return or print
+    ref_t :
+        Reference time. If None is provided the time elapsed_time_init() was last called is used.
+    do_return: bool :
+         (Default value = False)
+    ref_t: datetime.datetime :
+         (Default value = None)
+
+    Returns
+    -------
+    type
+        In case of do_return: Datetime object containing the elapsed time. Else None.
+
     """
     global global_t
     if ref_t is None:
@@ -354,26 +536,56 @@ def elapsed_time(do_return: bool = False, ref_t: datetime.datetime = None) -> da
 
 
 def time_to_str(t: datetime.datetime, time_format: str = '%Y-%m-%d') -> str:
-    """
-    Wrapper for strftime
+    """Wrapper for strftime
 
-    :param t: datetime object
-    :param time_format: time format, passed to strftime
-    :return: formated datetime as string
+    Parameters
+    ----------
+    t :
+        datetime object
+    time_format :
+        time format, passed to strftime
+    t: datetime.datetime :
+        
+    time_format: str :
+         (Default value = '%Y-%m-%d')
+
+    Returns
+    -------
+    type
+        formated datetime as string
+
     """
     return pd.to_datetime(t).strftime(time_format)
 
 
 # custom vectorize function (only works for 1 parameter)
 def cf_vec(x: Any, func: Callable, *args, **kwargs) -> Any:
-    """
-    Pandas compatible vectorize function. In case a DataFrame is passed the function is applied to all columns.
+    """Pandas compatible vectorize function. In case a DataFrame is passed the function is applied to all columns.
 
-    :param x: Any vector like object
-    :param func: Any function that should be vectorized
-    :param args: passed to func
-    :param kwargs: passed to func
-    :return: Vector like object
+    Parameters
+    ----------
+    x :
+        Any vector like object
+    func :
+        Any function that should be vectorized
+    args :
+        passed to func
+    kwargs :
+        passed to func
+    x: Any :
+        
+    func: Callable :
+        
+    *args :
+        
+    **kwargs :
+        
+
+    Returns
+    -------
+    type
+        Vector like object
+
     """
     # df
 
@@ -407,12 +619,24 @@ def cf_vec(x: Any, func: Callable, *args, **kwargs) -> Any:
 
 
 def round_signif_i(x: np.number, digits: int = 1) -> float:
-    """
-    Round to significant number of digits
+    """Round to significant number of digits
 
-    :param x: any number
-    :param digits: integer amount of significant digits
-    :return: float rounded to significant digits
+    Parameters
+    ----------
+    x :
+        any number
+    digits :
+        integer amount of significant digits
+    x: np.number :
+        
+    digits: int :
+         (Default value = 1)
+
+    Returns
+    -------
+    type
+        float rounded to significant digits
+
     """
     if not np.isfinite(x):
         return x
@@ -424,24 +648,51 @@ def round_signif_i(x: np.number, digits: int = 1) -> float:
 
 
 def round_signif(x: Any, *args, **kwargs) -> Any:
-    """
-    Round to significant number of digits
+    """Round to significant number of digits
 
-    :param x: any vector like object of numbers
-    :param args: passed to cf_vec
-    :param kwargs: passed to cf_vec
-    :return: Vector like object of floats rounded to significant digits
+    Parameters
+    ----------
+    x :
+        any vector like object of numbers
+    args :
+        passed to cf_vec
+    kwargs :
+        passed to cf_vec
+    x: Any :
+        
+    *args :
+        
+    **kwargs :
+        
+
+    Returns
+    -------
+    type
+        Vector like object of floats rounded to significant digits
+
     """
     return cf_vec(x, round_signif_i, *args, **kwargs)
 
 
 def floor_signif(x: Any, digits: int = 1) -> Any:
-    """
-    Floor to significant number of digits
+    """Floor to significant number of digits
 
-    :param x: any vector like object of numbers
-    :param digits: integer amount of significant digits
-    :return: float floored to significant digits
+    Parameters
+    ----------
+    x :
+        any vector like object of numbers
+    digits :
+        integer amount of significant digits
+    x: Any :
+        
+    digits: int :
+         (Default value = 1)
+
+    Returns
+    -------
+    type
+        float floored to significant digits
+
     """
     if x == 0:
         return 0
@@ -455,12 +706,24 @@ def floor_signif(x: Any, digits: int = 1) -> Any:
 
 
 def ceil_signif(x: Any, digits: int = 1) -> Any:
-    """
-    Ceil to significant number of digits
+    """Ceil to significant number of digits
 
-    :param x: any vector like object of numbers
-    :param digits: integer amount of significant digits
-    :return: float ceiled to significant digits
+    Parameters
+    ----------
+    x :
+        any vector like object of numbers
+    digits :
+        integer amount of significant digits
+    x: Any :
+        
+    digits: int :
+         (Default value = 1)
+
+    Returns
+    -------
+    type
+        float ceiled to significant digits
+
     """
     if x == 0:
         return 0
@@ -474,14 +737,32 @@ def ceil_signif(x: Any, digits: int = 1) -> Any:
 
 
 def concat_cols(df: pd.DataFrame, columns: list, sep: str = '_', to_int: bool = False) -> pd.Series:
-    """
-    Concat a number of columns of a pandas DataFrame
+    """Concat a number of columns of a pandas DataFrame
 
-    :param df: Pandas DataFrame
-    :param columns: Names of the columns to be concat
-    :param sep: Separator
-    :param to_int: If true: Converts columns to int before concatting
-    :return: Pandas Series containing the concat columns
+    Parameters
+    ----------
+    df :
+        Pandas DataFrame
+    columns :
+        Names of the columns to be concat
+    sep :
+        Separator
+    to_int :
+        If true: Converts columns to int before concatting
+    df: pd.DataFrame :
+        
+    columns: list :
+        
+    sep: str :
+         (Default value = '_')
+    to_int: bool :
+         (Default value = False)
+
+    Returns
+    -------
+    type
+        Pandas Series containing the concat columns
+
     """
     _df = df.copy()
     del df
@@ -504,33 +785,62 @@ def concat_cols(df: pd.DataFrame, columns: list, sep: str = '_', to_int: bool = 
 
 
 def list_unique(lst: list) -> list:
-    """
-    Returns unique elements from a list
+    """Returns unique elements from a list
 
-    :param lst: any list like object
-    :return: a list
+    Parameters
+    ----------
+    lst :
+        any list like object
+    lst: list :
+        
+
+    Returns
+    -------
+    type
+        a list
+
     """
     return list(dict.fromkeys(force_list(lst)))
 
 
 def list_flatten(lst: list) -> list:
-    """
-    Flatten a list of lists
+    """Flatten a list of lists
 
-    :param lst: list of lists
-    :return: flattened list
+    Parameters
+    ----------
+    lst :
+        list of lists
+    lst: list :
+        
+
+    Returns
+    -------
+    type
+        flattened list
+
     """
     return np.array(force_list(lst)).flat
 
 
 def list_merge(*args, unique=True, flatten=False) -> list:
-    """
-    Merges n lists together
+    """Merges n lists together
 
-    :param args: The lists to be merged together
-    :param unique: if True then duplicate elements will be dropped
-    :param flatten: if True then the individual lists will be flatten before merging
-    :return: The merged list
+    Parameters
+    ----------
+    args :
+        The lists to be merged together
+    unique :
+        if True then duplicate elements will be dropped (Default value = True)
+    flatten :
+        if True then the individual lists will be flatten before merging (Default value = False)
+    *args :
+        
+
+    Returns
+    -------
+    type
+        The merged list
+
     """
     _list = []
 
@@ -553,12 +863,24 @@ def list_merge(*args, unique=True, flatten=False) -> list:
 
 
 def list_intersection(lst: list, *args) -> list:
-    """
-    Returns common elements of n lists
+    """Returns common elements of n lists
 
-    :param lst: the first list
-    :param args: the subsequent lists
-    :return: the list of common elements
+    Parameters
+    ----------
+    lst :
+        the first list
+    args :
+        the subsequent lists
+    lst: list :
+        
+    *args :
+        
+
+    Returns
+    -------
+    type
+        the list of common elements
+
     """
     # more performant than list comprehension
     _list_out = list(lst)
@@ -571,15 +893,36 @@ def list_intersection(lst: list, *args) -> list:
 
 
 def rand(shape: tuple = None, lower: int = None, upper: int = None, step: int = None, seed: int = None) -> np.array:
-    """
-    A seedable wrapper for numpy.random.random_sample that allows for boundaries and steps
+    """A seedable wrapper for numpy.random.random_sample that allows for boundaries and steps
 
-    :param shape: A tuple containing the shape of the desired output array
-    :param lower: Lower bound of random numbers
-    :param upper: Upper bound of random numbers
-    :param step: Minimum step between random numbers
-    :param seed: Random Seed
-    :return: Numpy Array
+    Parameters
+    ----------
+    shape :
+        A tuple containing the shape of the desired output array
+    lower :
+        Lower bound of random numbers
+    upper :
+        Upper bound of random numbers
+    step :
+        Minimum step between random numbers
+    seed :
+        Random Seed
+    shape: tuple :
+         (Default value = None)
+    lower: int :
+         (Default value = None)
+    upper: int :
+         (Default value = None)
+    step: int :
+         (Default value = None)
+    seed: int :
+         (Default value = None)
+
+    Returns
+    -------
+    type
+        Numpy Array
+
     """
     # seed
     if seed is not None:
@@ -609,11 +952,20 @@ def rand(shape: tuple = None, lower: int = None, upper: int = None, step: int = 
 
 
 def dict_list(*args) -> dict:
-    """
-    Creates a dictionary of empty named lists. Useful for iteratively creating a pandas DataFrame
+    """Creates a dictionary of empty named lists. Useful for iteratively creating a pandas DataFrame
 
-    :param args: The names of the lists
-    :return: Dictionary of empty named lists
+    Parameters
+    ----------
+    args :
+        The names of the lists
+    *args :
+        
+
+    Returns
+    -------
+    type
+        Dictionary of empty named lists
+
     """
     _dict = {}
 
@@ -625,13 +977,30 @@ def dict_list(*args) -> dict:
 
 
 def append_to_dict_list(dct: dict, append: Union[dict, list], inplace: bool = True) -> Union[dict, None]:
-    """
-    Appends to a dictionary of named lists. Useful for iteratively creating a pandas DataFrame.
+    """Appends to a dictionary of named lists. Useful for iteratively creating a pandas DataFrame.
 
-    :param dct: dictionary to append to
-    :param append: List of Dictionary of values to append
-    :param inplace: Modify inplace or return modified copy
-    :return: None if inplace, else modified dictionary
+    Parameters
+    ----------
+    dct :
+        dictionary to append to
+    append :
+        List of Dictionary of values to append
+    inplace :
+        Modify inplace or return modified copy
+    dct: dict :
+        
+    append: Union[dict :
+        
+    list] :
+        
+    inplace: bool :
+         (Default value = True)
+
+    Returns
+    -------
+    type
+        None if inplace, else modified dictionary
+
     """
     if inplace:
         _dic = dct
@@ -661,21 +1030,39 @@ def append_to_dict_list(dct: dict, append: Union[dict, list], inplace: bool = Tr
 
 
 def is_list_like(obj: Any) -> bool:
-    """
-    Checks any python object to see if it is list like
+    """Checks any python object to see if it is list like
 
-    :param obj: Any python object
-    :return: Boolean
+    Parameters
+    ----------
+    obj :
+        Any python object
+    obj: Any :
+        
+
+    Returns
+    -------
+    type
+        Boolean
+
     """
     return isinstance(obj, collections.Iterable) and not isinstance(obj, (str, bytes))
 
 
 def force_list(*args) -> list:
-    """
-    Takes any python object and turns it into an iterable list.
+    """Takes any python object and turns it into an iterable list.
 
-    :param args: Any python object
-    :return: List
+    Parameters
+    ----------
+    args :
+        Any python object
+    *args :
+        
+
+    Returns
+    -------
+    type
+        List
+
     """
     args = list(args)
 
@@ -707,20 +1094,62 @@ def force_list(*args) -> list:
 
 def qformat(value: Any, int_format: str = ',', float_format: str = ',.2f', datetime_format: str = '%Y-%m-%d',
             sep: str = ' - ', key_sep: str = ': ', print_key: bool = True) -> str:
-    """
-    Creates a human readable representation of a generic python object
+    """Creates a human readable representation of a generic python object
 
-    :param value: Any python object
-    :param int_format: Format string for integer
-    :param float_format: Format string for float
-    :param datetime_format: Format string for datetime
-    :param sep: Separator
-    :param key_sep: Separator used between key and value if print_key is True
-    :param print_key: weather to print keys as well as values (if object has keys)
-    :return: Formated string
+    Parameters
+    ----------
+    value :
+        Any python object
+    int_format :
+        Format string for integer
+    float_format :
+        Format string for float
+    datetime_format :
+        Format string for datetime
+    sep :
+        Separator
+    key_sep :
+        Separator used between key and value if print_key is True
+    print_key :
+        weather to print keys as well as values (if object has keys)
+    value: Any :
+        
+    int_format: str :
+         (Default value = ')
+    ' :
+        
+    float_format: str :
+         (Default value = ')
+    .2f' :
+        
+    datetime_format: str :
+         (Default value = '%Y-%m-%d')
+    sep: str :
+         (Default value = ' - ')
+    key_sep: str :
+         (Default value = ': ')
+    print_key: bool :
+         (Default value = True)
+
+    Returns
+    -------
+    type
+        Formated string
+
     """
 
     def _qformat(_value_i: Any) -> str:
+        """
+
+        Parameters
+        ----------
+        _value_i: Any :
+            
+
+        Returns
+        -------
+
+        """
 
         if is_list_like(_value_i):
             _value_i = str(_value_i)
@@ -771,11 +1200,23 @@ def qformat(value: Any, int_format: str = ',', float_format: str = ',.2f', datet
 
 
 def tdelta(*args, **kwargs) -> datetime.timedelta:
-    """
-    Wrapper for numpy.timedelta64
+    """Wrapper for numpy.timedelta64
 
-    :param args: passed to numpy.timedelta64
-    :param kwargs: passed to numpy.timedelta64
-    :return: Timedelta object
+    Parameters
+    ----------
+    args :
+        passed to numpy.timedelta64
+    kwargs :
+        passed to numpy.timedelta64
+    *args :
+        
+    **kwargs :
+        
+
+    Returns
+    -------
+    type
+        Timedelta object
+
     """
     return np.timedelta64(*args, **kwargs)
