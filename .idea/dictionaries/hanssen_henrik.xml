@@ -1,11 +1,13 @@
 <component name="ProjectDictionaryState">
   <dictionary name="hanssen.henrik">
     <words>
+      <w>aggfunc</w>
       <w>aggkws</w>
       <w>aggplot</w>
       <w>anim</w>
       <w>animplot</w>
       <w>autodoc</w>
+      <w>bandstop</w>
       <w>barh</w>
       <w>barplot</w>
       <w>btype</w>
@@ -25,14 +27,17 @@
       <w>distfit</w>
       <w>distplot</w>
       <w>dropna</w>
+      <w>dtype</w>
       <w>edgecolor</w>
       <w>facecolor</w>
       <w>figsize</w>
+      <w>fltr</w>
       <w>formated</w>
       <w>formating</w>
       <w>fprint</w>
       <w>frac</w>
       <w>fwhm</w>
+      <w>ggplot</w>
       <w>groupby</w>
       <w>hacky</w>
       <w>hanssen</w>
@@ -91,12 +96,15 @@
       <w>scoreplot</w>
       <w>seaborn</w>
       <w>seedable</w>
+      <w>sharex</w>
+      <w>sharey</w>
       <w>signif</w>
       <w>sklearn</w>
       <w>stdae</w>
       <w>stemplot</w>
       <w>strftime</w>
       <w>subax</w>
+      <w>suptitle</w>
       <w>tdelta</w>
       <w>ticklabels</w>
       <w>tprint</w>
@@ -108,6 +116,7 @@
       <w>vlines</w>
       <w>xerr</w>
       <w>xkcd</w>
+      <w>xlabel</w>
       <w>xlim</w>
       <w>xticklabels</w>
       <w>yaxis</w>
