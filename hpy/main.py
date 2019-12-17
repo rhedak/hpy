@@ -254,9 +254,9 @@ def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', mid: str = None, 
     :param symbol: symbol that represents progress percentage
     :param mid: what to write in the middle of the progressbar, if mid is passed mode is ignored
     :param mode: one of 'perc', 'total' or 'elapsed'. If perc is passed writes percentage. If 'remaining' or 'elapsed'
-    writes remaining or elapsed time respectively.
+        writes remaining or elapsed time respectively.
     :param print_prefix: what to write in front of the progressbar. Useful when calling progressbar multiple times
-    from different functions.
+        from different functions.
     :param p_step: progressbar prints one symbol per p_step
     :param printf: Using tprint by default. Use fprint to write to file instead.
     :param persist: Whether to persist the progressbar after reaching 100 percent.

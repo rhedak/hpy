@@ -17,4 +17,4 @@ pip install git+https://github.com/rhedak/hpy
 
 ## Documentation
 
-Documentation is available at [https://hpy.readthedocs.io/]()
+Documentation is available at [https://hpy.readthedocs.io/](https://hpy.readthedocs.io/)
