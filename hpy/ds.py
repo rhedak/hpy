@@ -686,7 +686,7 @@ def rel_acc(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd
     return _acc - _acc_mc
 
 
-def cm(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFame = None) -> pd.DataFrame:
+def cm(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None) -> pd.DataFrame:
     """
     confusion matrix from pandas df
     :param y_true: true values as name of df or vector data
