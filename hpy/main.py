@@ -136,13 +136,12 @@ def tprint(*args, sep=' ', **kwargs):
     :param kwargs: passed to print
     :return: None
     :example:
-        code-block:: python
         >>>tprint('Hello World')
         'Hello World'
+
     """
     global global_tprint_len
 
-    # print(_whitespace_len)
     _string = ''
     _arg_len = 0
 
