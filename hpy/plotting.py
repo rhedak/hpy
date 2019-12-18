@@ -1288,7 +1288,7 @@ def facet_wrap(func, data, facet, *args, col_wrap=4, width=4, height=9 / 2, catc
 def get_subax(ax, row=None, col=None, rows_prio=True) -> Axes:
     # rows_prio decides if to use row or col in case of a 1xn / nx1 shape (false means cols get priority)
 
-    if isinstance(ax, np.array):
+    if isinstance(ax, np.ndarray):
         _dims = len(ax.shape)
     else:
         _dims = 0
