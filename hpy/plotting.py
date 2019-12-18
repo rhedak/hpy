@@ -502,7 +502,7 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
                 _ax.plot(__x, _y, linestyle=_f_distfit_line, color=_f_distfit_color, alpha=alpha, linewidth=2,
                          label=_label_2, **kwargs)
                 if not show_hist and _f_fill:
-                    _ax.fill_between(_f_bins, _y, color=_f_facecolor, alpha=alpha)
+                    _ax.fill_between(__x, _y, color=_f_facecolor, alpha=alpha)
 
             _f_ax2.get_yaxis().set_visible(False)
 
