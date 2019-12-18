@@ -17,7 +17,7 @@ import sys
 import datetime
 
 # third party imports
-from typing import Any, AnyStr, Callable, Union
+from typing import Any, Callable, Union
 
 # --- init
 pd.plotting.register_matplotlib_converters()

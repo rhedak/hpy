@@ -40,6 +40,7 @@
       <w>frac</w>
       <w>fwhm</w>
       <w>ggplot</w>
+      <w>gridf</w>
       <w>groupby</w>
       <w>hacky</w>
       <w>hanssen</w>
@@ -51,7 +52,9 @@
       <w>hspace</w>
       <w>iloc</w>
       <w>importances</w>
+      <w>isin</w>
       <w>iterpolate</w>
+      <w>iterrows</w>
       <w>kdeplot</w>
       <w>kwhist</w>
       <w>kwline</w>
@@ -99,8 +102,10 @@
       <w>scatterplot</w>
       <w>scikit</w>
       <w>scipy</w>
+      <w>scoreing</w>
       <w>scoreplot</w>
       <w>seaborn</w>
+      <w>secaxis</w>
       <w>seedable</w>
       <w>sharex</w>
       <w>sharey</w>

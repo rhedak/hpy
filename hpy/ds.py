@@ -7,24 +7,22 @@ Contains DataScience functions extending on pandas and sklearn
 """
 
 # standard imports
-from collections import Mapping
-
-import pandas.api.types as ptypes
-from sklearn.preprocessing import StandardScaler
-
-try:
-    import h5py
-except ImportError:
-    h5py = None
+import numpy as np
+import pandas as pd
+import warnings
 
 # third party imports
 from copy import deepcopy
+from typing import Callable, Union
 from scipy import stats, signal
 from scipy.spatial import distance
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, median_absolute_error
+from sklearn.preprocessing import StandardScaler
+from collections import Mapping
 
 # local imports
-from hpy.main import *
+from hpy.main import export, force_list, tprint, progressbar, qformat, list_intersection, round_signif, is_list_like, \
+    dict_list, append_to_dict_list, concat_cols, tdelta
 
 
 # --- pandas styles
@@ -255,7 +253,7 @@ def drop_duplicate_cols(df: pd.DataFrame) -> pd.DataFrame:
 
 
 @export
-def change_span(s: pd.Series, steps:int = 5) -> pd.Series :
+def change_span(s: pd.Series, steps: int = 5) -> pd.Series:
     """
     return a True/False series around a changepoint, used for filtering stepwise data series in a pandas df
     must be properly sorted!
@@ -530,7 +528,7 @@ def qf(df: pd.DataFrame, fltr: Union[pd.DataFrame, pd.Series, Mapping], remove_u
     del df
 
     # filter_df can also be a dictionary, in which case pd.DataFrame.from_dict will be applied
-    if isinstance(fltr, collections.Mapping):
+    if isinstance(fltr, Mapping):
         _filter_df = pd.DataFrame(fltr, index=[0])
     # if the filter_df is a series, attempt to cast to data frame
     elif isinstance(fltr, pd.Series):
@@ -665,7 +663,7 @@ def rel_acc(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd
     :param y_true: true values as name of df or vector data
     :param y_pred: predicted values as name of df or vector data
     :param df: pandas DataFrame containing true and predicted values [optional]
-    :param target_class: name of the target class, by default the most common one is used [otional]
+    :param target_class: name of the target class, by default the most common one is used [optional]
     :return: accuracy difference as percent
     """
     if df is None:
@@ -1004,7 +1002,7 @@ def corr(*args, **kwargs) -> Union[pd.DataFrame, float]:
 
 @export
 def df_score(df: pd.DataFrame, y_true: str, pred_suffix: list = None, scores: list = None, pivot: bool = True,
-             scale: int = None, groupby: Union[list, str] = None) -> pd.DataFrame:
+             scale: Union[dict, list, int] = None, groupby: Union[list, str] = None) -> pd.DataFrame:
     """
     creates a DataFrame displaying various kind of scores
 
@@ -1034,13 +1032,14 @@ def df_score(df: pd.DataFrame, y_true: str, pred_suffix: list = None, scores: li
     _target = force_list(y_true)
     _model_names = force_list(pred_suffix)
 
-    if isinstance(scale, collections.Mapping):
+    if isinstance(scale, Mapping):
         for _key, _value in scale.items():
             _df[_key] *= _value
             for _model_name in _model_names:
                 _df['{}_{}'.format(_key, _model_name)] *= _value
     elif is_list_like(scale):
         _i = -1
+        # noinspection PyTypeChecker
         for _scale in scale:
             _i += 1
             _df[_target[_i]] *= _scale

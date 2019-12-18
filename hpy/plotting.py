@@ -7,9 +7,14 @@ Contains plotting functions
 """
 
 # standard imports
+from copy import deepcopy
+
+import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 import logging
+import warnings
 
 # third party imports
 from matplotlib.axes import Axes
@@ -17,6 +22,8 @@ from matplotlib import patches
 from matplotlib.animation import FuncAnimation
 from matplotlib.legend import Legend
 from colour import Color
+from scipy import stats
+from collections import Mapping
 
 try:
     from IPython.core.display import HTML
@@ -24,7 +31,8 @@ except ImportError:
     HTML = None
 
 # local imports
-from hpy.ds import *
+from hpy.main import export, concat_cols, is_list_like, floor_signif, ceil_signif, tprint, list_intersection
+from hpy.ds import get_df_corr, lfit, kde, df_count, quantile_split, top_n_coding, df_rmsd, df_agg
 
 # colors for plotting
 
@@ -46,13 +54,14 @@ rcParams = {
     'fig_height': 8
 }
 
-# loop
-for _i in range(5):
-    rcParams['palette'] += rcParams['palette']
-    rcParams['hatches'] += rcParams['hatches']
+# # loop
+# for _i in range(5):
+#     rcParams['palette'] += rcParams['palette']
+#     rcParams['hatches'] += rcParams['hatches']
 
 
 # --- functions
+@export
 def heatmap(x: str, y: str, z: str, data: pd.DataFrame, figsize: tuple = rcParams['figsize_square'], ax: Axes = None,
             cmap: object = None, invert_y: bool = True, **kwargs) -> Axes:
     """
@@ -136,7 +145,7 @@ def corrplot_bar(data, target=None, columns=None, corr_cutoff=0, corr_as_alpha=F
 
     # filter columns (if applicable)
     if columns is not None:
-        _columns = deepcopy(columns)
+        _columns = columns + []
         if target is not None and target not in _columns:
             _columns.append(target)
         _df_corr = _df_corr[(_df_corr['col_0'].isin(_columns)) & (_df_corr['col_1'].isin(_columns))]
@@ -226,8 +235,8 @@ def pairwise_corrplot(df, corr_cutoff=.5, ncols=4, hue=None, width=rcParams['fig
             _df_hue = _df[_df[hue] == _hue]
             _df_corr_hue = get_df_corr(_df_hue, target=target)
 
-            _df_hues[_hue] = deepcopy(_df_hue)
-            _df_corrs[_hue] = deepcopy(_df_corr_hue)
+            _df_hues[_hue] = _df_hue.copy()
+            _df_corrs[_hue] = _df_corr_hue.copy()
 
     # get df corr
     _df_corr = get_df_corr(_df, target=target)
@@ -293,7 +302,7 @@ def pairwise_corrplot(df, corr_cutoff=.5, ncols=4, hue=None, width=rcParams['fig
                 _color = palette[_hue_i]
 
                 _df_hue = _df_hues[_hue]
-                _df_corr_hue = deepcopy(_df_corrs[_hue])
+                _df_corr_hue = _df_corrs[_hue].copy()
 
                 # sometimes it can happen that the correlation is not possible to calculate because
                 # one of those values does not change in the hue level
@@ -639,14 +648,14 @@ def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=No
 
             _hue = _hues[_it]
 
-            if isinstance(pattern, collections.Mapping):
+            if isinstance(pattern, Mapping):
                 _color = pattern[_hue]
             elif is_list_like(pattern):
                 _color = pattern[_it]
             else:
                 _color = pattern
 
-            if isinstance(distfit_line, collections.Mapping):
+            if isinstance(distfit_line, Mapping):
                 _linestyle = distfit_line[_hue]
             elif is_list_like(distfit_line):
                 _linestyle = distfit_line[_it]
@@ -849,7 +858,7 @@ def level_histogram(df, cols, level, hue=None, level_colors=None, pattern=None, 
 
             _df[hue] = _df[hue].replace(hue_labels)
 
-            if isinstance(pattern, collections.Mapping):
+            if isinstance(pattern, Mapping):
 
                 for _key in hue_labels.keys():
 
@@ -858,7 +867,7 @@ def level_histogram(df, cols, level, hue=None, level_colors=None, pattern=None, 
 
         for _level_i, _level in enumerate(_levels):
 
-            if isinstance(level_colors, collections.Mapping):
+            if isinstance(level_colors, Mapping):
                 _level_color = level_colors[_level]
             elif is_list_like(level_colors):
                 _level_color = level_colors[_level_i]
@@ -1206,7 +1215,7 @@ def facet_wrap(func, data, facet, *args, col_wrap=4, width=4, height=9 / 2, catc
                 func(*_args, data=_df_facet, ax=_ax, **kwargs)
             except Exception as _exc:
                 warnings.warn('could not plot facet {} with exception {}, skipping. '
-                              'For details use catch_error=False'.format(_exc,_facet_i))
+                              'For details use catch_error=False'.format(_exc, _facet_i))
                 _ax.set_axis_off()
                 continue
         else:
@@ -1914,7 +1923,7 @@ def aggplot2dy(y, x, **kwargs):
 
 
 def insert_linebreak(s, pos=None, frac=None, max_breaks=None):
-    _s = deepcopy(s)
+    _s = s + ''
 
     if pos is not None:
         _pos = pos
@@ -2094,7 +2103,7 @@ def animplot(data=None, x='x', y='y', t='t', lines=None, max_interval=None, inte
             else:
                 _vline = vline
 
-            if isinstance(color, collections.Mapping):
+            if isinstance(color, Mapping):
                 if _y in color.keys():
                     _color = color[_y]
                 else:
@@ -2117,7 +2126,7 @@ def animplot(data=None, x='x', y='y', t='t', lines=None, max_interval=None, inte
 
             if label is None:
                 _label = _y
-            elif isinstance(label, collections.Mapping):
+            elif isinstance(label, Mapping):
                 _label = label[_y]
             elif is_list_like(label):
                 _label = label[_it]
@@ -2309,7 +2318,7 @@ def animplot(data=None, x='x', y='y', t='t', lines=None, max_interval=None, inte
                 _ax_i.set_title('{}{}'.format(_title_prefix, _t_str))
 
             # -- facecolor --
-            if isinstance(ax_facecolor, collections.Mapping):
+            if isinstance(ax_facecolor, Mapping):
 
                 for _key_i in list(ax_facecolor.keys()):
 
@@ -2406,7 +2415,7 @@ def lcurveplot(train, test, labels=None, legend='upper right', ax=None, figsize=
             _label_test = test.name
         else:
             _label_test = 'test'
-    elif isinstance(labels, collections.Mapping):
+    elif isinstance(labels, Mapping):
         _label_train = labels['train']
         _label_test = labels['test']
     elif is_list_like(labels):
@@ -2519,7 +2528,7 @@ def from_to_plot(data: pd.DataFrame, x_from='x_from', x_to='x_to', y_from=0, y_t
                 _label = _name + ''
                 _labels.append(_label)
 
-        if isinstance(palette, collections.Mapping):
+        if isinstance(palette, Mapping):
             _color = palette[_name]
         elif is_list_like(palette):
             _color = palette[_labels.index(_name)]
@@ -2534,8 +2543,8 @@ def from_to_plot(data: pd.DataFrame, x_from='x_from', x_to='x_to', y_from=0, y_t
     return ax
 
 
-def vlineplot(data, palette=None, label=None, legend=True, legend_loc=None, ax=None, figsize=plt.rcParams['figure.figsize'],
-              **kwargs):
+def vlineplot(data, palette=None, label=None, legend=True, legend_loc=None, ax=None,
+              figsize=plt.rcParams['figure.figsize'], **kwargs):
     # defaults
     if ax is None:
         _, ax = plt.subplots(figsize=figsize)
@@ -2558,7 +2567,7 @@ def vlineplot(data, palette=None, label=None, legend=True, legend_loc=None, ax=N
                 _label = _name + ''
                 _labels.append(_label)
 
-        if isinstance(palette, collections.Mapping):
+        if isinstance(palette, Mapping):
             _color = palette[_name]
         elif is_list_like(palette):
             _color = palette[_labels.index(_name)]
@@ -2608,7 +2617,7 @@ def set_axlim(ax, lim, xy=None):
     elif xy == 'y':
         ax.set_ylim(lim)
     else:
-        if isinstance(lim, collections.Mapping):
+        if isinstance(lim, Mapping):
             ax.set_xlim(lim['x'])
             ax.set_xlim(lim['y'])
         else:
@@ -2713,7 +2722,7 @@ def replace_xticklabels(ax, mapping):
 
         _text = _label.get_text()
 
-        if isinstance(mapping, collections.Mapping):
+        if isinstance(mapping, Mapping):
             if _text in mapping.keys():
                 _new_label = mapping[_text]
             else:
@@ -2733,7 +2742,7 @@ def replace_yticklabels(ax, mapping):
 
         _text = _label.get_text()
 
-        if isinstance(mapping, collections.Mapping):
+        if isinstance(mapping, Mapping):
             if _text in mapping.keys():
                 _new_label = mapping[_text]
             else:
@@ -2748,9 +2757,10 @@ def replace_yticklabels(ax, mapping):
 
 def kdeplot(x, data=None, *args, hue=None, hue_order=None, bins=40, adj_x_range=False, baseline=0, highlight_peaks=True,
             show_kde=True, show_hist=True, show_area=False, area_center='mean', ha='center', va='center',
-            legend_loc='upper right', palette=None, text_offset=15, nr_format=',.2f', figsize=plt.rcParams['figure.figsize'],
-            kwline=None, perc=False, facecolor=None, sigma_color='xkcd:blue', sigma_2_color='xkcd:cyan',
-            kde_color='black', edgecolor='black', alpha=.5, ax=None, ax2=None, kwhist=None, **kwargs):
+            legend_loc='upper right', palette=None, text_offset=15, nr_format=',.2f',
+            figsize=plt.rcParams['figure.figsize'], kwline=None, perc=False, facecolor=None, sigma_color='xkcd:blue',
+            sigma_2_color='xkcd:cyan', kde_color='black', edgecolor='black', alpha=.5, ax=None, ax2=None, kwhist=None,
+            **kwargs):
     # -- init
     if palette is None:
         palette = rcParams['palette']
@@ -2806,7 +2816,7 @@ def kdeplot(x, data=None, *args, hue=None, hue_order=None, bins=40, adj_x_range=
 
         _df_kde, _df_kde_ex = kde(x=x, df=_df_hue, *args, **kwargs)
 
-        if isinstance(palette, collections.Mapping):
+        if isinstance(palette, Mapping):
             _color = palette[_hue]
         elif is_list_like(palette):
             _color = palette[_it]
@@ -3018,7 +3028,8 @@ def histplot(x=None, data=None, hue=None, hue_order=None, ax=None, bins=30, use_
     if data is not None:
         # avoid inplace operations
         _df_plot = data.copy()
-        _x = deepcopy(x)
+        del data
+        _x = x
     else:
         # create dummy df
         _df_plot = pd.DataFrame.from_dict({'x': x})
@@ -3134,7 +3145,8 @@ def countplot(x=None, data=None, hue=None, ax=None, order='default', hue_order=N
         if normalize_x:
             ax.set_ylabel('perc')
 
-    if hue is None and normalize_hue: ax.set_ylabel('perc')
+    if hue is None and normalize_hue:
+        ax.set_ylabel('perc')
 
     if annotate:
         # add annotation
@@ -3150,7 +3162,8 @@ def countplot(x=None, data=None, hue=None, ax=None, order='default', hue_order=N
         ax.legend(**legend_kws)
 
     # tick rotation
-    if x_tick_rotation is not None: ax.xaxis.set_tick_params(rotation=x_tick_rotation)
+    if x_tick_rotation is not None:
+        ax.xaxis.set_tick_params(rotation=x_tick_rotation)
 
     # total count on secaxis
     if count_twinx:
@@ -3159,9 +3172,12 @@ def countplot(x=None, data=None, hue=None, ax=None, order='default', hue_order=N
 
         count_twinx_kws_keys = list(count_twinx_kws.keys())
 
-        if 'marker' not in count_twinx_kws_keys: count_twinx_kws['marker'] = '_'
-        if 'color' not in count_twinx_kws_keys: count_twinx_kws['color'] = 'k'
-        if 'alpha' not in count_twinx_kws_keys: count_twinx_kws['alpha'] = .5
+        if 'marker' not in count_twinx_kws_keys:
+            count_twinx_kws['marker'] = '_'
+        if 'color' not in count_twinx_kws_keys:
+            count_twinx_kws['color'] = 'k'
+        if 'alpha' not in count_twinx_kws_keys:
+            count_twinx_kws['alpha'] = .5
 
         _ax.scatter(_x, _count_x, data=_df_count[[x, _count_x]].drop_duplicates(), **count_twinx_kws)
         _ax.set_ylabel('count')
@@ -3223,4 +3239,3 @@ def quantile_plot(x, data=None, qs=None, x2=None, hue=None, to_abs=False, ax=Non
     ax.set_ylabel(_label)
 
     return ax
-

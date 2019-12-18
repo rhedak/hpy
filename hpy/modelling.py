@@ -9,15 +9,25 @@ to provide convenient train text functions.
 
 # standard imports
 import itertools
+import warnings
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # third party imports
+from copy import deepcopy
+from collections import Mapping
+
 try:
     from IPython.core import display
 except ImportError:
     display = None
 
 # local imports
-from hpy.plotting import *
+from hpy.main import export, is_list_like, force_list, tprint, dict_list, append_to_dict_list
+from hpy.ds import df_merge
+from hpy.plotting import ax_as_list, legend_outside
 
 
 # --- classes
@@ -56,7 +66,7 @@ class _BaseModel:
             if 'to_dict' in dir(_attr):
                 _attr = _attr.to_dict()
             elif is_list_like(_attr):
-                if isinstance(_attr, collections.Mapping):
+                if isinstance(_attr, Mapping):
                     for _key, _value in _attr.items():
                         if 'to_dict' in dir(_value):
                             _attr[_key] = _value.to_dict()
@@ -75,7 +85,7 @@ class _BaseModel:
                 continue
             _attr = dic[_attr_name]
             if is_list_like(_attr):
-                if isinstance(_attr, collections.Mapping):
+                if isinstance(_attr, Mapping):
 
                     if '__name__' in _attr.keys():
 
@@ -91,7 +101,7 @@ class _BaseModel:
 
                         for _attr_key, _attr_value in _attr.items():
 
-                            if isinstance(_attr_value, collections.Mapping):
+                            if isinstance(_attr_value, Mapping):
 
                                 if '__name__' in _attr_value.keys():
 
@@ -108,7 +118,7 @@ class _BaseModel:
 
                         _attr_value = _attr[_i]
 
-                        if isinstance(_attr_value, collections.Mapping):
+                        if isinstance(_attr_value, Mapping):
 
                             if '__name__' in _attr_value.keys():
 
@@ -136,6 +146,7 @@ class _BaseModel:
         return deepcopy(self)
 
 
+@export
 class Model(_BaseModel):
 
     def __init__(self, model=None, name='pred', X_ref=None, y_ref=None, trans=None, inv_trans=None, y_trans_lim=None):
@@ -295,6 +306,7 @@ class Model(_BaseModel):
             raise ValueError('{} is not a valid return_type'.format(return_type))
 
 
+@export
 class Ensemble(_BaseModel):
 
     def __init__(self, *args, name=None, X_ref=None, y_ref=None):
@@ -374,6 +386,7 @@ class Ensemble(_BaseModel):
 
 
 # A collection of Model and Ensemble Regressors
+@export
 class Models(_BaseModel):
 
     def __init__(self, *args, name=None, df=None, X_ref=None, y_ref=None, scaler_X=None, scaler_y=None):
@@ -620,7 +633,7 @@ class Models(_BaseModel):
         else:
             _df = None
 
-        if isinstance(scale, collections.Mapping):
+        if isinstance(scale, Mapping):
             for _key, _value in scale.items():
                 _df[_key] *= _value
                 for _model_name in self.model_names:
@@ -742,7 +755,7 @@ def dict_to_model(dic):
 
 
 def force_model(model):
-    if not isinstance(model, collections.Mapping):
+    if not isinstance(model, Mapping):
         return model
 
     if '__name__' in model.keys():
@@ -774,69 +787,70 @@ def get_coefs(model, y):
 
 
 # get feature importance of a decision tree like model in a sorted data frame
+@export
 def get_feature_importance(model, predictors, features_to_sum=None):
+
+    def _get_feature_importance_rf(_f_model, _f_predictors, _f_features_to_sum=None):
+
+        _feature_importances = _f_model.feature_importances_
+
+        __df = pd.DataFrame()
+
+        __df['feature'] = _f_predictors
+        __df['importance'] = _feature_importances
+
+        if _f_features_to_sum is not None:
+
+            for _key in list(_f_features_to_sum.keys()):
+                __df['feature'] = np.where(__df['feature'].isin(_f_features_to_sum[_key]), _key, __df['feature'])
+                __df = __df.groupby('feature').sum().reset_index()
+
+        __df = __df.sort_values(['importance'], ascending=False).reset_index(drop=True)
+
+        __df['importance'] = np.round(__df['importance'], 5)
+
+        return __df
+
+    # get feature importance of a decision tree like model in a sorted data frame
+    def _get_feature_importance_xgb(_f_model, _f_predictors, _f_features_to_sum=None):
+        # get f_score
+        _f_score = _f_model.get_booster().get_fscore()
+
+        # init df to return
+        __df = pd.DataFrame()
+
+        # get predictor code
+        __df['feature_code'] = list(_f_score.keys())
+        __df['feature_code'] = __df['feature_code'].str[1:].astype(int)
+
+        # code importance
+        __df['importance_abs'] = list(_f_score.values())
+        __df['importance'] = __df['importance_abs'] / __df['importance_abs'].sum()
+
+        __df = __df.sort_values(['feature_code']).reset_index(drop=True)
+
+        __df['feature'] = [_f_predictors[x] for x in range(len(_f_predictors)) if x in __df['feature_code']]
+
+        if _f_features_to_sum is not None:
+
+            for _key in list(_f_features_to_sum.keys()):
+                __df['feature'] = np.where(__df['feature'].isin(_f_features_to_sum[_key]), _key, __df['feature'])
+                __df = __df.groupby('feature').sum().reset_index()
+
+        __df = __df.sort_values(['importance'], ascending=False).reset_index(drop=True)
+
+        __df['importance'] = np.round(__df['importance'], 5)
+
+        __df = __df[['feature', 'importance']]
+
+        return __df
+
     try:
-        _df = get_feature_importance_rf(model, predictors, features_to_sum)
+        _df = _get_feature_importance_rf(model, predictors, features_to_sum)
         # this is supposed to also work for XGBoost but it was broken in a recent release
         # so below serves as fallback
     except ValueError:
-        _df = get_feature_importance_xgb(model, predictors, features_to_sum)
-
-    return _df
-
-
-def get_feature_importance_rf(model, predictors, features_to_sum=None):
-    _feature_importances = model.feature_importances_
-
-    _df = pd.DataFrame()
-
-    _df['feature'] = predictors
-    _df['importance'] = _feature_importances
-
-    if features_to_sum is not None:
-
-        for _key in list(features_to_sum.keys()):
-            _df['feature'] = np.where(_df['feature'].isin(features_to_sum[_key]), _key, _df['feature'])
-            _df = _df.groupby('feature').sum().reset_index()
-
-    _df = _df.sort_values(['importance'], ascending=False).reset_index(drop=True)
-
-    _df['importance'] = np.round(_df['importance'], 5)
-
-    return _df
-
-
-# get feature importance of a decision tree like model in a sorted data frame
-def get_feature_importance_xgb(model, predictors, features_to_sum=None):
-    # get f_score
-    _f_score = model.get_booster().get_fscore()
-
-    # init df to return
-    _df = pd.DataFrame()
-
-    # get predictor code
-    _df['feature_code'] = list(_f_score.keys())
-    _df['feature_code'] = _df['feature_code'].str[1:].astype(int)
-
-    # code importance
-    _df['importance_abs'] = list(_f_score.values())
-    _df['importance'] = _df['importance_abs'] / _df['importance_abs'].sum()
-
-    _df = _df.sort_values(['feature_code']).reset_index(drop=True)
-
-    _df['feature'] = [predictors[x] for x in range(len(predictors)) if x in _df['feature_code']]
-
-    if features_to_sum is not None:
-
-        for _key in list(features_to_sum.keys()):
-            _df['feature'] = np.where(_df['feature'].isin(features_to_sum[_key]), _key, _df['feature'])
-            _df = _df.groupby('feature').sum().reset_index()
-
-    _df = _df.sort_values(['importance'], ascending=False).reset_index(drop=True)
-
-    _df['importance'] = np.round(_df['importance'], 5)
-
-    _df = _df[['feature', 'importance']]
+        _df = _get_feature_importance_xgb(model, predictors, features_to_sum)
 
     return _df
 
@@ -867,11 +881,11 @@ def get_feature_importance_xgb(model, predictors, features_to_sum=None):
 #         target = target[0]
 #         warnings.warn('target cannot be a list for grid_search, using {}'.format(target))
 #
-#     # you can pass a dataframe or a dictionary as grid
+#     # you can pass a DataFrame or a dictionary as grid
 #     if isinstance(grid, pd.DataFrame):
 #         _grid = grid.copy()
 #         del grid
-#     elif isinstance(grid, collections.Mapping):
+#     elif isinstance(grid, Mapping):
 #
 #         # expand gridf
 #
@@ -879,7 +893,7 @@ def get_feature_importance_xgb(model, predictors, features_to_sum=None):
 #         del grid
 #
 #     else:
-#         raise 'grid should be a dictionary or dataframe'
+#         raise 'grid should be a dictionary or DataFrame'
 #
 #     # if a number of random combinations to try was passed, use it to sample grid
 #     if n_random is not None:
@@ -931,7 +945,7 @@ def get_feature_importance_xgb(model, predictors, features_to_sum=None):
 #             if 'cm' in _dict['cm'][target].keys(): _score = _dict['cm'][target]['f1_pr']
 #             _score = _dict['cm'][target]['cm_test']
 #         else:
-#             raise ValueError('Unkown opt_score_tpye {}'.format(opt_score_type))
+#             raise ValueError('Unknown opt_score_type {}'.format(opt_score_type))
 #
 #         if opt_class is not None: _score = _score[_score.index == opt_class]
 #
@@ -984,7 +998,7 @@ def get_feature_importance_xgb(model, predictors, features_to_sum=None):
 #     else:
 #         _predictors_it = predictors_it
 #
-#     ## empty dict so that it can become a dataframe
+#     ## empty dict so that it can become a DtaFrame
 #     _df_score = []
 #
 #     _i = 0
@@ -994,7 +1008,7 @@ def get_feature_importance_xgb(model, predictors, features_to_sum=None):
 #
 #         _i += 1
 #
-#         if isinstance(_predictor, collections.Mapping):
+#         if isinstance(_predictor, Mapping):
 #             _predictor_name = list(_predictor.keys())[0]
 #             _predictor_value = _predictor[_predictor_name]
 #         else:
@@ -1092,7 +1106,7 @@ def get_feature_importance_xgb(model, predictors, features_to_sum=None):
 #
 #                 for _predictor in _predictors_it:
 #
-#                     if not isinstance(_predictor, collections.Mapping):
+#                     if not isinstance(_predictor, Mapping):
 #                         _predictors_it_new.append(_predictor)
 #                     else:
 #                         if not _best['predictor'] in _predictor.keys(): _predictors_it_new.append(_predictor)
@@ -1162,7 +1176,7 @@ def get_feature_importance_xgb(model, predictors, features_to_sum=None):
 #
 #         # if the len is zero no improvements are possible -> quit
 #         if _df_score_base.shape[0] == 0:
-#             if do_print: print('{}no improvments possible, quitting'.format(_print_prefix))
+#             if do_print: print('{}no improvements possible, quitting'.format(_print_prefix))
 #             break
 #
 #         # get all predictors that made improvements:
@@ -1212,7 +1226,7 @@ def get_feature_importance_xgb(model, predictors, features_to_sum=None):
 #
 #                     for _predictor in _predictors_it:
 #
-#                         if not isinstance(_predictor, collections.Mapping):
+#                         if not isinstance(_predictor, Mapping):
 #                             _predictors_it_new.append(_predictor)
 #                         else:
 #                             if not _new_predictor_name in _predictor.keys(): _predictors_it_new.append(_predictor)
@@ -1343,7 +1357,7 @@ def get_feature_importance_xgb(model, predictors, features_to_sum=None):
 #
 #         if _removed == 0:
 #             tprint('')
-#             print('no improvements possible, qutting')
+#             print('no improvements possible, quitting')
 #             break
 #
 #         _predictors_it = deepcopy(_predictors_it_new)
