@@ -452,18 +452,18 @@ def lfit(x: Union[pd.Series, str], y: Union[pd.Series, str] = None, w: Union[pd.
 
         if y is None:
             _x = _df_i.index
-            _y = _df_i[x]
+            _y = _df_i[_x_name]
         else:
-            _x = _df_i[x]
-            _y = _df_i[y]
+            _x = _df_i[_x_name]
+            _y = _df_i[_y_name]
         if w is not None:
-            _w = _df_i[w]
+            _w = _df_i[_w_name]
+            _w = _w.astype(float)
         else:
             _w = None
 
         _x = _x.astype(float)
         _y = _y.astype(float)
-        _w = _w.astype(float)
 
         _idx = np.isfinite(_x) & np.isfinite(_y)
 
