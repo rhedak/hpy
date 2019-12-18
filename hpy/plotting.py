@@ -1307,7 +1307,7 @@ def get_subax(ax, row=None, col=None, rows_prio=True) -> Axes:
 
 
 def ax_as_list(ax):
-    if isinstance(ax, np.array):
+    if isinstance(ax, np.ndarray):
         _dims = len(ax.shape)
     else:
         _dims = 0
@@ -1324,7 +1324,7 @@ def ax_as_list(ax):
 
 def ax_as_array(ax):
 
-    if isinstance(ax, np.array):
+    if isinstance(ax, np.ndarray):
         if len(ax.shape) == 2:
             return ax
         else:
@@ -2631,7 +2631,7 @@ def share_xy(ax, x=True, y=True, mode='all', adj_twin_ax=True):
     if y:
         _xys.append('y')
 
-    if isinstance(ax, np.array):
+    if isinstance(ax, np.ndarray):
         _dims = len(ax.shape)
     else:
         _dims = 0
