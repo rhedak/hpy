@@ -292,7 +292,7 @@ def pairwise_corrplot(df, corr_cutoff=.5, ncols=4, hue=None, width=rcParams['fig
         if hue is None:
 
             # actual plot
-            _f_plot(_f_x=_x, _f_y=_y, _f_data=_df, _f_color=None, _f_color_trendline='k', _f_label=None, _f_ax=ax)
+            _f_plot(_f_x=_x, _f_y=_y, _f_data=_df, _f_color=None, _f_color_trendline='k', _f_label=None, _f_ax=_ax)
 
         else:
 
