@@ -62,7 +62,7 @@ rcParams = {
 
 # --- functions
 @export
-def heatmap(x: str, y: str, z: str, data: pd.DataFrame, figsize: tuple = rcParams['figsize_square'], ax: Axes = None,
+def heatmap(x: str, y: str, z: str, data: pd.DataFrame, ax: Axes = None,
             cmap: object = None, invert_y: bool = True, **kwargs) -> Axes:
     """
         wrapper for seaborn heatmap in x-y-z format
@@ -70,8 +70,7 @@ def heatmap(x: str, y: str, z: str, data: pd.DataFrame, figsize: tuple = rcParam
     :param y: Variable name for y axis value
     :param z: Variable name for z value, used to color the heatmap
     :param data: Data Frame or similar containing the named data
-    :param figsize: Size of the generated figure
-    :param ax: Axes object to plot on. If None a new axes of size figsize is generated
+    :param ax: Axes object to plot on. If None a new axes is generated
     :param cmap: Color map to use
     :param invert_y: Weather to call ax.invert_yaxis (orders the heatmap as expected)
     :param kwargs: Other keyword arguments passed to seaborn heatmap
@@ -83,7 +82,7 @@ def heatmap(x: str, y: str, z: str, data: pd.DataFrame, figsize: tuple = rcParam
     _df = data.groupby([x, y]).agg({z: 'mean'}).reset_index().pivot(x, y, z)
 
     if ax is None:
-        _, ax = plt.subplots(figsize=figsize)
+        _, ax = plt.subplots()
 
     sns.heatmap(_df, ax=ax, cmap=cmap, **kwargs)
     ax.set_title(z)
@@ -94,13 +93,12 @@ def heatmap(x: str, y: str, z: str, data: pd.DataFrame, figsize: tuple = rcParam
     return ax
 
 
-def corrplot(data, width=1, annotations=True, number_format='.2f', ax=None):
+def corrplot(data, annotations=True, number_format='.2f', ax=None):
     """
         function to create a correlation plot using a seaborn heatmap
         based on: https://www.linkedin.com/pulse/generating-correlation-heatmaps-seaborn-python-andrew-holt
     :param number_format: The format string used for the annotations
     :param data: Data Frame or similar containing the named data
-    :param width: Width of each individual cell in the corrplot
     :param annotations: whether to annotate the corrplot with the correlation coefficients
     :param ax: The Axes object to draw on. If None a new one is generated
     :return: The Axes object with the plot on it
@@ -108,11 +106,8 @@ def corrplot(data, width=1, annotations=True, number_format='.2f', ax=None):
     # Create Correlation df
     _corr = data.corr()
 
-    _size = len(_corr) * width
-
-    # Plot figsize
     if ax is None:
-        _, ax = plt.subplots(figsize=(_size, _size))
+        _, ax = plt.subplots()
     # Generate Color Map
     _colormap = sns.diverging_palette(220, 10, as_cmap=True)
 
@@ -133,8 +128,7 @@ def corrplot(data, width=1, annotations=True, number_format='.2f', ax=None):
 
 
 # print a bar corrplot
-def corrplot_bar(data, target=None, columns=None, corr_cutoff=0, corr_as_alpha=False, fix_x_range=True, ax=None,
-                 figsize=(10, 10)):
+def corrplot_bar(data, target=None, columns=None, corr_cutoff=0, corr_as_alpha=False, fix_x_range=True, ax=None):
     _df_corr = get_df_corr(data, target=target)
     _df_corr = _df_corr[_df_corr['corr_abs'] >= corr_cutoff]
 
@@ -166,7 +160,7 @@ def corrplot_bar(data, target=None, columns=None, corr_cutoff=0, corr_as_alpha=F
     # _df_corr['color'] = np.where(_df_corr['corr']>0,'blue','red')
 
     if ax is None:
-        _, ax = plt.subplots(figsize=figsize)
+        _, ax = plt.subplots()
 
     _rgba_colors = np.round(_rgba_colors, 2)
 
@@ -337,7 +331,7 @@ def pairwise_corrplot(df, corr_cutoff=.5, ncols=4, hue=None, width=rcParams['fig
 def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=None, hue_sort_type='count',
              hue_round=1, face_color='cyan', gauss_color='black', edgecolor='gray', alpha=None, bins=40, perc=None,
              top_nr=5, other_name='other', title=True, title_prefix='', value_name='column_value',
-             sigma_cutoff=3, figsize=plt.rcParams['figure.figsize'], show_hist=True, distfit='kde', show_grid=False,
+             sigma_cutoff=3, show_hist=True, distfit='kde', show_grid=False,
              legend=True, legend_loc='bottom', legend_space=None, legend_ncol=1, agg_func='mean',
              number_format='.2f', kde_steps=1000, max_n=100000, random_state=None, sample_warn=True, xlim=None,
              distfit_line=None, label_style='mu_sigma', ax=None, **kwargs):
@@ -545,7 +539,7 @@ def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=No
 
     # init plot
     if ax is None:
-        _, ax = plt.subplots(figsize=figsize)
+        _, ax = plt.subplots()
     ax2 = ax.twinx()
 
     # hue case
@@ -697,7 +691,7 @@ def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=No
 
 # 2d histogram
 def hist_2d(x, y, data, bins=100, std_cutoff=3, cutoff_perc=.01, cutoff_abs=0, cmap='rainbow', ax=None,
-            figsize=(10, 10), color_sigma='xkcd:red', draw_sigma=True, **kwargs):
+            color_sigma='xkcd:red', draw_sigma=True, **kwargs):
     _df = data.copy()
     del data
 
@@ -731,7 +725,7 @@ def hist_2d(x, y, data, bins=100, std_cutoff=3, cutoff_perc=.01, cutoff_abs=0, c
 
     # Plot 2D histogram using pcolor
     if ax is None:
-        _, ax = plt.subplots(figsize=figsize)
+        _, ax = plt.subplots()
 
     _mappable = ax.pcolormesh(_x_edges, _y_edges, _hist, cmap=cmap, **kwargs)
     ax.set_xlabel(x)
@@ -1022,10 +1016,8 @@ def get_legends(ax):
     return [c for c in ax.get_children() if isinstance(c, Legend)]
 
 
-# a plot to compare four components of a dataframe
-def four_comp_plot(data, x_1, y_1, x_2, y_2, hue_1=None, hue_2=None,
-                   lim=None, return_fig_ax=False,
-                   **kwargs):
+# a plot to compare four components of a DataFrame
+def four_comp_plot(data, x_1, y_1, x_2, y_2, hue_1=None, hue_2=None, lim=None, return_fig_ax=False, **kwargs):
     # you can pass the hues to use or if none are given the default ones (std,plus/minus) are used
     # you can pass xlim and y_lim or assume default (4 std)
 
@@ -1036,7 +1028,7 @@ def four_comp_plot(data, x_1, y_1, x_2, y_2, hue_1=None, hue_2=None,
     _ncols = 2
 
     # init plot
-    fig, ax = plt.subplots(ncols=_ncols, nrows=_nrows, figsize=(16, 9))
+    fig, ax = plt.subplots(ncols=_ncols, nrows=_nrows)
 
     # make a copy yo avoid inplace operations
     _df_plot = data.copy()
@@ -1381,7 +1373,7 @@ def bubbleplot(x, y, hue, s, text=None, text_as_label=False, color=None, data=No
             _df['_color'] = _df[color]
 
     if ax is None:
-        fig, ax = plt.subplots(figsize=(10, 10))
+        fig, ax = plt.subplots()
 
     # draw ellipse to mark 1 sigma area
     if show_std:
@@ -1528,7 +1520,7 @@ def bubblecountplot(x, y, hue, data, agg_function='median', show_std=True, top_n
 
 
 # plot rmsd
-def rmsdplot(x, data, groups=None, hue=None, hue_order=None, cutoff=0, ax=None, figsize=(10, 10),
+def rmsdplot(x, data, groups=None, hue=None, hue_order=None, cutoff=0, ax=None,
              color_as_balance=True, balance_cutoff=None, rmsd_as_alpha=False, sort_by_hue=False,
              line_break_kws=None, barh_kws=None, palette=None, **kwargs):
     if palette is None:
@@ -1603,7 +1595,7 @@ def rmsdplot(x, data, groups=None, hue=None, hue_order=None, cutoff=0, ax=None, 
         _rgba_colors[:, 3] = 1
 
     if ax is None:
-        _, ax = plt.subplots(figsize=figsize)
+        _, ax = plt.subplots()
 
     # make positions from labels
 
@@ -1874,7 +1866,7 @@ def aggplot(x, data, group, hue=None, width=16, height=9 / 2,
 
 
 def aggplot2d(x, y, data, aggfunc='mean', ax=None, x_int=None, time_int=None,
-              figsize=plt.rcParams['figure.figsize'], color=rcParams['palette'][0], as_abs=False):
+              color=rcParams['palette'][0], as_abs=False):
     # time int should be something like '<M8[D]'
     # D can be any datetime unit from numpy https://docs.scipy.org/doc/numpy-1.13.0/reference/arrays.datetime.html
 
@@ -1899,7 +1891,7 @@ def aggplot2d(x, y, data, aggfunc='mean', ax=None, x_int=None, time_int=None,
     _df = _df.groupby([x]).agg({y: [aggfunc, 'std']}).set_axis([_y_agg, _y_std], axis=1, inplace=False).reset_index()
 
     if ax is None:
-        _, ax = plt.subplots(figsize=figsize)
+        _, ax = plt.subplots()
         _show = True
     else:
         _show = False
@@ -2051,7 +2043,7 @@ def annotate_barplot(ax=None, x=None, y=None, ci=True, ci_newline=True, adj_ylim
 # animate a plot (wrapper for FuncAnimation to be used with pandas dfs)
 def animplot(data=None, x='x', y='y', t='t', lines=None, max_interval=None, interval=200, html=True, title=True,
              title_prefix='', t_format=None,
-             fig=None, ax=None, figsize=plt.rcParams['figure.figsize'], color=None, label=None, legend=False, legend_out=False,
+             fig=None, ax=None, color=None, label=None, legend=False, legend_out=False,
              legend_kws=None, xlim=None, y_lim=None, ax_facecolor=None, grid=False,
              vline=None, **kwargs):
     # example for lines (a list of dicts)
@@ -2064,7 +2056,7 @@ def animplot(data=None, x='x', y='y', t='t', lines=None, max_interval=None, inte
     # init fig,ax
     if fig is None:
         if ax is None:
-            fig, ax = plt.subplots(figsize=figsize)
+            fig, ax = plt.subplots()
         else:
             fig = plt.gcf()
     else:
@@ -2405,7 +2397,7 @@ def custom_legend(colors, labels, do_show=True):
         return _handles
 
 
-def lcurveplot(train, test, labels=None, legend='upper right', ax=None, figsize=plt.rcParams['figure.figsize']):
+def lcurveplot(train, test, labels=None, legend='upper right', ax=None):
     if labels is None:
         if 'name' in dir(train):
             _label_train = train.name
@@ -2426,7 +2418,7 @@ def lcurveplot(train, test, labels=None, legend='upper right', ax=None, figsize=
         _label_test = labels
 
     if ax is None:
-        _, ax = plt.subplots(figsize=figsize)
+        _, ax = plt.subplots()
 
     ax.plot(train, color='xkcd:blue', label=_label_train)
     ax.plot(test, color='xkcd:red', label=_label_test)
@@ -2464,7 +2456,7 @@ def dic_to_lcurveplot(dic, width=16, height=9 / 2, **kwargs):
 
 
 # re implementation of stemplot because customization sucks
-def stemplot(x, y, data=None, ax=None, figsize=plt.rcParams['figure.figsize'], color=rcParams['palette'][0], baseline=0,
+def stemplot(x, y, data=None, ax=None, color=rcParams['palette'][0], baseline=0,
              kwline=None, **kwargs):
     if kwline is None:
         kwline = {}
@@ -2489,7 +2481,7 @@ def stemplot(x, y, data=None, ax=None, figsize=plt.rcParams['figure.figsize'], c
         _data = data.copy()
 
     if ax is None:
-        _, ax = plt.subplots(figsize=figsize)
+        _, ax = plt.subplots()
 
     # baseline
     ax.axhline(baseline, color='k', ls='--', alpha=.5)
@@ -2505,10 +2497,10 @@ def stemplot(x, y, data=None, ax=None, figsize=plt.rcParams['figure.figsize'], c
 
 
 def from_to_plot(data: pd.DataFrame, x_from='x_from', x_to='x_to', y_from=0, y_to=1, palette=None, label=None,
-                 legend=True, legend_loc=None, ax=None, figsize=plt.rcParams['figure.figsize'], **kwargs):
+                 legend=True, legend_loc=None, ax=None, **kwargs):
     # defaults
     if ax is None:
-        _, ax = plt.subplots(figsize=figsize)
+        _, ax = plt.subplots()
     if palette is None:
         palette = rcParams['palette']
 
@@ -2543,11 +2535,10 @@ def from_to_plot(data: pd.DataFrame, x_from='x_from', x_to='x_to', y_from=0, y_t
     return ax
 
 
-def vlineplot(data, palette=None, label=None, legend=True, legend_loc=None, ax=None,
-              figsize=plt.rcParams['figure.figsize'], **kwargs):
+def vlineplot(data, palette=None, label=None, legend=True, legend_loc=None, ax=None, **kwargs):
     # defaults
     if ax is None:
-        _, ax = plt.subplots(figsize=figsize)
+        _, ax = plt.subplots()
     if palette is None:
         palette = rcParams['palette']
 
@@ -2758,7 +2749,7 @@ def replace_yticklabels(ax, mapping):
 def kdeplot(x, data=None, *args, hue=None, hue_order=None, bins=40, adj_x_range=False, baseline=0, highlight_peaks=True,
             show_kde=True, show_hist=True, show_area=False, area_center='mean', ha='center', va='center',
             legend_loc='upper right', palette=None, text_offset=15, nr_format=',.2f',
-            figsize=plt.rcParams['figure.figsize'], kwline=None, perc=False, facecolor=None, sigma_color='xkcd:blue',
+            kwline=None, perc=False, facecolor=None, sigma_color='xkcd:blue',
             sigma_2_color='xkcd:cyan', kde_color='black', edgecolor='black', alpha=.5, ax=None, ax2=None, kwhist=None,
             **kwargs):
     # -- init
@@ -2848,7 +2839,7 @@ def kdeplot(x, data=None, *args, hue=None, hue_order=None, bins=40, adj_x_range=
         # -- plot
 
         if ax is None:
-            _, ax = plt.subplots(figsize=figsize)
+            _, ax = plt.subplots()
 
         # hist
         if show_hist:
@@ -2998,7 +2989,7 @@ def q_barplot(pd_series, ax=None, sort=False, percentage=False, **kwargs):
     _name = pd_series.name
 
     if ax is None:
-        _, ax = plt.subplots(figsize=(16, 9 / 2))
+        _, ax = plt.subplots()
 
     _df_plot = pd_series.value_counts().reset_index()
 
@@ -3020,7 +3011,7 @@ def q_barplot(pd_series, ax=None, sort=False, percentage=False, **kwargs):
     return ax
 
 
-def histplot(x=None, data=None, hue=None, hue_order=None, ax=None, bins=30, use_q_xlim=False, figsize=(16, 9 / 2),
+def histplot(x=None, data=None, hue=None, hue_order=None, ax=None, bins=30, use_q_xlim=False,
              legend_kws=None, **kwargs):
     # long or short format
     if legend_kws is None:
@@ -3049,7 +3040,7 @@ def histplot(x=None, data=None, hue=None, hue_order=None, ax=None, bins=30, use_
 
     # if an axis has not been passed initialize one
     if ax is None:
-        _, ax = plt.subplots(figsize=figsize)
+        _, ax = plt.subplots()
 
     # if a hue has been passed loop them
     if hue is not None:
@@ -3075,8 +3066,7 @@ def histplot(x=None, data=None, hue=None, hue_order=None, ax=None, bins=30, use_
 def countplot(x=None, data=None, hue=None, ax=None, order='default', hue_order=None, normalize_x=False,
               normalize_hue=False, color=None, palette=None,
               x_tick_rotation=None, count_twinx=False, hide_legend=False, annotate=True,
-              annotate_format=',.2f', figsize=(16, 9 / 2),
-              legend_kws=None, barplot_kws=None, count_twinx_kws=None, **kwargs):
+              annotate_format=',.2f', legend_kws=None, barplot_kws=None, count_twinx_kws=None, **kwargs):
     # normalize_x causes the sum of each x group to be 100 percent
     # normalize_hue (with normalize=False) causes the sum of each hue group to be 100 percent
 
@@ -3109,7 +3099,7 @@ def countplot(x=None, data=None, hue=None, ax=None, order='default', hue_order=N
 
     # if an axis has not been passed initialize one
     if ax is None:
-        _, ax = plt.subplots(figsize=figsize)
+        _, ax = plt.subplots()
 
     if normalize_x:
         _y = 'perc_{}'.format(_x)
@@ -3186,8 +3176,7 @@ def countplot(x=None, data=None, hue=None, ax=None, order='default', hue_order=N
 
 
 # quantile plot
-def quantile_plot(x, data=None, qs=None, x2=None, hue=None, to_abs=False, ax=None,
-                  figsize=(16, 9 / 2), **kwargs):
+def quantile_plot(x, data=None, qs=None, x2=None, hue=None, to_abs=False, ax=None, **kwargs):
     # long or short format
     if qs is None:
         qs = [.1, .25, .5, .75, .9]
@@ -3210,7 +3199,7 @@ def quantile_plot(x, data=None, qs=None, x2=None, hue=None, to_abs=False, ax=Non
             _x = 'x_delta'
 
     if ax is None:
-        _, ax = plt.subplots(figsize=figsize)
+        _, ax = plt.subplots()
 
     _label = _x
 

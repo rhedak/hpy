@@ -447,7 +447,7 @@ def lfit(x: Union[pd.Series, str], y: Union[pd.Series, str] = None, w: Union[pd.
 
     for _it, (_index, _df_i) in enumerate(_df.groupby(groupby)):
 
-        if do_print:
+        if do_print and _it_max > 1:
             progressbar(_it, _it_max, print_prefix=qformat(_index))
 
         if y is None:
@@ -504,6 +504,9 @@ def lfit(x: Union[pd.Series, str], y: Union[pd.Series, str] = None, w: Union[pd.
         _df_fit.append(_df_i)
 
     _df_fit = df_merge(_df_fit)
+
+    if do_print and _it_max > 1:
+        progressbar()
 
     if return_df:
         return _df_fit
