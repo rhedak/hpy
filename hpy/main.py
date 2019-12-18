@@ -136,8 +136,9 @@ def tprint(*args, sep=' ', **kwargs):
     :param kwargs: passed to print
     :return: None
     :examples:
-    >>>tprint('Hello World')
-    Hello World
+        .. codeblock:: python
+            >>>tprint('Hello World')
+            Hello World
 
     """
     global global_tprint_len

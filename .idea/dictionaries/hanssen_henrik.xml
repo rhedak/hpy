@@ -18,6 +18,7 @@
       <w>ceiled</w>
       <w>changepoint</w>
       <w>cmap</w>
+      <w>codeblock</w>
       <w>coef</w>
       <w>coefs</w>
       <w>concats</w>
@@ -81,6 +82,7 @@
       <w>printf</w>
       <w>prio</w>
       <w>ptypes</w>
+      <w>pygments</w>
       <w>pytest</w>
       <w>qagg</w>
       <w>quantile</w>

@@ -66,3 +66,4 @@ html_static_path = ['_static']
 
 # -- Extension configuration -------------------------------------------------
 numpydoc_show_class_members = False
+pygments_style = 'sphinx'
