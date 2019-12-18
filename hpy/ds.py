@@ -28,6 +28,7 @@ from hpy.main import *
 
 
 # --- pandas styles
+@export
 def highlight_max(df: pd.DataFrame, color: str = 'xkcd:cyan') -> pd.DataFrame:
     """
     highlights the largest value in each column of a pandas DataFrame
@@ -42,6 +43,7 @@ def highlight_max(df: pd.DataFrame, color: str = 'xkcd:cyan') -> pd.DataFrame:
     return df.style.apply(cond_max)
 
 
+@export
 def highlight_min(df: pd.DataFrame, color: str = 'xkcd:light red') -> pd.DataFrame:
     """
     highlights the smallest value in each column of a pandas DataFrame
@@ -56,6 +58,7 @@ def highlight_min(df: pd.DataFrame, color: str = 'xkcd:light red') -> pd.DataFra
     return df.style.apply(cond_min)
 
 
+@export
 def highlight_max_min(df: pd.DataFrame, max_color: str = 'xkcd:cyan', min_color: str = 'xkcd:light red'):
     """
     highlights the largest and smallest value in each column of a pandas DataFrame
@@ -84,6 +87,7 @@ def highlight_max_min(df: pd.DataFrame, max_color: str = 'xkcd:cyan', min_color:
 
 
 # --- functions
+@export
 def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_cat: bool = True, cat_frac: bool = .5) \
         -> pd.DataFrame:
     """
@@ -143,6 +147,7 @@ def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_ca
     return _df
 
 
+@export
 def get_df_corr(df: pd.DataFrame, target: str = None, groupby: Union[str, list] = None) -> pd.DataFrame:
     """
     returns a pandas DataFrame containing all pearson correlations in a melted format
@@ -215,6 +220,7 @@ def get_df_corr(df: pd.DataFrame, target: str = None, groupby: Union[str, list] 
     return _df_corr
 
 
+@export
 def drop_zero_cols(df: pd.DataFrame) -> pd.DataFrame:
     """
     Drop columns with all 0 or None Values from DataFrame. Useful after applying one hot encoding.
@@ -226,6 +232,7 @@ def drop_zero_cols(df: pd.DataFrame) -> pd.DataFrame:
     return df[df.columns[(df != 0).any()]]
 
 
+@export
 def get_duplicate_cols(df: pd.DataFrame) -> list:
     """
     Returns names of duplicate columns from a pandas DataFrame
@@ -236,6 +243,7 @@ def get_duplicate_cols(df: pd.DataFrame) -> list:
     return df.columns.duplicated().to_list()
 
 
+@export
 def drop_duplicate_cols(df: pd.DataFrame) -> pd.DataFrame:
     """
     Drop duplicate columns from pandas DataFrame
@@ -246,6 +254,7 @@ def drop_duplicate_cols(df: pd.DataFrame) -> pd.DataFrame:
     return df.loc[:, ~df.columns.duplicated()]
 
 
+@export
 def change_span(s: pd.Series, steps:int = 5) -> pd.Series :
     """
     return a True/False series around a changepoint, used for filtering stepwise data series in a pandas df
@@ -258,6 +267,7 @@ def change_span(s: pd.Series, steps:int = 5) -> pd.Series :
     return pd.Series(s.shift(-steps).ffill() != s.shift(steps).bfill())
 
 
+@export
 def outlier_to_nan(df: pd.DataFrame, col: str, groupby: Union[list, str] = None, std_cutoff: np.number = 3,
                    reps: int = 1, do_print: bool = False) -> pd.DataFrame:
     """
@@ -313,6 +323,7 @@ def outlier_to_nan(df: pd.DataFrame, col: str, groupby: Union[list, str] = None,
     return _df
 
 
+@export
 def butter_pass_filter(data: pd.Series, cutoff: int, fs: int, order: int, btype: str = None, shift: bool = False):
     """
     Implementation of a highpass / lowpass filter using scipy.signal.butter
@@ -353,6 +364,7 @@ def butter_pass_filter(data: pd.Series, cutoff: int, fs: int, order: int, btype:
     return _y
 
 
+@export
 def pass_by_group(df: pd.DataFrame, col: str, groupby: Union[str, list], btype: str, shift: bool = False,
                   cutoff: int = 1, fs: int = 20, order: int = 5):
     """
@@ -383,6 +395,7 @@ def pass_by_group(df: pd.DataFrame, col: str, groupby: Union[str, list], btype: 
     return _df
 
 
+@export
 def lfit(x: Union[pd.Series, str], y: Union[pd.Series, str] = None, w: Union[pd.Series, str] = None,
          df: pd.DataFrame = None, groupby: Union[list, str] = None, do_print: bool = True,
          catch_error: bool = False, return_df: bool = False, extrapolate: bool = None):
@@ -500,6 +513,7 @@ def lfit(x: Union[pd.Series, str], y: Union[pd.Series, str] = None, w: Union[pd.
         return _df_fit[_y_name_fit]
 
 
+@export
 def qf(df: pd.DataFrame, fltr: Union[pd.DataFrame, pd.Series, Mapping], remove_unused_categories: bool = True,
        reset_index: bool = False):
     """
@@ -558,6 +572,7 @@ def qf(df: pd.DataFrame, fltr: Union[pd.DataFrame, pd.Series, Mapping], remove_u
     return _df
 
 
+@export
 def quantile_split(s: pd.Series, n: int, signif: int = 2, na_to_med: bool = False):
     """
     splits a numerical column into n quantiles. Useful for mapping numerical columns to categorical columns
@@ -618,6 +633,7 @@ def quantile_split(s: pd.Series, n: int, signif: int = 2, na_to_med: bool = Fals
     return _s_out
 
 
+@export
 def acc(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None) -> float:
     """
     calculate accuracy for a categorical label
@@ -641,6 +657,7 @@ def acc(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.Dat
     return _acc
 
 
+@export
 def rel_acc(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None,
             target_class: str = None):
     """
@@ -686,6 +703,7 @@ def rel_acc(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd
     return _acc - _acc_mc
 
 
+@export
 def cm(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None) -> pd.DataFrame:
     """
     confusion matrix from pandas df
@@ -722,6 +740,7 @@ def cm(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.Data
     return _cm
 
 
+@export
 def f1_pr(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None, target: str = None,
           factor: int = 100) -> pd.DataFrame:
     """
@@ -842,6 +861,7 @@ def f1_pr(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.D
     return _f1_pr
 
 
+@export
 def f_score(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None, dropna: bool = False,
             f: Callable = r2_score, groupby: Union[list, str] = None, f_name: str = None) -> Union[pd.DataFrame, float]:
     """
@@ -902,6 +922,7 @@ def f_score(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd
 
 
 # shorthand r2
+@export
 def r2(*args, **kwargs) -> Union[pd.DataFrame, float]:
     """
     wrapper for f_score using sklearn.metrics.r2_score
@@ -913,6 +934,7 @@ def r2(*args, **kwargs) -> Union[pd.DataFrame, float]:
     return f_score(*args, f=r2_score, **kwargs)
 
 
+@export
 def rmse(*args, **kwargs) -> Union[pd.DataFrame, float]:
     """
     wrapper for f_score using numpy.sqrt(skearn.metrics.mean_squared_error)
@@ -927,6 +949,7 @@ def rmse(*args, **kwargs) -> Union[pd.DataFrame, float]:
     return f_score(*args, f=_f_rmse, **kwargs)
 
 
+@export
 def mae(*args, **kwargs) -> Union[pd.DataFrame, float]:
     """
     wrapper for f_score using skearn.metrics.mean_absolute_error
@@ -938,6 +961,7 @@ def mae(*args, **kwargs) -> Union[pd.DataFrame, float]:
     return f_score(*args, f=mean_absolute_error, **kwargs)
 
 
+@export
 def stdae(*args, **kwargs) -> Union[pd.DataFrame, float]:
     """
     wrapper for f_score using the standard deviation of the absolute error
@@ -952,6 +976,7 @@ def stdae(*args, **kwargs) -> Union[pd.DataFrame, float]:
     return f_score(*args, f=_f_stdae, **kwargs)
 
 
+@export
 def medae(*args, **kwargs) -> Union[pd.DataFrame, float]:
     """
     wrapper for f_score using skearn.metrics.median_absolute_error
@@ -963,6 +988,7 @@ def medae(*args, **kwargs) -> Union[pd.DataFrame, float]:
     return f_score(*args, f=median_absolute_error, **kwargs)
 
 
+@export
 def corr(*args, **kwargs) -> Union[pd.DataFrame, float]:
     """
     wrapper for f_score using pandas.Series.corr
@@ -976,6 +1002,7 @@ def corr(*args, **kwargs) -> Union[pd.DataFrame, float]:
     return f_score(*args, f=_f_corr, **kwargs)
 
 
+@export
 def df_score(df: pd.DataFrame, y_true: str, pred_suffix: list = None, scores: list = None, pivot: bool = True,
              scale: int = None, groupby: Union[list, str] = None) -> pd.DataFrame:
     """
@@ -1068,8 +1095,22 @@ def df_score(df: pd.DataFrame, y_true: str, pred_suffix: list = None, scores: li
     return _df_score
 
 
-# calculated the weighted root mean squared difference by group
-def rmsd(x, df, group, return_df_paired=False, agg_func='median', standardize=False, to_abs=False):
+@export
+def rmsd(x: str, df: pd.DataFrame, group: str, return_df_paired: bool = False, agg_func: str = 'median',
+         standardize: bool = False, to_abs: bool = False) -> Union[float, pd.DataFrame]:
+    """
+    calculated the weighted root mean squared difference for a reference columns x by a specific group
+
+    :param x: name of the column to calculate the rmsd for
+    :param df: pandas DataFrame
+    :param group: groups for which to calculate the rmsd
+    :param return_df_paired: whether to return the paired DataFrame
+    :param agg_func: which aggregation to use for the group value, passed to pd.DataFrame.agg
+    :param standardize: whether to apply Standardization before calculating the rmsd
+    :param to_abs: whether to cast x to abs before calculating the rmsd
+    :return: if return_df_paired pandas DataFrame, else rmsd as float
+    """
+
     _agg_by_group = '{}_by_group'.format(agg_func)
 
     _df = df.copy()
@@ -1096,8 +1137,24 @@ def rmsd(x, df, group, return_df_paired=False, agg_func='median', standardize=Fa
 
 
 # get a data frame showing the root mean squared difference by group type
-def df_rmsd(x, df, groups=None, hue=None, hue_order=None, sort_by_hue=True, n_quantiles=10, include_rmsd=True,
-            **kwargs):
+@export
+def df_rmsd(x: str, df: pd.DataFrame, groups: Union[list, str] = None, hue: str = None, hue_order: list = None,
+            sort_by_hue: bool = True, n_quantiles: int = 10, include_rmsd: bool = True, **kwargs):
+    """
+    calculate rmsd for reference column x with multiple other columns and return as DataFrame
+
+    :param x: name of the column to calculate the rmsd for
+    :param df: pandas DataFrame containing the data
+    :param groups: groups to calculate the rmsd or, defaults to all other columns in the DataFrame [optional]
+    :param hue: further calculate the rmsd for each hue level [optional]
+    :param hue_order: sort the hue levels in this order [optional]
+    :param sort_by_hue: sort the values by hue rather than by group [optional]
+    :param n_quantiles: numeric columns will be automatically split into this many quantiles [optional]
+    :param include_rmsd: if False provide only a grouped DataFrame but don't actually calculate the rmsd,
+        you can use include_rmsd=False to save computation time if you only need the maxperc (used in plotting)
+    :param kwargs: passed to rmsd
+    :return: None
+    """
     # avoid inplace operations
     _df = df.copy()
 
@@ -1156,8 +1213,6 @@ def df_rmsd(x, df, groups=None, hue=None, hue_order=None, sort_by_hue=True, n_qu
                     _rmsd = rmsd(x=_x, df=_df_hue, group='_group', **kwargs)
                 else:
                     _rmsd = np.nan
-                    # you can use include_rmsd=False to save computation time
-                    # if you only need the maxperc (used in plotting)
 
                 _count = len(_df_hue['_group'])
                 _maxcount = _df_hue['_group'].value_counts().reset_index()['_group'].iloc[0]
@@ -1196,8 +1251,20 @@ def df_rmsd(x, df, groups=None, hue=None, hue_order=None, sort_by_hue=True, n_qu
     return _df_rmsd
 
 
-# df with p value
-def df_p(x, group, df, hue=None, agg_func='mean', agg=False, n_quantiles=10):
+@export
+def df_p(x: str, group: str, df: pd.DataFrame, hue: str = None, agg_func: str = 'mean', agg: bool = False,
+         n_quantiles: int = 10):
+    """
+    returns a DataFrame with the p value. See hypothesis testing.
+    :param x: name of column to evaluate
+    :param group: name of grouping column
+    :param df: pandas DataFrame
+    :param hue: further split by hue level
+    :param agg_func: standard agg function, passed to pd.DataFrame.agg
+    :param agg: whether to include standard aggregation
+    :param n_quantiles: numeric columns will be automatically split into this many quantiles [optional]
+    :return: pandas DataFrame containing p values
+    """
     # numeric to quantile
     _df, _groupby, _groupby_names, _vars, _df_levels, _levels = df_group_hue(df, group=group, hue=hue, x=x,
                                                                                n_quantiles=n_quantiles)

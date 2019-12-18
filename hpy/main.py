@@ -13,6 +13,7 @@ import pandas as pd
 import warnings
 import collections
 import os
+import sys
 import datetime
 
 # third party imports
@@ -22,13 +23,22 @@ from typing import Any, AnyStr, Callable, Union
 pd.plotting.register_matplotlib_converters()
 pd.options.mode.chained_assignment = None
 
-# --- classes
+# --- constants
 global_t = datetime.datetime.now()  # for times progress bar
 global_tprint_len = 0  # for temporary printing
 
 
-# ----------------- classes and operators ------------------------
+# --- decorators
+def export(fn):
+    mod = sys.modules[fn.__module__]
+    if hasattr(mod, '__all__'):
+        mod.__all__.append(fn.__name__)
+    else:
+        mod.__all__ = [fn.__name__]
+    return fn
 
+
+# --- classes
 class Infix:
     """
         Class for representing the pipe operator |__|
@@ -59,6 +69,7 @@ __ = Infix(lambda _o, _f: _f(_o))
 
 
 # --- functions
+@export
 def today(date_format: str = '%Y_%m_%d') -> str:
     """
     Returns today's date as string
@@ -70,6 +81,7 @@ def today(date_format: str = '%Y_%m_%d') -> str:
 
 
 # for pipe operator:
+@export
 def round1(x: float) -> float:
     """
     Wrapper for np.round with default digits 1
@@ -80,6 +92,7 @@ def round1(x: float) -> float:
     return np.round(x, 1)
 
 
+@export
 def round2(x: float) -> float:
     """
     Wrapper for np.round with default digits 2
@@ -90,7 +103,7 @@ def round2(x: float) -> float:
     return np.round(x, 2)
 
 
-# format bytes
+@export
 def size(byte: int, unit: str = 'MB', dec: int = 2) -> str:
     """
     Formats bytes as human readable string
@@ -105,7 +118,7 @@ def size(byte: int, unit: str = 'MB', dec: int = 2) -> str:
     return '{} {}'.format(np.round(byte / (1024 ** _power), dec), unit)
 
 
-# return memory usage more detailed than default
+@export
 def mem_usage(pandas_obj, *args, **kwargs) -> str:
     """
     Get memory usage of a pandas object
@@ -124,7 +137,7 @@ def mem_usage(pandas_obj, *args, **kwargs) -> str:
     return size(_usage_b, *args, **kwargs)
 
 
-# print temporary text that will be overwritten by the next print
+@export
 def tprint(*args, sep=' ', **kwargs):
     """
     Wrapper for print() but with a carriage return at the end.
@@ -141,10 +154,9 @@ def tprint(*args, sep=' ', **kwargs):
     >>> tprint('Hello World')
     Hello World
 
-    Examples 2::
-
-        >>> tprint('Sup')
-        Sup
+    >>> tprint(1)
+    >>> tprint(2)
+    2
 
     """
     global global_tprint_len
@@ -174,7 +186,7 @@ def tprint(*args, sep=' ', **kwargs):
     global_tprint_len = _arg_len
 
 
-# print to file
+@export
 def fprint(*args, file: str = '_print.txt', sep: str = ' ', mode: str = 'replace', append_sep: str = '\n',
            timestamp: bool = True, do_print: bool = False, do_tprint: bool = False):
     """
@@ -226,6 +238,7 @@ def fprint(*args, file: str = '_print.txt', sep: str = ' ', mode: str = 'replace
         _txt.write(_string)
 
 
+@export
 def total_time(i: int, i_max: int) -> datetime.timedelta:
     """
     Estimates total time of running operation by linear extrapolation using iteration counters.
@@ -240,6 +253,7 @@ def total_time(i: int, i_max: int) -> datetime.timedelta:
     return _total_time
 
 
+@export
 def remaining_time(i: int, i_max: int) -> datetime.timedelta:
     """
     Estimates remaining time of running operation by linear extrapolation using iteration counters.
@@ -254,6 +268,7 @@ def remaining_time(i: int, i_max: int) -> datetime.timedelta:
     return _remaining_time
 
 
+@export
 def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', mid: str = None, mode: str = 'perc',
                 print_prefix: str = '', p_step: int = 1, printf: Callable = tprint, persist: bool = False, **kwargs):
     """
@@ -332,6 +347,7 @@ def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', mid: str = None, 
         print('')
 
 
+@export
 def elapsed_time_init():
     """
     Resets reference time for elapsed_time()
@@ -342,6 +358,7 @@ def elapsed_time_init():
     global_t = datetime.datetime.now()
 
 
+@export
 def elapsed_time(do_return: bool = False, ref_t: datetime.datetime = None) -> datetime.timedelta:
     """
     Get the elapsed time since reference time ref_time.
@@ -362,6 +379,7 @@ def elapsed_time(do_return: bool = False, ref_t: datetime.datetime = None) -> da
         tprint(str(_delta_t)[:-5])
 
 
+@export
 def time_to_str(t: datetime.datetime, time_format: str = '%Y-%m-%d') -> str:
     """
     Wrapper for strftime
@@ -373,7 +391,7 @@ def time_to_str(t: datetime.datetime, time_format: str = '%Y-%m-%d') -> str:
     return pd.to_datetime(t).strftime(time_format)
 
 
-# custom vectorize function (only works for 1 parameter)
+@export
 def cf_vec(x: Any, func: Callable, *args, **kwargs) -> Any:
     """
     Pandas compatible vectorize function. In case a DataFrame is passed the function is applied to all columns.
@@ -415,6 +433,7 @@ def cf_vec(x: Any, func: Callable, *args, **kwargs) -> Any:
     return _out
 
 
+@export
 def round_signif_i(x: np.number, digits: int = 1) -> float:
     """
     Round to significant number of digits
@@ -432,6 +451,7 @@ def round_signif_i(x: np.number, digits: int = 1) -> float:
         return round(float(x), _scale)
 
 
+@export
 def round_signif(x: Any, *args, **kwargs) -> Any:
     """
     Round to significant number of digits
@@ -444,6 +464,7 @@ def round_signif(x: Any, *args, **kwargs) -> Any:
     return cf_vec(x, round_signif_i, *args, **kwargs)
 
 
+@export
 def floor_signif(x: Any, digits: int = 1) -> Any:
     """
     Floor to significant number of digits
@@ -463,6 +484,7 @@ def floor_signif(x: Any, digits: int = 1) -> Any:
             return round_signif_x - 1 / np.power(10., _scale)
 
 
+@export
 def ceil_signif(x: Any, digits: int = 1) -> Any:
     """
     Ceil to significant number of digits
@@ -482,6 +504,7 @@ def ceil_signif(x: Any, digits: int = 1) -> Any:
             return round_signif_x + 1 / np.power(10., _scale)
 
 
+@export
 def concat_cols(df: pd.DataFrame, columns: list, sep: str = '_', to_int: bool = False) -> pd.Series:
     """
     Concat a number of columns of a pandas DataFrame
@@ -512,6 +535,7 @@ def concat_cols(df: pd.DataFrame, columns: list, sep: str = '_', to_int: bool = 
     return _df['_out']
 
 
+@export
 def list_unique(lst: list) -> list:
     """
     Returns unique elements from a list
@@ -522,6 +546,7 @@ def list_unique(lst: list) -> list:
     return list(dict.fromkeys(force_list(lst)))
 
 
+@export
 def list_flatten(lst: list) -> list:
     """
     Flatten a list of lists
@@ -532,6 +557,7 @@ def list_flatten(lst: list) -> list:
     return np.array(force_list(lst)).flat
 
 
+@export
 def list_merge(*args, unique=True, flatten=False) -> list:
     """
     Merges n lists together
@@ -561,6 +587,7 @@ def list_merge(*args, unique=True, flatten=False) -> list:
     return _list
 
 
+@export
 def list_intersection(lst: list, *args) -> list:
     """
     Returns common elements of n lists
@@ -579,6 +606,7 @@ def list_intersection(lst: list, *args) -> list:
     return _list_out
 
 
+@export
 def rand(shape: tuple = None, lower: int = None, upper: int = None, step: int = None, seed: int = None) -> np.array:
     """
     A seedable wrapper for numpy.random.random_sample that allows for boundaries and steps
@@ -617,6 +645,7 @@ def rand(shape: tuple = None, lower: int = None, upper: int = None, step: int = 
     return _samples
 
 
+@export
 def dict_list(*args) -> dict:
     """
     Creates a dictionary of empty named lists. Useful for iteratively creating a pandas DataFrame
@@ -633,6 +662,7 @@ def dict_list(*args) -> dict:
     return _dict
 
 
+@export
 def append_to_dict_list(dct: dict, append: Union[dict, list], inplace: bool = True) -> Union[dict, None]:
     """
     Appends to a dictionary of named lists. Useful for iteratively creating a pandas DataFrame.
@@ -669,6 +699,7 @@ def append_to_dict_list(dct: dict, append: Union[dict, list], inplace: bool = Tr
         return _dic
 
 
+@export
 def is_list_like(obj: Any) -> bool:
     """
     Checks any python object to see if it is list like
@@ -679,6 +710,7 @@ def is_list_like(obj: Any) -> bool:
     return isinstance(obj, collections.Iterable) and not isinstance(obj, (str, bytes))
 
 
+@export
 def force_list(*args) -> list:
     """
     Takes any python object and turns it into an iterable list.
@@ -705,7 +737,7 @@ def force_list(*args) -> list:
 
         args[_i] = _arg
 
-    # depending on weather just one argument was passed or list of arguments we need to return differently
+    # depending on whether just one argument was passed or list of arguments we need to return differently
     if len(args) == 1:
         args = args[0]
     else:
@@ -714,6 +746,7 @@ def force_list(*args) -> list:
     return args
 
 
+@export
 def qformat(value: Any, int_format: str = ',', float_format: str = ',.2f', datetime_format: str = '%Y-%m-%d',
             sep: str = ' - ', key_sep: str = ': ', print_key: bool = True) -> str:
     """
@@ -779,6 +812,7 @@ def qformat(value: Any, int_format: str = ',', float_format: str = ',.2f', datet
     return _string
 
 
+@export
 def tdelta(*args, **kwargs) -> datetime.timedelta:
     """
     Wrapper for numpy.timedelta64
