@@ -26,7 +26,7 @@ setup(
     url=about['__url__'],
     packages=['hpy'],
     include_package_data=True,
-    python_requires=">=3.7.*",
+    python_requires=">=3.6.*",
     install_requires=['numpy', 'pandas', 'scipy', 'matplotlib', 'scikit-learn', 'seaborn', 'colour', 'pytest',
                       'requests', 'IPython', 'sphinx-automodapi'],
     license=about['__license__'],
