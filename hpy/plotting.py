@@ -51,7 +51,9 @@ rcParams = {
     'hatches': ['/', '\\', '|', '-', '+', 'x', 'o', 'O', '.', '*'],
     'figsize_square': (8, 8),
     'fig_width': 8,
-    'fig_height': 8
+    'fig_height': 8,
+    'legend_outside.legend_space': .1,
+    'float_format': '.2f'
 }
 
 
@@ -327,12 +329,12 @@ def pairwise_corrplot(df, corr_cutoff=.5, ncols=4, hue=None, width=rcParams['fig
 
 # plot a NORMALIZED histogram + a fit of a gaussian distribution
 def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=None, hue_sort_type='count',
-             hue_round=1, face_color='cyan', gauss_color='black', edgecolor='gray', alpha=None, bins=40, perc=None,
+             hue_round=1, linecolor='black', edgecolor='gray', alpha=None, bins=40, perc=None,
              top_nr=5, other_name='other', title=True, title_prefix='', value_name='column_value',
-             sigma_cutoff=3, show_hist=True, distfit='kde', show_grid=False,
-             legend=True, legend_loc='bottom', legend_space=None, legend_ncol=1, agg_func='mean',
-             number_format='.2f', kde_steps=1000, max_n=100000, random_state=None, sample_warn=True, xlim=None,
-             distfit_line=None, label_style='mu_sigma', ax=None, **kwargs):
+             sigma_cutoff=3, show_hist=True, distfit='kde', show_grid=False, fill=True,
+             legend=True, legend_loc='bottom', legend_space=rcParams['legend_outside.legend_space'], legend_ncol=1,
+             agg_func='mean', number_format=rcParams['float_format'], kde_steps=1000, max_n=100000, random_state=None,
+             sample_warn=True, xlim=None, distfit_line=None, label_style='mu_sigma', ax=None, **kwargs):
     if palette is None:
         palette = rcParams['palette']
     if not top_nr:
@@ -401,7 +403,7 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
 
     # the actual plot
     def _f_distplot(_f_x, _f_data, _f_x_label, _f_facecolor, _f_distfit_color, _f_bins,
-                    _f_sigma_cutoff, _f_xlim, _f_distfit_line, _f_ax, _f_ax2):
+                    _f_sigma_cutoff, _f_xlim, _f_distfit_line, _f_ax, _f_ax2, _f_fill):
 
         # make a copy to avoid inplace operations
         _df_i = _f_data.copy()
@@ -488,7 +490,9 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
                          label=_label_2, **kwargs)
 
                 if show_hist:
-                    _ax.set_ylim([0, np.max(_y) * 1.05])  # there used to be a try except here
+                    _ax.set_ylim([0, np.max(_y) * 1.05])
+                elif _f_fill:
+                    _ax.fill_between(_f_bins, _y, color=_f_facecolor, alpha=alpha)
 
             elif distfit == 'kde':
 
@@ -497,6 +501,8 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
                 _y = _kde['value']
                 _ax.plot(__x, _y, linestyle=_f_distfit_line, color=_f_distfit_color, alpha=alpha, linewidth=2,
                          label=_label_2, **kwargs)
+                if not show_hist and _f_fill:
+                    _ax.fill_between(_f_bins, _y, color=_f_facecolor, alpha=alpha)
 
             _f_ax2.get_yaxis().set_visible(False)
 
@@ -569,11 +575,18 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
             _plot_x_min = np.min(bins)
             _plot_x_max = np.max(bins)
 
+        if isinstance(palette, Mapping):
+            _color = list(palette.values())[0]
+        elif is_list_like(palette):
+            _color = palette[0]
+        else:
+            _color = palette
+
         # just plot
-        ax, ax2 = _f_distplot(_f_x=_x, _f_data=_df, _f_x_label=_x_name, _f_facecolor=face_color,
-                              _f_distfit_color=gauss_color,
+        ax, ax2 = _f_distplot(_f_x=_x, _f_data=_df, _f_x_label=_x_name, _f_facecolor=_color,
+                              _f_distfit_color=linecolor,
                               _f_bins=_bins, _f_sigma_cutoff=sigma_cutoff,
-                              _f_xlim=xlim, _f_distfit_line=distfit_line, _f_ax=ax, _f_ax2=ax2)
+                              _f_xlim=xlim, _f_distfit_line=distfit_line, _f_ax=ax, _f_ax2=ax2, _f_fill=fill)
 
     else:
 
@@ -659,7 +672,7 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
             ax, ax2 = _f_distplot(_f_x=_x, _f_data=_df_hue, _f_x_label=_hue, _f_facecolor=_color,
                                   _f_distfit_color=_color, _f_bins=_bins,
                                   _f_sigma_cutoff=_sigma_cutoff_hues,
-                                  _f_xlim=xlim, _f_distfit_line=_linestyle, _f_ax=ax, _f_ax2=ax2)
+                                  _f_xlim=xlim, _f_distfit_line=_linestyle, _f_ax=ax, _f_ax2=ax2, _f_fill=False)
     if legend:
 
         if legend_loc in ['bottom', 'right']:
@@ -2308,7 +2321,8 @@ def animplot(data=None, x='x', y='y', t='t', lines=None, max_interval=None, inte
         return _anim
 
 
-def legend_outside(ax=None, width=.85, loc='right', legend_space=.1, offset_x=0, offset_y=0, **kwargs):
+def legend_outside(ax=None, width=.85, loc='right', legend_space=rcParams['legend_outside.legend_space'], offset_x=0,
+                   offset_y=0, **kwargs):
     # -- init
     if loc not in ['bottom', 'right']:
         warnings.warn('legend_outside: legend loc not recognized')

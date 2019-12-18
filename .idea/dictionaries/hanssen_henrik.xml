@@ -63,6 +63,7 @@
       <w>levelplot</w>
       <w>lfit</w>
       <w>lims</w>
+      <w>linecolor</w>
       <w>linestyle</w>
       <w>lowpass</w>
       <w>mahalanobis</w>
@@ -131,6 +132,7 @@
       <w>xkcd</w>
       <w>xlabel</w>
       <w>xlim</w>
+      <w>xlims</w>
       <w>xticklabels</w>
       <w>yaxis</w>
       <w>yerr</w>
