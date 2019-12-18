@@ -41,23 +41,18 @@ from hpy.ds import get_df_corr, lfit, kde, df_count, quantile_split, top_n_codin
 rcParams = {
     'palette': [
         'xkcd:blue', 'xkcd:red', 'xkcd:green', 'xkcd:cyan', 'xkcd:magenta',
-        'golden yellow', 'xkcd:dark cyan', 'xkcd:red orange', 'xkcd:dark yellow', 'xkcd:easter green',
-        'baby blue', 'xkcd:light brown', 'xkcd:strong pink', 'xkcd:light navy blue', 'xkcd:deep blue',
-        'deep red', 'xkcd:ultramarine blue', 'xkcd:sea green', 'xkcd:plum', 'xkcd:old pink',
-        'lawn green', 'xkcd:amber', 'xkcd:green blue', 'xkcd:yellow green', 'xkcd:dark mustard',
-        'bright lime', 'xkcd:aquamarine', 'xkcd:very light blue', 'xkcd:light grey blue', 'xkcd:dark sage',
-        'dark peach', 'xkcd:shocking pink'
+        'xkcd:golden yellow', 'xkcd:dark cyan', 'xkcd:red orange', 'xkcd:dark yellow', 'xkcd:easter green',
+        'xkcd:baby blue', 'xkcd:light brown', 'xkcd:strong pink', 'xkcd:light navy blue', 'xkcd:deep blue',
+        'xkcd:deep red', 'xkcd:ultramarine blue', 'xkcd:sea green', 'xkcd:plum', 'xkcd:old pink',
+        'xkcd:lawn green', 'xkcd:amber', 'xkcd:green blue', 'xkcd:yellow green', 'xkcd:dark mustard',
+        'xkcd:bright lime', 'xkcd:aquamarine', 'xkcd:very light blue', 'xkcd:light grey blue', 'xkcd:dark sage',
+        'xkcd:dark peach', 'xkcd:shocking pink'
     ],
     'hatches': ['/', '\\', '|', '-', '+', 'x', 'o', 'O', '.', '*'],
     'figsize_square': (8, 8),
     'fig_width': 8,
     'fig_height': 8
 }
-
-# # loop
-# for _i in range(5):
-#     rcParams['palette'] += rcParams['palette']
-#     rcParams['hatches'] += rcParams['hatches']
 
 
 # --- functions
@@ -164,8 +159,7 @@ def corrplot_bar(data, target=None, columns=None, corr_cutoff=0, corr_as_alpha=F
 
     _rgba_colors = np.round(_rgba_colors, 2)
 
-    _plot = ax.barh(_df_corr['label'], _df_corr['corr'], color=_rgba_colors)  # ,palette='RdBu_r'
-    # sns.barplot(x='corr',y='label',palette='RdBu_r',data=_df_corr)
+    _plot = ax.barh(_df_corr['label'], _df_corr['corr'], color=_rgba_colors)
     ax.invert_yaxis()
 
     if fix_x_range:
@@ -290,10 +284,14 @@ def pairwise_corrplot(df, corr_cutoff=.5, ncols=4, hue=None, width=rcParams['fig
 
         else:
 
-            for _hue_i in range(len(_hues)):
+            for _hue_it, _hue in enumerate(_hues):
 
-                _hue = _hues[_hue_i]
-                _color = palette[_hue_i]
+                if isinstance(palette, Mapping):
+                    _color = palette[_hue]
+                elif is_list_like(palette):
+                    _color = palette[_hue_it % len(palette)]
+                else:
+                    _color = palette
 
                 _df_hue = _df_hues[_hue]
                 _df_corr_hue = _df_corrs[_hue].copy()
@@ -328,15 +326,15 @@ def pairwise_corrplot(df, corr_cutoff=.5, ncols=4, hue=None, width=rcParams['fig
 
 
 # plot a NORMALIZED histogram + a fit of a gaussian distribution
-def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=None, hue_sort_type='count',
+def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=None, hue_sort_type='count',
              hue_round=1, face_color='cyan', gauss_color='black', edgecolor='gray', alpha=None, bins=40, perc=None,
              top_nr=5, other_name='other', title=True, title_prefix='', value_name='column_value',
              sigma_cutoff=3, show_hist=True, distfit='kde', show_grid=False,
              legend=True, legend_loc='bottom', legend_space=None, legend_ncol=1, agg_func='mean',
              number_format='.2f', kde_steps=1000, max_n=100000, random_state=None, sample_warn=True, xlim=None,
              distfit_line=None, label_style='mu_sigma', ax=None, **kwargs):
-    if pattern is None:
-        pattern = rcParams['palette']
+    if palette is None:
+        palette = rcParams['palette']
     if not top_nr:
         top_nr = None
 
@@ -403,7 +401,7 @@ def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=No
 
     # the actual plot
     def _f_distplot(_f_x, _f_data, _f_x_label, _f_facecolor, _f_distfit_color, _f_bins,
-                              _f_sigma_cutoff, _f_xlim, _f_distfit_line, _f_ax, _f_ax2):
+                    _f_sigma_cutoff, _f_xlim, _f_distfit_line, _f_ax, _f_ax2):
 
         # make a copy to avoid inplace operations
         _df_i = _f_data.copy()
@@ -573,9 +571,9 @@ def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=No
 
         # just plot
         ax, ax2 = _f_distplot(_f_x=_x, _f_data=_df, _f_x_label=_x_name, _f_facecolor=face_color,
-                                        _f_distfit_color=gauss_color,
-                                        _f_bins=_bins, _f_sigma_cutoff=sigma_cutoff,
-                                        _f_xlim=xlim, _f_distfit_line=distfit_line, _f_ax=ax, _f_ax2=ax2)
+                              _f_distfit_color=gauss_color,
+                              _f_bins=_bins, _f_sigma_cutoff=sigma_cutoff,
+                              _f_xlim=xlim, _f_distfit_line=distfit_line, _f_ax=ax, _f_ax2=ax2)
 
     else:
 
@@ -586,9 +584,9 @@ def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=No
 
             # sort by value count
             if hue_sort_type == 'count':
-                _hues = list(_df[hue].value_counts().reset_index()['index'])
+                _hues = _df[hue].value_counts().reset_index().sort_values(by=[hue, 'index'])['index'].tolist()
             else:
-                _hues = sorted(_df[hue].unique())
+                _hues = _df[hue].drop_duplicates().sort_values().tolist()
 
             # group values outside of top_n to other_name
             if top_nr is not None:
@@ -642,12 +640,12 @@ def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=No
 
             _hue = _hues[_it]
 
-            if isinstance(pattern, Mapping):
-                _color = pattern[_hue]
-            elif is_list_like(pattern):
-                _color = pattern[_it]
+            if isinstance(palette, Mapping):
+                _color = palette[_hue]
+            elif is_list_like(palette):
+                _color = palette[_it]
             else:
-                _color = pattern
+                _color = palette
 
             if isinstance(distfit_line, Mapping):
                 _linestyle = distfit_line[_hue]
@@ -659,9 +657,9 @@ def distplot(x, data=None, hue=None, hue_order=None, pattern=None, hue_labels=No
             _df_hue = _df[_df[hue] == _hue]
 
             ax, ax2 = _f_distplot(_f_x=_x, _f_data=_df_hue, _f_x_label=_hue, _f_facecolor=_color,
-                                            _f_distfit_color=_color, _f_bins=_bins,
-                                            _f_sigma_cutoff=_sigma_cutoff_hues,
-                                            _f_xlim=xlim, _f_distfit_line=_linestyle, _f_ax=ax, _f_ax2=ax2)
+                                  _f_distfit_color=_color, _f_bins=_bins,
+                                  _f_sigma_cutoff=_sigma_cutoff_hues,
+                                  _f_xlim=xlim, _f_distfit_line=_linestyle, _f_ax=ax, _f_ax2=ax2)
     if legend:
 
         if legend_loc in ['bottom', 'right']:
@@ -807,12 +805,12 @@ def q_plim(pd_series, q_min=.1, q_max=.9, offset_perc=.1, limit_min_max=False, o
 
 
 # leveled histogram
-def level_histogram(df, cols, level, hue=None, level_colors=None, pattern=None, do_print=False,
+def level_histogram(df, cols, level, hue=None, level_colors=None, palette=None, do_print=False,
                     figsize=None, scale=1, col_labels=None, level_labels=None, hue_labels=None,
                     distplot_title='Distplot all Levels', hspace=.6, return_fig_ax=False, distkws=None,
                     dist_kws=None):
-    if pattern is None:
-        pattern = rcParams['palette']
+    if palette is None:
+        palette = rcParams['palette']
     if distkws is None:
         distkws = {}
     if dist_kws is None:
@@ -852,12 +850,12 @@ def level_histogram(df, cols, level, hue=None, level_colors=None, pattern=None, 
 
             _df[hue] = _df[hue].replace(hue_labels)
 
-            if isinstance(pattern, Mapping):
+            if isinstance(palette, Mapping):
 
                 for _key in hue_labels.keys():
 
-                    if _key in pattern.keys():
-                        pattern[hue_labels[_key]] = pattern.pop(_key)
+                    if _key in palette.keys():
+                        palette[hue_labels[_key]] = palette.pop(_key)
 
         for _level_i, _level in enumerate(_levels):
 
@@ -883,7 +881,7 @@ def level_histogram(df, cols, level, hue=None, level_colors=None, pattern=None, 
             else:
                 _level_label = _level
 
-            distplot(_df_level, _col, hue=hue, pattern=pattern, ax=_ax, **distkws)
+            distplot(_df_level, _col, hue=hue, palette=palette, ax=_ax, **distkws)
 
             # noinspection PyTypeChecker
             _ax.set_xlim(_xlim)
@@ -918,64 +916,44 @@ def level_histogram(df, cols, level, hue=None, level_colors=None, pattern=None, 
 
 
 # leveled countplot
-def level_countplot(data, level, hue, ncols=4, level_colors=None, hue_colors=None, do_print=False,
-                    figsize=None, scale=1, palette=None, level_labels=None, hue_labels=None,
+def level_countplot(data, level, hue, ncols=4, do_print=False,
+                    scale=1, level_order=None, hue_order=None,
                     levelplot_title='Count per Level', hspace=.6,
                     return_fig_ax=False, subplots_kws=None, **kwargs):
     # default values
     if subplots_kws is None:
         subplots_kws = {}
-    if palette is None:
-        palette = rcParams['palette'] + []
     _row = None
     _col = None
 
-    _levels = ['all'] + list(data[level].value_counts().reset_index()['index'])
+    _levels = ['all']
 
-    if hue is not None:
-        _hues = sorted(data[hue].unique())
+    if level_order is not None:
+        _levels += level_order
+    else:
+        _levels += data[level].value_counts().reset_index().sort_values(by=[level, 'index'])['index'].tolist()
+
+    if hue_order is None:
+        _hues = data[hue].drop_duplicates().sort_values().tolist()
+    else:
+        _hues = hue_order
 
     _nrows = int(np.ceil(len(_levels) / ncols))
 
-    if figsize is None:
-        figsize = [16 * 2, _nrows * ((9 / 2) + hspace)] * scale
+    figsize = [16 * 2, _nrows * ((9 / 2) + hspace)] * scale
 
     fig, ax = plt.subplots(nrows=_nrows, ncols=ncols, figsize=figsize, **subplots_kws)
 
     _df = data.copy()
     _df['_dummy'] = 1
 
-    # adjust hues if applicable
-    if hue_labels is not None:
+    for _it, _level in enumerate(_levels):
 
-        _df[hue] = _df[hue].replace(hue_labels)
-
-        if hue_colors is not None:
-
-            for _key in list(hue_labels.keys()):
-
-                if _key in list(hue_colors.keys()):
-                    hue_colors[hue_labels[_key]] = hue_colors.pop(_key)
-
-    for _level_i in range(len(_levels)):
-
-        _col = _level_i % ncols
-        _row = _level_i // ncols
+        _col = _it % ncols
+        _row = _it // ncols
 
         # get axis
         _ax = get_subax(ax, _row, _col, rows_prio=False)
-
-        _level = _levels[_level_i]
-
-        if level_colors is not None:
-            _level_color = level_colors[_level]  # should be a dict
-        else:
-            _level_color = palette[_level_i]
-
-        if level_labels is not None:
-            _level_label = level_labels[_level]
-        else:
-            _level_label = _level
 
         if do_print:
             tprint(_col, _level)
@@ -983,16 +961,14 @@ def level_countplot(data, level, hue, ncols=4, level_colors=None, hue_colors=Non
         if _level == 'all':
 
             # first plot: counts per level
-            countplot(data=_df, x=level, ax=_ax, **kwargs)
+            countplot(data=_df, x=level, order=_levels[1:], ax=_ax, **kwargs)
             _ax.set_title(levelplot_title)
 
         else:
             # subsequent plots: cols per hue
 
-            _df_level = _df[_df[level] == _level]
-
-            countplot(data=_df_level, x=hue, ax=_ax, **kwargs)
-            _ax.set_title(_level_label)
+            countplot(data=_df[_df[level] == _level], x=hue, order=hue_order, ax=_ax, **kwargs)
+            _ax.set_title(_level)
 
     # hide remaining empty axis
     for __col in range(_col + 1, ncols, 1):
@@ -1315,7 +1291,6 @@ def ax_as_list(ax):
 
 
 def ax_as_array(ax):
-
     if isinstance(ax, np.ndarray):
         if len(ax.shape) == 2:
             return ax
@@ -1326,18 +1301,18 @@ def ax_as_array(ax):
 
 
 # bubble plot
-def bubbleplot(x, y, hue, s, text=None, text_as_label=False, color=None, data=None, s_factor=250, palette=None,
-               hue_order=None, hue_color=None, x_range_factor=5, y_range_factor=5, show_std=False, grid=False, ax=None,
+def bubbleplot(x, y, hue, s, text=None, text_as_label=False, data=None, s_factor=250, palette=None,
+               hue_order=None, x_range_factor=5, y_range_factor=5, show_std=False, ax=None,
                legend_loc='right', text_kws=None):
     if palette is None:
         palette = rcParams['palette']
     if text_kws is None:
         text_kws = {}
-    _df = data.copy().reset_index(drop=True)
+    if ax is None:
+        _, ax = plt.subplots()
 
-    # print(_df)
-
-    _df = _df[~((_df[x].isnull()) | (_df[y].isnull()) | (_df[s].isnull()))]
+    _df = data.copy()
+    _df = _df[~((_df[x].isnull()) | (_df[y].isnull()) | (_df[s].isnull()))].reset_index(drop=True)
 
     if hue_order is not None:
         _df['_sort'] = _df[hue].apply(lambda _: hue_order.index(_))
@@ -1354,26 +1329,12 @@ def bubbleplot(x, y, hue, s, text=None, text_as_label=False, color=None, data=No
     else:
         _text = pd.Series()
 
-    # color logic
-    if hue_color is not None:  # hue color takes precedence (should be a dict with hue levels as keys)
-
-        _df['_color'] = _df[hue].apply(lambda _: hue_color[_])
-
+    if isinstance(palette, Mapping):
+        _df['_color'] = _df[hue].apply(lambda _: palette[_])
+    elif is_list_like(palette):
+        _df['_color'] = palette[:_df.index.max() + 1]
     else:
-
-        if color is None:
-
-            if palette is None:
-                _df['_color'] = palette[:_df.index.max() + 1]
-            else:
-                _df['_color'] = palette[:_df.index.max() + 1]
-
-        else:
-
-            _df['_color'] = _df[color]
-
-    if ax is None:
-        fig, ax = plt.subplots()
+        _df['color'] = palette
 
     # draw ellipse to mark 1 sigma area
     if show_std:
@@ -1458,12 +1419,8 @@ def bubbleplot(x, y, hue, s, text=None, text_as_label=False, color=None, data=No
     else:
         ax.legend(loc=legend_loc)
 
-    # ax.set_axis_off()
-
     # title
     ax.set_title(hue)
-    if grid:
-        ax.grid()
 
     return ax
 
@@ -1567,11 +1524,16 @@ def rmsdplot(x, data, groups=None, hue=None, hue_order=None, cutoff=0, ax=None,
         else:
             _hues = _df_rmsd[hue].cat.categories
 
-        _df_rmsd['_color'] = _df_rmsd[hue].apply(lambda _l: palette[list(_hues).index(_l)])
+        if isinstance(palette, Mapping):
+            _df_rmsd['_color'] = _df_rmsd[hue].apply(lambda _: palette[_])
+        elif is_list_like(palette):
+            _df_rmsd['_color'] = _df_rmsd[hue].apply(lambda _: palette[list(_hues).index(_)])
+        else:
+            _df_rmsd['color'] = palette
 
-        _rgba_colors[:, 0] = _df_rmsd['_color'].apply(lambda _l: Color(_l).red)
-        _rgba_colors[:, 1] = _df_rmsd['_color'].apply(lambda _l: Color(_l).green)
-        _rgba_colors[:, 2] = _df_rmsd['_color'].apply(lambda _l: Color(_l).blue)
+        _rgba_colors[:, 0] = _df_rmsd['_color'].apply(lambda _: Color(_).red)
+        _rgba_colors[:, 1] = _df_rmsd['_color'].apply(lambda _: Color(_).green)
+        _rgba_colors[:, 2] = _df_rmsd['_color'].apply(lambda _: Color(_).blue)
 
     elif color_as_balance:
 
@@ -1767,9 +1729,13 @@ def aggplot(x, data, group, hue=None, width=16, height=9 / 2,
             _label = '_label'
             _df_agg[_label] = concat_cols(_df_agg, [_group, hue], sep='_').astype('category')
             _hues = _df_agg[hue].value_counts().reset_index()['index']
-            # map colors to hues
-            _df_agg['_color'] = _df_agg[hue].apply(lambda _l: palette[list(_hues).index(_l)])
-            # inser rows of nan between groups (for white space)
+
+            if isinstance(palette, Mapping):
+                _df_agg['_color'] = _df_agg[hue].apply(lambda _: palette[_])
+            elif is_list_like(palette):
+                _df_agg['_color'] = _df_agg[hue].apply(lambda _: palette[list(_hues).index(_)])
+            else:
+                _df_agg['_color'] = palette
 
         else:
             _label = _group
@@ -2456,26 +2422,20 @@ def dic_to_lcurveplot(dic, width=16, height=9 / 2, **kwargs):
 
 
 # re implementation of stemplot because customization sucks
-def stemplot(x, y, data=None, ax=None, color=rcParams['palette'][0], baseline=0,
-             kwline=None, **kwargs):
+def stemplot(x, y, data=None, ax=None, color=rcParams['palette'][0], baseline=0, kwline=None, **kwargs):
     if kwline is None:
         kwline = {}
     if data is None:
-
         if 'name' in dir(x):
             _x = x.name
         else:
             _x = 'x'
-
         if 'name' in dir(y):
             _y = y.name
         else:
             _y = 'x'
-
         _data = pd.DataFrame({_x: x, _y: y})
-
     else:
-
         _x = x
         _y = y
         _data = data.copy()
@@ -2523,7 +2483,7 @@ def from_to_plot(data: pd.DataFrame, x_from='x_from', x_to='x_to', y_from=0, y_t
         if isinstance(palette, Mapping):
             _color = palette[_name]
         elif is_list_like(palette):
-            _color = palette[_labels.index(_name)]
+            _color = palette[_labels.index(_name) % len(palette)]
         else:
             _color = palette
 
@@ -2561,7 +2521,7 @@ def vlineplot(data, palette=None, label=None, legend=True, legend_loc=None, ax=N
         if isinstance(palette, Mapping):
             _color = palette[_name]
         elif is_list_like(palette):
-            _color = palette[_labels.index(_name)]
+            _color = palette[_labels.index(_name) % len(palette)]
         else:
             _color = palette
 
@@ -2692,7 +2652,6 @@ def share_xy(ax, x=True, y=True, mode='all', adj_twin_ax=True):
 
 
 def share_legend(ax, keep_i=None):
-
     _ax_list = ax_as_list(ax)
 
     if keep_i is None:
@@ -2810,7 +2769,7 @@ def kdeplot(x, data=None, *args, hue=None, hue_order=None, bins=40, adj_x_range=
         if isinstance(palette, Mapping):
             _color = palette[_hue]
         elif is_list_like(palette):
-            _color = palette[_it]
+            _color = palette[_it % len(palette)]
         else:
             _color = palette
 
@@ -2936,7 +2895,7 @@ def kdeplot(x, data=None, *args, hue=None, hue_order=None, bins=40, adj_x_range=
                 # std
                 if highlight_peaks != 'max':
                     ax2.plot([_row['range_min'], _row['range_max']], [_value_std, _value_std],
-                                                      color=kde_color, label='__nolegend__', ls=':', **kwline)
+                             color=kde_color, label='__nolegend__', ls=':', **kwline)
 
                 # scatterplot for markers
                 ax2.scatter(x=_mu, y=_row['value'], facecolor=kde_color, **kwargs)
@@ -3063,8 +3022,8 @@ def histplot(x=None, data=None, hue=None, hue_order=None, ax=None, bins=30, use_
     return ax
 
 
-def countplot(x=None, data=None, hue=None, ax=None, order='default', hue_order=None, normalize_x=False,
-              normalize_hue=False, color=None, palette=None,
+def countplot(x=None, data=None, hue=None, ax=None, order=None, hue_order=None, normalize_x=False,
+              normalize_hue=False, palette=None,
               x_tick_rotation=None, count_twinx=False, hide_legend=False, annotate=True,
               annotate_format=',.2f', legend_kws=None, barplot_kws=None, count_twinx_kws=None, **kwargs):
     # normalize_x causes the sum of each x group to be 100 percent
@@ -3110,24 +3069,27 @@ def countplot(x=None, data=None, hue=None, ax=None, order='default', hue_order=N
 
     _df_count = df_count(x=_x, df=_df, hue=hue, **kwargs)
 
-    if not is_list_like(order):
-        if order == 'default':
-            order = _df_count[[_x, _count_x]].drop_duplicates().sort_values(by=[_count_x], ascending=False)[_x]
-        elif order == 'sorted':
-            order = sorted(_df_count[_x].unique())
-    if (hue_order == 'sorted') and (hue is not None):
-        hue_order = sorted(_df_count[hue].unique())
-    if (hue_order is None) and (hue is not None):
-        hue_order = _df_count[[hue, _count_hue]].drop_duplicates().sort_values(by=[_count_hue], ascending=False)[hue]
+    if order is None or order == 'count':
+        _order = _df_count[[_x, _count_x]].drop_duplicates().sort_values(by=[_count_x], ascending=False)[_x].tolist()
+    elif order == 'sorted':
+        _order = _df_count[_x].drop_duplicates().sort_values().tolist()
+    else:
+        _order = order
+
+    if hue is not None:
+        if hue_order is None or hue_order == 'count':
+            _hues = _df_count[[hue, _count_hue]].drop_duplicates().sort_values(by=[_count_hue], ascending=False
+                                                                               )[hue].tolist()
+        elif hue_order == 'sorted':
+            _hues = _df_count[hue].drop_duplicates().sort_values().tolist()
+        else:
+            _hues = hue_order
 
     if palette is None:
-        if color is None:
-            palette = rcParams['palette']
-        else:
-            palette = [color]
+        palette = rcParams['palette']*5
 
-    _plot = sns.barplot(data=_df_count, x=_x, y=_y, hue=hue, order=order, hue_order=hue_order, color=color,
-                        palette=palette, ax=ax, **barplot_kws)
+    _plot = sns.barplot(data=_df_count, x=_x, y=_y, hue=hue, order=_order, hue_order=hue_order, palette=palette, ax=ax,
+                        **barplot_kws)
 
     # cleanup for x=None
     if x is None:

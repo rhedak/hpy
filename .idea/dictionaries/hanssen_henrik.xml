@@ -27,6 +27,7 @@
       <w>corrs</w>
       <w>countplot</w>
       <w>distfit</w>
+      <w>distkws</w>
       <w>distplot</w>
       <w>dropna</w>
       <w>dtype</w>
@@ -97,6 +98,7 @@
       <w>resampling</w>
       <w>rgba</w>
       <w>rmsd</w>
+      <w>rmsdplot</w>
       <w>rmse</w>
       <w>scaler</w>
       <w>scatterplot</w>
