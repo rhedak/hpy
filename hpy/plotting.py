@@ -17,13 +17,12 @@ import logging
 import warnings
 
 # third party imports
-from matplotlib.axes import Axes
 from matplotlib import patches
 from matplotlib.animation import FuncAnimation
 from matplotlib.legend import Legend
 from colour import Color
 from scipy import stats
-from collections import Mapping
+from typing import Union, Sequence, Mapping, Callable
 
 try:
     from IPython.core.display import HTML
@@ -31,7 +30,7 @@ except ImportError:
     HTML = None
 
 # local imports
-from hpy.main import export, concat_cols, is_list_like, floor_signif, ceil_signif, tprint, list_intersection
+from hpy.main import export, concat_cols, is_list_like, floor_signif, ceil_signif, tprint, list_intersection, force_list
 from hpy.ds import get_df_corr, lfit, kde, df_count, quantile_split, top_n_coding, df_rmsd, df_agg
 
 # colors for plotting
@@ -52,34 +51,128 @@ rcParams = {
     'figsize_square': (8, 8),
     'fig_width': 8,
     'fig_height': 8,
+    'float_format': '.2f',
     'legend_outside.legend_space': .1,
-    'float_format': '.2f'
+    'distplot.label_style': 'mu_sigma',
+    'distplot.legend_loc': 'bottom',
+    'max_n': 10000,
+    'max_n.random_state': None,
+    'max_n.sample_warn': True,
+    'return_fig_ax': False,
+    'corr_cutoff': 0,
+}
+
+docstrings = {
+    'ax_in': 'The axes object to plot on, defaults to current axis [optional]',
+    'ax_out': 'The axes object with the plot on it',
+    'fig_ax_out': 'if return_fig_ax: figure and axis objects as tuple, else None',
+    'x': 'Name of the x variable in data or vector data',
+    'y': 'Name of the y variable in data or vector data',
+    't': 'Name of the t variable in data or vector data',
+    'x_novec': 'Name of the x variable in data',
+    'y_novec': 'Name of the y variable in data',
+    't_novec': 'Name of the t variable in data',
+    'data': 'Pandas DataFrame containing named data, optional if vector data is used',
+    'hue': 'Further split the plot by the levels of this variable [optional]',
+    'order': '''Either a string describing how the (hue) levels or to be ordered or an explicit list of levels to be 
+    used for plotting. Accepted strings are:
+        * sorted: following python standard sorting conventions (alphabetical for string, ascending for value)
+        * inv: following sort of python standard sorting conventions but in inverse order
+        * count: sorted by value counts
+        * mean, mean_ascending, mean_descending: sorted by mean value, defaults to descending
+        * median, mean_ascending, median_descending: sorted by median value, defaults to descending
+    ''',
+    'color': 'color used for plotting, must be known to matplotlib.pyplot',
+    'palette': 'Collection of colors to be used for plotting. Can be a dictionary for with names for each level or '
+               'a list of colors or an individual color name. Must be valid colors known to pyplot [optional]',
+    'cmap': 'Color map to use [optional]',
+    'annotations': 'Whether to display annotations [optional]',
+    'number_format': 'The format string used for annotations [optional]',
+    'float_format': 'The format string used for displaying floats [optional]',
+    'int_format': 'The format string used for displaying floats [optional]',
+    'corr_target': 'target variable name, if specified only correlations with the target are shown [optional]',
+    'corr_cutoff': 'filter all correlation whose absolute value is below the cutoff [optional]',
+    'col_wrap': 'After how many columns to create a new line of subplots [optional]',
+    'subplot_width': 'Width of each individual subplot [optional]',
+    'subplot_height': 'Height of each individual subplot [optional]',
+    'trendline': 'Whether to add a trendline [optional]',
+    'alpha': 'Alpha transparency level [optional]',
+    'max_n': 'Maximum number of samples to be used for plotting, if this number is exceeded max_n samples are drawn'
+             'at random from the data which triggers a warning unless sample_warn is set to False.'
+             'Set to False or None to use all samples for plotting. [optional]',
+    'max_n_random_state': 'Random state (seed) used for drawing the random samples [optional]',
+    'max_n_sample_warn': 'Whether to trigger a warning if the data has more samples than max_n [optional]',
+    'return_fig_ax': 'Whether to return the figure and axes objects as tuple to be captured as fig,ax = ... .'
+                     'If False pyplot.show() is called and the plot returns None [optional]',
+    'legend': 'Whether to show a legend [optional]',
+    'legend_loc': 'Location of the legend, one of [\'bottom\', \'right\'] or accepted value of pyplot.legend'
+                  'If in {bottom, right} legend_outside is used, else pyplot.legend [optional]',
+    'legend_ncol': 'Number of columns to use in legend [optional]',
+    'legend_space': 'Only valid if legend_loc is bottom. The space between the main plot and the legend [optional]',
+    'kde_steps': 'Nr of steps the range is split into for kde fitting [optional]',
+    'linestyle': 'Linestyle used, must a valid linestyle recognized by pyplot.plot [optional]',
+    'bins': 'Nr of bins of the histogram [optional]',
+    'sharex': 'Whether to share the x axis [optional]',
+    'sharey': 'Whether to share the y axis [optional]',
+    'row': 'Row index [optional]',
+    'col': 'Column index [optional]',
+    'legend_out': 'Whether to draw the legend outside of the axis, can also be a location string [optional]',
+    'legend_kws': 'Other keyword arguments passed to pyplot.legend [optional]',
+    'xlim': 'X limits for the axis as tuple, passed to ax.set_xlim() [optional]',
+    'ylim': 'Y limits for the axis as tuple, passed to ax.set_ylim() [optional]',
+    'grid': 'Whether to toggle ax.grid() [optional]',
+    'vline': 'A list of x positions to draw vlines at [optional]',
+    'valid_distfits': ['kde', 'gauss', False, None]
 }
 
 
 # --- functions
+def _get_ordered_levels(data: pd.DataFrame, level: str, order: Union[list, str, None], x: str = None) -> list:
+    if order is None or order == 'sorted':
+        _hues = data[level].drop_duplicates().sort_values().tolist()
+    elif order == 'inv':
+        _hues = data[level].drop_duplicates().sort_values().tolist()[::-1]
+    elif order == 'count':
+        _hues = data[level].value_counts().reset_index().sort_values(by=[level, 'index'])['index'].tolist()
+    elif order in ['mean', 'mean_descending']:
+        _hues = data.groupby(level)[x].mean().reset_index().sort_values(by=[x, level], ascending=[False, True]
+                                                                        )[level].tolist()
+    elif order == 'mean_ascending':
+        _hues = data.groupby(level)[x].mean().reset_index().sort_values(by=[x, level])[level].tolist()
+    elif order in ['median', 'median_descending']:
+        _hues = data.groupby(level)[x].median().reset_index().sort_values(by=[x, level], ascending=[False, True]
+                                                                          )[level].tolist()
+    elif order == 'median_ascending':
+        _hues = data.groupby(level)[x].median().reset_index().sort_values(by=[x, level])[level].tolist()
+    else:
+        _hues = order
+
+    return _hues
+
+
 @export
-def heatmap(x: str, y: str, z: str, data: pd.DataFrame, ax: Axes = None,
-            cmap: object = None, invert_y: bool = True, **kwargs) -> Axes:
+def heatmap(x: str, y: str, z: str, data: pd.DataFrame, ax: plt.Axes = None,
+            cmap: object = None, invert_y: bool = True, **kwargs) -> plt.Axes:
     """
-        wrapper for seaborn heatmap in x-y-z format
+    wrapper for seaborn heatmap in x-y-z format
+    
     :param x: Variable name for x axis value
     :param y: Variable name for y axis value
     :param z: Variable name for z value, used to color the heatmap
-    :param data: Data Frame or similar containing the named data
-    :param ax: Axes object to plot on. If None a new axes is generated
-    :param cmap: Color map to use
-    :param invert_y: Weather to call ax.invert_yaxis (orders the heatmap as expected)
+    :param data: {data}
+    :param ax: {ax_in}
+    :param cmap: {cmap}
+    :param invert_y: Whether to call ax.invert_yaxis (orders the heatmap as expected)
     :param kwargs: Other keyword arguments passed to seaborn heatmap
-    :return: The Axes object with the plot on it
-    """
+    :return: {ax_out}
+    """.format(**docstrings)
     if cmap is None:
         cmap = sns.diverging_palette(10, 220, as_cmap=True)
 
     _df = data.groupby([x, y]).agg({z: 'mean'}).reset_index().pivot(x, y, z)
 
     if ax is None:
-        _, ax = plt.subplots()
+        ax = plt.gca()
 
     sns.heatmap(_df, ax=ax, cmap=cmap, **kwargs)
     ax.set_title(z)
@@ -90,21 +183,23 @@ def heatmap(x: str, y: str, z: str, data: pd.DataFrame, ax: Axes = None,
     return ax
 
 
-def corrplot(data, annotations=True, number_format='.2f', ax=None):
+@export
+def corrplot(data: pd.DataFrame, annotations: bool = True, number_format: str = rcParams['float_format'], ax=None):
     """
-        function to create a correlation plot using a seaborn heatmap
-        based on: https://www.linkedin.com/pulse/generating-correlation-heatmaps-seaborn-python-andrew-holt
-    :param number_format: The format string used for the annotations
-    :param data: Data Frame or similar containing the named data
-    :param annotations: whether to annotate the corrplot with the correlation coefficients
-    :param ax: The Axes object to draw on. If None a new one is generated
-    :return: The Axes object with the plot on it
-    """
+    function to create a correlation plot using a seaborn heatmap
+    based on: https://www.linkedin.com/pulse/generating-correlation-heatmaps-seaborn-python-andrew-holt
+        
+    :param number_format: {number_format}
+    :param data: {data}
+    :param annotations: {annotations}
+    :param ax: {ax_in}
+    :return: {ax_out}
+    """.format(**docstrings)
     # Create Correlation df
     _corr = data.corr()
 
     if ax is None:
-        _, ax = plt.subplots()
+        ax = plt.gca()
     # Generate Color Map
     _colormap = sns.diverging_palette(220, 10, as_cmap=True)
 
@@ -124,8 +219,23 @@ def corrplot(data, annotations=True, number_format='.2f', ax=None):
     return ax
 
 
-# print a bar corrplot
-def corrplot_bar(data, target=None, columns=None, corr_cutoff=0, corr_as_alpha=False, fix_x_range=True, ax=None):
+@export
+def corrplot_bar(data: pd.DataFrame, target: str = None, columns: Sequence[str] = None,
+                 corr_cutoff: float = rcParams['corr_cutoff'], corr_as_alpha: bool = False,
+                 xlim: tuple = (-1, 1), ax: plt.Axes = None):
+    """
+    correlation plot as barchart
+    
+    :param data: {data}
+    :param target: {corr_target}
+    :param columns: columns for which to calculate the correlations, defaults to all numeric columns [optional]
+    :param corr_cutoff: {corr_cutoff}
+    :param corr_as_alpha: whether to set alpha value of bars to scale with correlation [optional]
+    :param xlim: xlim scale for plot, defaults to (-1, 1) to show the absolute scale of the correlations.
+        set to None if you want the plot x limits to scale to the highest correlation values [optional]
+    :param ax: {ax_in}
+    :return: {ax_out}
+    """.format(**docstrings)
     _df_corr = get_df_corr(data, target=target)
     _df_corr = _df_corr[_df_corr['corr_abs'] >= corr_cutoff]
 
@@ -154,18 +264,17 @@ def corrplot_bar(data, target=None, columns=None, corr_cutoff=0, corr_as_alpha=F
     else:
         _rgba_colors[:, 3] = 1
 
-    # _df_corr['color'] = np.where(_df_corr['corr']>0,'blue','red')
-
     if ax is None:
-        _, ax = plt.subplots()
+        ax = plt.gca()
 
     _rgba_colors = np.round(_rgba_colors, 2)
 
     _plot = ax.barh(_df_corr['label'], _df_corr['corr'], color=_rgba_colors)
     ax.invert_yaxis()
 
-    if fix_x_range:
-        ax.set_xlim([-1, 1])
+    if xlim:
+        # noinspection PyTypeChecker
+        ax.set_xlim(xlim)
 
     if target is not None:
         ax.set_title('Correlations with {} by Absolute Value'.format(target))
@@ -173,20 +282,41 @@ def corrplot_bar(data, target=None, columns=None, corr_cutoff=0, corr_as_alpha=F
     else:
         ax.set_title('Correlations by Absolute Value')
 
-    if ax is None:
-        plt.gcf().patch.set_facecolor('white')
-        plt.show()
-    else:
-        return ax
+    return ax
 
 
-# print a pairwise_corrplot to for all variables in the df, by default only plots those with a correlation 
-# coefficient of >= .5
-def pairwise_corrplot(df, corr_cutoff=.5, ncols=4, hue=None, width=rcParams['fig_width'],
-                      height=rcParams['fig_height'], trendline=True, alpha=.5, ax=None,
-                      target=None, palette=rcParams['palette'],
-                      max_n=1000, random_state=None, sample_warn=True, return_fig_ax=False, **kwargs):
-    warnings.simplefilter('ignore', np.RankWarning)
+@export
+def pairwise_corrplot(data: pd.DataFrame, corr_cutoff: float = rcParams['corr_cutoff'], col_wrap: int = 4,
+                      hue: str = None, hue_order: Union[list, str] = None,
+                      width: float = rcParams['fig_width'], height: float = rcParams['fig_height'],
+                      trendline: bool = True, alpha: float = .75, ax: plt.Axes = None,
+                      target: str = None, palette: Union[Mapping, Sequence, str] = rcParams['palette'],
+                      max_n: int = rcParams['max_n'], random_state: int = rcParams['max_n.random_state'],
+                      sample_warn: bool = rcParams['max_n.sample_warn'],
+                      return_fig_ax: bool = rcParams['return_fig_ax'], **kwargs) -> Union[tuple, None]:
+    """
+    print a pairwise_corrplot to for all variables in the df, by default only plots those with a correlation
+    coefficient of >= corr_cutoff
+    
+    :param data: {data}
+    :param corr_cutoff: {corr_cutoff}
+    :param col_wrap: {col_wrap}
+    :param hue: {hue}
+    :param hue_order: {order}
+    :param width: {subplot_width}
+    :param height: {subplot_height}
+    :param trendline: {trendline}
+    :param alpha: {alpha}
+    :param ax: {ax_in}
+    :param target: {corr_target}
+    :param palette: {palette}
+    :param max_n: {max_n}
+    :param random_state: {max_n_random_state}
+    :param sample_warn: {max_n_sample_warn}
+    :param return_fig_ax: {return_fig_ax}
+    :param kwargs: other keyword arguments passed to pyplot.subplots
+    :return: {fig_ax_out}
+    """.format(**docstrings)
 
     # actual plot function
     def _f_plot(_f_x, _f_y, _f_data, _f_color, _f_color_trendline, _f_label, _f_ax):
@@ -211,13 +341,13 @@ def pairwise_corrplot(df, corr_cutoff=.5, ncols=4, hue=None, width=rcParams['fig
         return _f_ax
 
     # avoid inplace operations
-    _df = df.copy()
+    _df = data.copy()
     _df_hues = pd.DataFrame()
     _df_corrs = pd.DataFrame()
     _hues = None
 
     if hue is not None:
-        _hues = _df[hue].value_counts().reset_index()['index']
+        _hues = _get_ordered_levels(_df, hue, hue_order)
         _df_hues = {}
         _df_corrs = {}
 
@@ -240,18 +370,18 @@ def pairwise_corrplot(df, corr_cutoff=.5, ncols=4, hue=None, width=rcParams['fig
         return None
 
     # edge case for less plots than ncols
-    if len(_df_corr) < ncols:
+    if len(_df_corr) < col_wrap:
         _ncols = len(_df_corr)
     else:
-        _ncols = ncols
+        _ncols = col_wrap
 
     # calculate nrows
     _nrows = int(np.ceil(len(_df_corr) / _ncols))
 
-    figsize = (width * ncols, height * _nrows)
+    _figsize = (width * col_wrap, height * _nrows)
 
     if ax is None:
-        fig, ax = plt.subplots(nrows=_nrows, ncols=_ncols, figsize=figsize, **kwargs)
+        fig, ax = plt.subplots(nrows=_nrows, ncols=_ncols, figsize=_figsize, **kwargs)
     else:
         fig = plt.gcf()
 
@@ -327,14 +457,65 @@ def pairwise_corrplot(df, corr_cutoff=.5, ncols=4, hue=None, width=rcParams['fig
         plt.show()
 
 
-# plot a NORMALIZED histogram + a fit of a gaussian distribution
-def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=None, hue_sort_type='count',
-             hue_round=1, linecolor='black', edgecolor='gray', alpha=None, bins=40, perc=None,
-             top_nr=5, other_name='other', title=True, title_prefix='', value_name='column_value',
-             sigma_cutoff=3, show_hist=True, distfit='kde', show_grid=False, fill=True,
-             legend=True, legend_loc='bottom', legend_space=rcParams['legend_outside.legend_space'], legend_ncol=1,
+@export
+def distplot(x, data, hue=None, hue_order='sorted', palette=None,
+             linecolor='black', edgecolor='black', alpha=None, bins=40, perc=None,
+             top_nr=None, other_name='other', title=True, title_prefix='', value_name='column_value',
+             std_cutoff=3, show_hist=None, distfit='kde', fill=None,
+             legend=True, legend_loc=rcParams['distplot.legend_loc'],
+             legend_space=rcParams['legend_outside.legend_space'], legend_ncol=1,
              agg_func='mean', number_format=rcParams['float_format'], kde_steps=1000, max_n=100000, random_state=None,
-             sample_warn=True, xlim=None, distfit_line=None, label_style='mu_sigma', ax=None, **kwargs):
+             sample_warn=True, xlim=None, linestyle=None, label_style=rcParams['distplot.label_style'],
+             ax=None, **kwargs):
+    """
+    Similar to seaborn.distplot but supports hues and some other things. Plots a combination of a histogram and
+    a kernel density estimation.
+    
+    :param x: the name of the variable(s) in data or vector data, if data is provided and x is a list of columns
+        the DataFrame is automatically melted and the newly generated column used as hue. i.e. you plot
+        the distributions of multiple columns on the same axis
+    :param data: {data}
+    :param hue: {hue}
+    :param hue_order: {order}
+    :param palette: {palette}
+    :param linecolor: Color of the kde fit line, overwritten with palette by hue level if hue is specified [optional]
+    :param edgecolor: Color of the histogram edges [optional]
+    :param alpha: {alpha}
+    :param bins: {bins}
+    :param perc: Whether to display the y-axes as percentage, if false count is displayed.
+        Defaults if hue: True, else False [optional]
+    :param top_nr: limit hue to top_nr levels using hpy.ds.top_n, the rest will be cast to other [optional]
+    :param other_name: name of the other group created by hpy.ds.top_n [optional]
+    :param title: whether to set the plot title equal to x's name [optional]
+    :param title_prefix: prefix to be used in plot title [optional]
+    :param value_name: if x is a list and data is not None this will be the name of the newly created column [optional]
+    :param std_cutoff: automatically cutoff data outside of the std_cutoff standard deviations range [optional]
+    :param show_hist: whether to show the histogram, default False if hue else True [optional]
+    :param distfit: one of {valid_distfits}. If 'kde' fits a kernel density distribution to the data.
+        If gauss fits a gaussian distribution with the observed mean and std to the data. [optional]
+    :param fill: whether to fill the area under the distfit curve, ignored if show_hist is True.
+        Default if hue: False, else True. [optional]
+    :param legend: {legend}
+    :param legend_loc: {legend_loc}
+    :param legend_space: {legend_space}
+    :param legend_ncol: {legend_ncol}
+    :param agg_func: one of ['mean', 'median']. The agg function used to find the center of the distribution [optional]
+    :param number_format: {number_format}
+    :param kde_steps: {kde_steps}
+    :param max_n: {max_n}
+    :param random_state: {max_n_random_state}
+    :param sample_warn: {max_n_sample_warn}
+    :param xlim: {xlim}
+    :param linestyle: {linestyle}
+    :param label_style: one of ['mu_sigma', 'plain']. If mu_sigma then the mean (or median) and std value are displayed
+        inside the label [optional]
+    :param ax: {ax_in}
+    :param kwargs: additional keyword arguments passed to pyplot.plot
+    :return: {ax_out}
+    """.format(**docstrings)
+    # -- asserts
+    assert (distfit in docstrings['valid_distfits']), 'distfit must be one of {}'.format(docstrings['valid_distfits'])
+    # -- defaults
     if palette is None:
         palette = rcParams['palette']
     if not top_nr:
@@ -371,19 +552,24 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
 
     del x
 
-    if hue is not None:
-
-        _df = _df[~_df[hue].isnull()]
-        if hue_round is not None:
-            if _df[hue].dtype == float:
-                _df[hue] = _df[hue].round(hue_round)
-        if perc is None:
-            perc = True
-
-    else:
+    if hue is None:
 
         if perc is None:
             perc = False
+        if fill is None:
+            fill = True
+        if show_hist is None:
+            show_hist = True
+
+    else:
+
+        _df = _df[~_df[hue].isnull()]
+        if perc is None:
+            perc = True
+        if fill is None:
+            fill = False
+        if show_hist is None:
+            show_hist = False
 
     # in case that there are more than max_n samples: take  a random sample for calc speed
     if max_n:
@@ -403,36 +589,32 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
 
     # the actual plot
     def _f_distplot(_f_x, _f_data, _f_x_label, _f_facecolor, _f_distfit_color, _f_bins,
-                    _f_sigma_cutoff, _f_xlim, _f_distfit_line, _f_ax, _f_ax2, _f_fill):
+                    _f_std_cutoff, _f_xlim, _f_distfit_line, _f_ax, _f_ax2, _f_fill):
 
         # make a copy to avoid inplace operations
         _df_i = _f_data.copy()
-
-        # rename hues (if applicable)
-        if hue_labels is not None:
-            _df_i[hue] = _df_i[hue].replace(hue_labels)
 
         # best fit of data
         _mu = _df_i.agg({_f_x: agg_func})[0]
         _sigma = _df_i.agg({_f_x: 'std'})[0]
 
         # apply sigma cutoff
-        if (_f_sigma_cutoff is not None) or (_f_xlim is not None):
+        if (_f_std_cutoff is not None) or (_f_xlim is not None):
 
             if _f_xlim is not None:
 
                 __x_min = _f_xlim[0]
                 __x_max = _f_xlim[1]
 
-            elif is_list_like(_f_sigma_cutoff):
+            elif is_list_like(_f_std_cutoff):
 
-                __x_min = _f_sigma_cutoff[0]
-                __x_max = _f_sigma_cutoff[1]
+                __x_min = _f_std_cutoff[0]
+                __x_max = _f_std_cutoff[1]
 
             else:
 
-                __x_min = _mu - _f_sigma_cutoff * _sigma
-                __x_max = _mu + _f_sigma_cutoff * _sigma
+                __x_min = _mu - _f_std_cutoff * _sigma
+                __x_max = _mu + _f_std_cutoff * _sigma
 
             _df_i = _df_i[
                 (_df_i[_f_x] >= __x_min) &
@@ -475,7 +657,7 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
             if _f_distfit_line is None:
                 _f_distfit_line = '-'
 
-        if distfit is not None:
+        if distfit:
 
             if show_hist:
                 _ax = _f_ax2
@@ -485,14 +667,10 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
             if distfit == 'gauss':
 
                 # add a 'best fit' line
+                __x = _f_bins
                 _y = stats.norm.pdf(_f_bins, _mu, _sigma)  # _hist_bins
-                _ax.plot(_f_bins, _y, linestyle=_f_distfit_line, color=_f_distfit_color, alpha=alpha, linewidth=2,
+                _ax.plot(__x, _y, linestyle=_f_distfit_line, color=_f_distfit_color, alpha=alpha, linewidth=2,
                          label=_label_2, **kwargs)
-
-                if show_hist:
-                    _ax.set_ylim([0, np.max(_y) * 1.05])
-                elif _f_fill:
-                    _ax.fill_between(_f_bins, _y, color=_f_facecolor, alpha=alpha)
 
             elif distfit == 'kde':
 
@@ -501,7 +679,11 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
                 _y = _kde['value']
                 _ax.plot(__x, _y, linestyle=_f_distfit_line, color=_f_distfit_color, alpha=alpha, linewidth=2,
                          label=_label_2, **kwargs)
-                if not show_hist and _f_fill:
+
+            if not show_hist:
+                _ax.set_ylabel('pdf')
+                if _f_fill:
+                    # noinspection PyUnboundLocalVariable
                     _ax.fill_between(__x, _y, color=_f_facecolor, alpha=alpha)
 
             _f_ax2.get_yaxis().set_visible(False)
@@ -543,7 +725,7 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
 
     # init plot
     if ax is None:
-        _, ax = plt.subplots()
+        ax = plt.gca()
     ax2 = ax.twinx()
 
     # hue case
@@ -554,10 +736,10 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
             _x_min = xlim[0]
             _x_max = xlim[1]
 
-        elif sigma_cutoff is not None:
+        elif std_cutoff is not None:
 
-            _x_min = _df[_x].mean() - _df[_x].std() * sigma_cutoff
-            _x_max = _df[_x].mean() + _df[_x].std() * sigma_cutoff
+            _x_min = _df[_x].mean() - _df[_x].std() * std_cutoff
+            _x_max = _df[_x].mean() + _df[_x].std() * std_cutoff
 
         else:
 
@@ -585,47 +767,34 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
         # just plot
         ax, ax2 = _f_distplot(_f_x=_x, _f_data=_df, _f_x_label=_x_name, _f_facecolor=_color,
                               _f_distfit_color=linecolor,
-                              _f_bins=_bins, _f_sigma_cutoff=sigma_cutoff,
-                              _f_xlim=xlim, _f_distfit_line=distfit_line, _f_ax=ax, _f_ax2=ax2, _f_fill=fill)
+                              _f_bins=_bins, _f_std_cutoff=std_cutoff,
+                              _f_xlim=xlim, _f_distfit_line=linestyle, _f_ax=ax, _f_ax2=ax2, _f_fill=fill)
 
     else:
 
-        _df[hue] = _df[hue].astype('str')
-
-        # make one plot per hue, but all on the same axis
-        if hue_order is None:
-
-            # sort by value count
-            if hue_sort_type == 'count':
-                _hues = _df[hue].value_counts().reset_index().sort_values(by=[hue, 'index'])['index'].tolist()
-            else:
-                _hues = _df[hue].drop_duplicates().sort_values().tolist()
-
-            # group values outside of top_n to other_name
-            if top_nr is not None:
-
-                if (top_nr + 1) < len(_hues):  # the plus 1 is there to avoid the other group having exactly 1 entry
-
-                    _hues = pd.Series(_hues)[0:top_nr]
-                    _df[hue] = np.where(_df[hue].isin(_hues), _df[hue], other_name)
-                    _df[hue] = _df[hue].astype('str')
-                    _hues = list(_hues) + [other_name]
-
+        # group values outside of top_n to other_name
+        if top_nr is not None:
+            _hues = _df[hue].value_counts().reset_index().sort_values(by=[hue, 'index'])['index'].tolist()
+            if (top_nr + 1) < len(_hues):  # the plus 1 is there to avoid the other group having exactly 1 entry
+                _hues = pd.Series(_hues)[0:top_nr]
+                _df[hue] = np.where(_df[hue].isin(_hues), _df[hue], other_name)
+                _df[hue] = _df[hue].astype('str')
+                _hues = list(_hues) + [other_name]
+        # parse hue order
         else:
-            _hues = hue_order
+            _hues = _get_ordered_levels(_df, hue, hue_order, _x)
 
         # find shared _x_min ; _x_max
-
         if xlim is not None:
 
-            _sigma_cutoff_hues = None
+            _std_cutoff_hues = None
 
             _x_min = xlim[0]
             _x_max = xlim[1]
 
-        elif sigma_cutoff is None:
+        elif std_cutoff is None:
 
-            _sigma_cutoff_hues = None
+            _std_cutoff_hues = None
 
             _x_min = _df[_x].min()
             _x_max = _df[_x].max()
@@ -633,14 +802,14 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
         else:
             _df_agg = _df.groupby(hue).agg({_x: ['mean', 'std']}).reset_index()
             _df_agg.columns = [hue, 'mean', 'std']
-            _df_agg['x_min'] = _df_agg['mean'] - _df_agg['std'] * sigma_cutoff
-            _df_agg['x_max'] = _df_agg['mean'] + _df_agg['std'] * sigma_cutoff
+            _df_agg['x_min'] = _df_agg['mean'] - _df_agg['std'] * std_cutoff
+            _df_agg['x_max'] = _df_agg['mean'] + _df_agg['std'] * std_cutoff
             _df_agg['x_range'] = _df_agg['x_max'] - _df_agg['x_min']
 
             _x_min = _df_agg['x_min'].min()
             _x_max = _df_agg['x_max'].max()
 
-            _sigma_cutoff_hues = [_x_min, _x_max]
+            _std_cutoff_hues = [_x_min, _x_max]
 
         _x_step = (_x_max - _x_min) / bins
 
@@ -649,9 +818,7 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
 
         _bins = np.arange(_x_min, _x_max + _x_step, _x_step)
 
-        for _it in range(len(_hues)):
-
-            _hue = _hues[_it]
+        for _it, _hue in enumerate(_hues):
 
             if isinstance(palette, Mapping):
                 _color = palette[_hue]
@@ -660,19 +827,19 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
             else:
                 _color = palette
 
-            if isinstance(distfit_line, Mapping):
-                _linestyle = distfit_line[_hue]
-            elif is_list_like(distfit_line):
-                _linestyle = distfit_line[_it]
+            if isinstance(linestyle, Mapping):
+                _linestyle = linestyle[_hue]
+            elif is_list_like(linestyle):
+                _linestyle = linestyle[_it]
             else:
-                _linestyle = distfit_line
+                _linestyle = linestyle
 
             _df_hue = _df[_df[hue] == _hue]
 
             ax, ax2 = _f_distplot(_f_x=_x, _f_data=_df_hue, _f_x_label=_hue, _f_facecolor=_color,
                                   _f_distfit_color=_color, _f_bins=_bins,
-                                  _f_sigma_cutoff=_sigma_cutoff_hues,
-                                  _f_xlim=xlim, _f_distfit_line=_linestyle, _f_ax=ax, _f_ax2=ax2, _f_fill=False)
+                                  _f_std_cutoff=_std_cutoff_hues,
+                                  _f_xlim=xlim, _f_distfit_line=_linestyle, _f_ax=ax, _f_ax2=ax2, _f_fill=fill)
     if legend:
 
         if legend_loc in ['bottom', 'right']:
@@ -694,15 +861,31 @@ def distplot(x, data=None, hue=None, hue_order=None, palette=None, hue_labels=No
     if xlim is not None:
         ax.set_xlim(xlim)
 
-    if show_grid:
-        ax.grid(True)
-
     return ax
 
 
-# 2d histogram
-def hist_2d(x, y, data, bins=100, std_cutoff=3, cutoff_perc=.01, cutoff_abs=0, cmap='rainbow', ax=None,
-            color_sigma='xkcd:red', draw_sigma=True, **kwargs):
+@export
+def hist_2d(x: str, y: str, data: pd.DataFrame, bins: int = 100, std_cutoff: int = 3, cutoff_perc: float = .01,
+            cutoff_abs: float = 0, cmap: str = 'rainbow', ax: plt.Axes = None, color_sigma: str = 'xkcd:red',
+            draw_sigma: bool = True, **kwargs) -> plt.Axes:
+    """
+    generic 2d histogram created by splitting the 2d area into equal sized cells, counting data points in them and
+    drawn using pyplot.pcolormesh
+    
+    :param x: {x}
+    :param y: {y}
+    :param data: {data}
+    :param bins: {bins}
+    :param std_cutoff: {std_cutoff}
+    :param cutoff_perc: if less than this percentage of data points is in the cell then the data is ignored [optional]
+    :param cutoff_abs: if less than this amount of data points is in the cell then the data is ignored [optional]
+    :param cmap: {cmap}
+    :param ax: {ax_in}
+    :param color_sigma: color to highlight the sigma range in, must be a valid pyplot.plot color [optional] 
+    :param draw_sigma: whether to highlight the sigma range [optional]
+    :param kwargs: other keyword arguments passed to pyplot.pcolormesh [optional]
+    :return: 
+    """.format(**docstrings)
     _df = data.copy()
     del data
 
@@ -736,7 +919,7 @@ def hist_2d(x, y, data, bins=100, std_cutoff=3, cutoff_perc=.01, cutoff_abs=0, c
 
     # Plot 2D histogram using pcolor
     if ax is None:
-        _, ax = plt.subplots()
+        ax = plt.gca()
 
     _mappable = ax.pcolormesh(_x_edges, _y_edges, _hist, cmap=cmap, **kwargs)
     ax.set_xlabel(x)
@@ -753,8 +936,20 @@ def hist_2d(x, y, data, bins=100, std_cutoff=3, cutoff_perc=.01, cutoff_abs=0, c
     return ax
 
 
-def paired_plot(df_in, vars_in, color_in=None, cmap_in=None, alpha_in=1, **kwargs):
-    # Function to calculate correlation coefficient between two arrays
+@export
+def paired_plot(data: pd.DataFrame, cols: Sequence, color: str = None, cmap: str = None, alpha: float = 1,
+                **kwargs) -> sns.FacetGrid:
+    """
+    create a facet grid to analyze various aspects of correlation between two variables using seaborn.PairGrid
+    
+    :param data: {data}
+    :param cols: list of exactly two variables to be compared
+    :param color: {color}
+    :param cmap: {cmap}
+    :param alpha: {alpha}
+    :param kwargs: other arguments passed to seaborn.PairGrid
+    :return: seaborn FacetGrid object with the plots on it
+    """.format(**docstrings)
     def _f_corr(_f_x, _f_y, _f_s=10, **_f_kwargs):
         # Calculate the value
         _coef = np.corrcoef(_f_x, _f_y)[0][1]
@@ -766,45 +961,54 @@ def paired_plot(df_in, vars_in, color_in=None, cmap_in=None, alpha_in=1, **kwarg
         _ax.annotate(_label, xy=(0.2, 0.95 - (_f_s - 10.) / 10.), size=20, xycoords=_ax.transAxes, **_f_kwargs)
 
     # Create an instance of the PairGrid class.
-    _grid = sns.PairGrid(data=df_in,
-                         vars=vars_in,
+    _grid = sns.PairGrid(data=data,
+                         vars=cols,
                          **kwargs)
 
     # Map a scatter plot to the upper triangle
-    _grid = _grid.map_upper(plt.scatter, alpha=alpha_in, color=color_in)
+    _grid = _grid.map_upper(plt.scatter, alpha=alpha, color=color)
     # Map a corr coef
     _grid = _grid.map_upper(_f_corr)
 
-    # Map a histogram to the diagonal
-
     # density = True might not be supported in older versions of seaborn / matplotlib
-    _grid = _grid.map_diag(plt.hist, bins=30, color=color_in, alpha=alpha_in, edgecolor='k', density=True)
+    _grid = _grid.map_diag(plt.hist, bins=30, color=color, alpha=alpha, edgecolor='k', density=True)
 
     # Map a density plot to the lower triangle
-    _grid = _grid.map_lower(sns.kdeplot, cmap=cmap_in, alpha=alpha_in)
+    _grid = _grid.map_lower(sns.kdeplot, cmap=cmap, alpha=alpha)
 
     # add legend
     _grid.add_legend()
 
-    # show
-    plt.show()
+    return _grid
 
 
-# quick x limits for plotting (cut off data not in 10%-90% quantile)
-def q_plim(pd_series, q_min=.1, q_max=.9, offset_perc=.1, limit_min_max=False, offset=True):
-    _lower_bound = floor_signif(pd_series.quantile(q=q_min))
-    _upper_bound = ceil_signif(pd_series.quantile(q=q_max))
+@export
+def q_plim(s: pd.Series, q_min: float = .1, q_max: float = .9, offset_perc: float =.1, limit_min_max: bool = False,
+           offset=True) -> tuple:
+    """
+    returns quick x limits for plotting (cut off data not in q_min to q_max quantile)
+    
+    :param s: pandas Series to truncate
+    :param q_min: lower bound quantile [optional]
+    :param q_max: upper bound quantile [optional]
+    :param offset_perc: percentage of offset to the left and right of the quantile boundaries
+    :param limit_min_max: whether to truncate the plot limits at the data limits
+    :param offset: whether to apply the offset
+    :return: a tuple containing the x limits
+    """.format(**docstrings)
+    _lower_bound = floor_signif(s.quantile(q=q_min))
+    _upper_bound = ceil_signif(s.quantile(q=q_max))
 
     if _upper_bound == _lower_bound:
-        _upper_bound = pd_series.max()
-        _lower_bound = pd_series.min()
+        _upper_bound = s.max()
+        _lower_bound = s.min()
 
     if limit_min_max:
 
-        if _upper_bound > pd_series.max():
-            _upper_bound = pd_series.max()
-        if _lower_bound < pd_series.min():
-            _lower_bound = pd_series.min()
+        if _upper_bound > s.max():
+            _upper_bound = s.max()
+        if _lower_bound < s.min():
+            _lower_bound = s.min()
 
     if offset:
 
@@ -818,9 +1022,10 @@ def q_plim(pd_series, q_min=.1, q_max=.9, offset_perc=.1, limit_min_max=False, o
 
 
 # leveled histogram
-def level_histogram(df, cols, level, hue=None, level_colors=None, palette=None, do_print=False,
+def level_histogram(df, cols, level, hue=None, hue_order=None, level_colors=None, palette=None, do_print=False,
                     figsize=None, scale=1, col_labels=None, level_labels=None, hue_labels=None,
-                    distplot_title='Distplot all Levels', hspace=.6, return_fig_ax=False, distkws=None,
+                    distplot_title='Distplot all Levels', hspace=.6, return_fig_ax=rcParams['return_fig_ax'],
+                    distkws=None,
                     dist_kws=None):
     if palette is None:
         palette = rcParams['palette']
@@ -834,7 +1039,7 @@ def level_histogram(df, cols, level, hue=None, level_colors=None, palette=None, 
 
     if hue is not None:
         _df[hue] = _df[hue].astype('category')
-        _hues = _df[hue].value_counts().reset_index()['index']
+        _hues = _get_ordered_levels(data=_df, level=hue, order=hue_order)
 
     _nrows = len(cols)
     _ncols = len(_levels) + 1
@@ -929,10 +1134,9 @@ def level_histogram(df, cols, level, hue=None, level_colors=None, palette=None, 
 
 
 # leveled countplot
-def level_countplot(data, level, hue, ncols=4, do_print=False,
-                    scale=1, level_order=None, hue_order=None,
-                    levelplot_title='Count per Level', hspace=.6,
-                    return_fig_ax=False, subplots_kws=None, **kwargs):
+def level_countplot(data, level, hue, hue_order=None, ncols=4, do_print=False,
+                    scale=1, level_order=None, levelplot_title='Count per Level', hspace=.6,
+                    return_fig_ax=rcParams['return_fig_ax'], subplots_kws=None, **kwargs):
     # default values
     if subplots_kws is None:
         subplots_kws = {}
@@ -947,7 +1151,7 @@ def level_countplot(data, level, hue, ncols=4, do_print=False,
         _levels += data[level].value_counts().reset_index().sort_values(by=[level, 'index'])['index'].tolist()
 
     if hue_order is None:
-        _hues = data[hue].drop_duplicates().sort_values().tolist()
+        _hues = _get_ordered_levels(data=data, level=hue, order=hue_order, x=level)
     else:
         _hues = hue_order
 
@@ -1000,15 +1204,24 @@ def level_countplot(data, level, hue, ncols=4, do_print=False,
         plt.show()
 
 
-# returns all legends on a given axis
-def get_legends(ax):
-    return [c for c in ax.get_children() if isinstance(c, Legend)]
+@export
+def get_legends(ax: plt.Axes = None) -> list:
+    """
+    returns all legends on a given axis, useful if you have a secaxis
+    
+    :param ax: {ax_in}
+    :return: list of legends
+    """.format(**docstrings)
+    if ax is None:
+        ax = plt.gca()
+    return [_ for _ in ax.get_children() if isinstance(_, Legend)]
 
 
 # a plot to compare four components of a DataFrame
-def four_comp_plot(data, x_1, y_1, x_2, y_2, hue_1=None, hue_2=None, lim=None, return_fig_ax=False, **kwargs):
+def four_comp_plot(data, x_1, y_1, x_2, y_2, hue_1=None, hue_2=None, lim=None, return_fig_ax=rcParams['return_fig_ax'],
+                   **kwargs):
     # you can pass the hues to use or if none are given the default ones (std,plus/minus) are used
-    # you can pass xlim and y_lim or assume default (4 std)
+    # you can pass xlim and ylim or assume default (4 std)
 
     # four components, ie 2 x 2
     if lim is None:
@@ -1116,44 +1329,65 @@ def four_comp_plot(data, x_1, y_1, x_2, y_2, hue_1=None, hue_2=None, lim=None, r
         plt.show()
 
 
-# facet wrap like ggplot
-def facet_wrap(func, data, facet, *args, col_wrap=4, width=4, height=9 / 2, catch_error=True,
-               return_fig_ax=False, tight_layout=False, legend_out=False, sharex=False, sharey=False, show_xlabel=True,
-               x_tick_rotation=None, y_tick_rotation=None, ax_title='set', order=None, suptitle=None,
-               linebreak_x_kws=None, linebreak_y_kws=None, subplots_kws=None, subplots_adjust_kws=None, **kwargs):
-    # facet can be one column name to use as facet OR a list of column names
-    # subplots_kws,subplots_adjust_kws should be dictionaries
+@export
+def facet_wrap(func: Callable, data: pd.DataFrame, facet: Union[list, str], *args, facet_type: str = None,
+               col_wrap: int = 4, width: int = rcParams['fig_width'], height: int = rcParams['fig_height'],
+               catch_error: bool = True, return_fig_ax: bool = rcParams['return_fig_ax'], sharex: bool = False,
+               sharey: bool = False, show_xlabel: bool = True, x_tick_rotation: int = None, y_tick_rotation: int = None,
+               ax_title: str = 'set', order: Union[list, str] = None, subplots_kws: Mapping = None, **kwargs):
+    """
+    modeled after r's facet_wrap function. Wraps a number of subplots onto a 2d grid of subplots while creating
+    a new line after col_wrap columns. Uses a given plot function and creates a new plot for each facet level.
+    
+    :param func: Any plot function. Must support keyword arguments data and ax
+    :param data: {data}
+    :param facet: The column / list of columns to facet over.
+    :param args: passed to func
+    :param facet_type: one of ['group', 'cols', None]. 
+        If group facet is treated as the column creating the facet levels and a subplot is created for each level. 
+        If cols each facet is in turn passed as the first positional argument to the plot function func. 
+        If None then the facet_type is inferred: a single facet value will be treated as group and multiple
+        facet values will be treated as cols. 
+    :param col_wrap: {col_wrap}
+    :param width: {subplot_width}
+    :param height: {subplot_height}
+    :param catch_error: whether to keep going in case of an error being encounted in the plot function [optional] 
+    :param return_fig_ax: {return_fig_ax}
+    :param sharex: {sharex}
+    :param sharey: {sharey}
+    :param show_xlabel: whether to show the x label for each subplot
+    :param x_tick_rotation: x tick rotation for each subplot
+    :param y_tick_rotation: y tick rotation for each subplot
+    :param ax_title: one of ['set','hide'], if set sets axis title to facet name, if hide forcefully hids axis title
+    :param order: {order}
+    :param subplots_kws: other keyword arguments passed to pyplot.subplots
+    :param kwargs: other keyword arguments passed to func
+    :return: {fig_ax_out}
+    """.format(**docstrings)
 
-    # avoid inplace operations
-    if linebreak_x_kws is None:
-        linebreak_x_kws = {}
-    if linebreak_y_kws is None:
-        linebreak_y_kws = {}
     if subplots_kws is None:
         subplots_kws = {}
-    if subplots_adjust_kws is None:
-        subplots_adjust_kws = {}
     _df = data.copy()
+    del data
     _facet = None
     _row = None
     _col = None
 
     # if it is a list of column names we will melt the df together
-    if isinstance(facet, list):
-
-        _type_list = True
-        _facets = facet
-
-    else:  # if not a list assume it is the name of the column that has the facet levels
-
-        _type_list = False
-        _facet = facet
-
-        # get facets sorted by value counts
-        if order is None:
-            _facets = _df[_facet].value_counts().reset_index()['index']
+    if facet_type is None:
+        if is_list_like(facet):
+            facet_type = 'cols'
         else:
-            _facets = order + []
+            facet_type = 'group'
+
+    # process the facets
+    if facet_type == 'cols':
+        _facets = facet
+    else:
+        if is_list_like(facet):
+            _df['_facet'] = concat_cols(_df, facet)
+            facet = '_facet'
+            _facets = _get_ordered_levels(data, facet, order)
 
     # init a grid
     if len(_facets) > col_wrap:
@@ -1166,28 +1400,22 @@ def facet_wrap(func, data, facet, *args, col_wrap=4, width=4, height=9 / 2, catc
     fig, ax = plt.subplots(ncols=_ncols, nrows=_nrows, figsize=(width * _ncols, height * _nrows), **subplots_kws)
     _ax_list = ax_as_list(ax)
 
-    _xlim_min = np.nan
-    _xlim_max = np.nan
-    _ylim_min = np.nan
-    _ylim_max = np.nan
-
     # loop facets
-    for _it in range(len(_facets)):
+    for _it, _facet in enumerate(_facets):
 
         _col = _it % _ncols
         _row = _it // _ncols
-
         _ax = _ax_list[_it]
 
         # get df facet
-        _facet_i = _facets[_it]
+        _facet = _facets[_it]
 
         # for list set target to be in line with facet to ensure proper naming
-        if _type_list:
+        if facet_type == 'cols':
             _df_facet = _df.copy()
-            _args = [_facet_i] + list(args)
+            _args = force_list(_facet) + list(args)
         else:
-            _df_facet = _df[_df[_facet] == _facet_i]
+            _df_facet = _df[_df[_facet] == _facet]
             _args = args
 
         # apply function on target (try catch)
@@ -1196,7 +1424,7 @@ def facet_wrap(func, data, facet, *args, col_wrap=4, width=4, height=9 / 2, catc
                 func(*_args, data=_df_facet, ax=_ax, **kwargs)
             except Exception as _exc:
                 warnings.warn('could not plot facet {} with exception {}, skipping. '
-                              'For details use catch_error=False'.format(_exc, _facet_i))
+                              'For details use catch_error=False'.format(_exc, _facet))
                 _ax.set_axis_off()
                 continue
         else:
@@ -1204,13 +1432,9 @@ def facet_wrap(func, data, facet, *args, col_wrap=4, width=4, height=9 / 2, catc
 
         # set axis title to facet or hide it or do nothing (depending on preference)
         if ax_title == 'set':
-            _ax.set_title(_facet_i)
+            _ax.set_title(_facet)
         elif ax_title == 'hide':
             _ax.set_title('')
-
-        # check for legend outside keyword
-        if legend_out:
-            legend_outside(_ax)
 
         # tick rotation
         if x_tick_rotation is not None:
@@ -1225,39 +1449,9 @@ def facet_wrap(func, data, facet, *args, col_wrap=4, width=4, height=9 / 2, catc
     # hide unused axes
     for __col in range(_col + 1, _ncols):
         ax[_row, __col].set_axis_off()
-
-    fig.patch.set_facecolor('white')
-
-    # postprocessing
-    if sharex or sharey or (len(linebreak_x_kws) > 0) or (len(linebreak_y_kws) > 0):
-
-        # We need to draw the canvas, otherwise the labels won't be positioned and we won't have values yet.
-        fig.canvas.draw()
-
-        for _it in range(len(_facets)):
-
-            _col = _it % _ncols
-            _row = _it // _ncols
-
-            # set x lim / x lim to be shared (if applicable)
-            _ax = get_subax(ax, _row, _col, rows_prio=False)
-
-            # add linebreaks
-            if len(linebreak_x_kws) > 0:
-                ax_tick_linebreaks(_ax, y=False, **linebreak_x_kws)
-            if len(linebreak_y_kws) > 0:
-                ax_tick_linebreaks(_ax, x=False, **linebreak_y_kws)
-
-    share_xy(ax, x=sharex, y=sharey)
-
-    if suptitle is not None:
-        plt.suptitle(suptitle)
-        if 'top' not in subplots_adjust_kws.keys():
-            subplots_adjust_kws['top'] = .95
-    if len(subplots_adjust_kws) > 0:
-        plt.subplots_adjust(**subplots_adjust_kws)
-    if tight_layout:
-        plt.tight_layout()
+    # share xy
+    if sharex or sharey:
+        share_xy(ax, x=sharex, y=sharey)
 
     if return_fig_ax:
         return fig, ax
@@ -1265,9 +1459,17 @@ def facet_wrap(func, data, facet, *args, col_wrap=4, width=4, height=9 / 2, catc
         plt.show()
 
 
-# shorthand to get around the fact that ax can be a list or an array (for subplots that can be 1x1,1xn,nx1)
-def get_subax(ax, row=None, col=None, rows_prio=True) -> Axes:
-    # rows_prio decides if to use row or col in case of a 1xn / nx1 shape (false means cols get priority)
+@export
+def get_subax(ax: Union[plt.Axes, np.ndarray], row: int = None, col: int = None, rows_prio: bool = True) -> plt.Axes:
+    """
+    shorthand to get around the fact that ax can be a 1D array or a 2D array (for subplots that can be 1x1,1xn,nx1)
+    
+    :param ax: {ax_in}
+    :param row: {row}
+    :param col: {col}
+    :param rows_prio: decides if to use row or col in case of a 1xn / nx1 shape (False means cols get priority)
+    :return: {ax_out}
+    """.format(**docstrings)
 
     if isinstance(ax, np.ndarray):
         _dims = len(ax.shape)
@@ -1287,7 +1489,15 @@ def get_subax(ax, row=None, col=None, rows_prio=True) -> Axes:
     return _ax
 
 
-def ax_as_list(ax):
+@export
+def ax_as_list(ax: Union[plt.Axes, np.ndarray]) -> list:
+    """
+    takes any Axes and turns them into a list
+    
+    :param ax: {ax_in}
+    :return: List containing the subaxes
+    """.format(**docstrings)
+    
     if isinstance(ax, np.ndarray):
         _dims = len(ax.shape)
     else:
@@ -1303,7 +1513,14 @@ def ax_as_list(ax):
     return _ax_list
 
 
-def ax_as_array(ax):
+@export
+def ax_as_array(ax: Union[plt.Axes, np.ndarray]) -> np.ndarray:
+    """
+    takes any Axes and turns them into a numpy 2D array
+
+    :param ax: {ax_in}
+    :return: Numpy 2D array containing the subaxes
+    """.format(**docstrings)
     if isinstance(ax, np.ndarray):
         if len(ax.shape) == 2:
             return ax
@@ -1322,7 +1539,7 @@ def bubbleplot(x, y, hue, s, text=None, text_as_label=False, data=None, s_factor
     if text_kws is None:
         text_kws = {}
     if ax is None:
-        _, ax = plt.subplots()
+        ax = plt.gca()
 
     _df = data.copy()
     _df = _df[~((_df[x].isnull()) | (_df[y].isnull()) | (_df[s].isnull()))].reset_index(drop=True)
@@ -1491,7 +1708,7 @@ def bubblecountplot(x, y, hue, data, agg_function='median', show_std=True, top_n
 
 # plot rmsd
 def rmsdplot(x, data, groups=None, hue=None, hue_order=None, cutoff=0, ax=None,
-             color_as_balance=True, balance_cutoff=None, rmsd_as_alpha=False, sort_by_hue=False,
+             color_as_balance=False, balance_cutoff=None, rmsd_as_alpha=False, sort_by_hue=False,
              line_break_kws=None, barh_kws=None, palette=None, **kwargs):
     if palette is None:
         palette = rcParams['palette']
@@ -1532,10 +1749,7 @@ def rmsdplot(x, data, groups=None, hue=None, hue_order=None, cutoff=0, ax=None,
 
     if hue is not None:
 
-        if hue_order is not None:
-            _hues = hue_order
-        else:
-            _hues = _df_rmsd[hue].cat.categories
+        _hues = _get_ordered_levels(data=_df_rmsd, level=hue, order=hue_order, x=x)
 
         if isinstance(palette, Mapping):
             _df_rmsd['_color'] = _df_rmsd[hue].apply(lambda _: palette[_])
@@ -1570,7 +1784,7 @@ def rmsdplot(x, data, groups=None, hue=None, hue_order=None, cutoff=0, ax=None,
         _rgba_colors[:, 3] = 1
 
     if ax is None:
-        _, ax = plt.subplots()
+        ax = plt.gca()
 
     # make positions from labels
 
@@ -1660,16 +1874,12 @@ def rmsdplot(x, data, groups=None, hue=None, hue_order=None, cutoff=0, ax=None,
     else:
         ax.set_title('Root Mean Square Difference')
 
-    if ax is None:
-        plt.gcf().patch.set_facecolor('white')
-        plt.show()
-    else:
-        return ax
+    return ax
 
 
 # plot agg
-def aggplot(x, data, group, hue=None, width=16, height=9 / 2,
-            p_1_0=True, palette=None, sort_by_hue=False, return_fig_ax=False, agg=None, p=False,
+def aggplot(x, data, group, hue=None, hue_order=None, width=16, height=9 / 2,
+            p_1_0=True, palette=None, sort_by_hue=False, return_fig_ax=rcParams['return_fig_ax'], agg=None, p=False,
             legend_loc='upper right', aggkws=None, subplots_kws=None, subplots_adjust_kws=None, **kwargs):
     # avoid inplace operations
     if palette is None:
@@ -1741,7 +1951,7 @@ def aggplot(x, data, group, hue=None, width=16, height=9 / 2,
             _df_agg = _df_agg.sort_values(by=_sort_by).reset_index(drop=True)
             _label = '_label'
             _df_agg[_label] = concat_cols(_df_agg, [_group, hue], sep='_').astype('category')
-            _hues = _df_agg[hue].value_counts().reset_index()['index']
+            _hues = _get_ordered_levels(data=_df, level=hue, order=hue_order, x=x)
 
             if isinstance(palette, Mapping):
                 _df_agg['_color'] = _df_agg[hue].apply(lambda _: palette[_])
@@ -1870,27 +2080,15 @@ def aggplot2d(x, y, data, aggfunc='mean', ax=None, x_int=None, time_int=None,
     _df = _df.groupby([x]).agg({y: [aggfunc, 'std']}).set_axis([_y_agg, _y_std], axis=1, inplace=False).reset_index()
 
     if ax is None:
-        _, ax = plt.subplots()
-        _show = True
-    else:
-        _show = False
+        ax = plt.gca()
 
     ax.plot(_df[x], _df[_y_agg], color=color, label=_y_agg)
     ax.fill_between(_df[x], _df[_y_agg] + _df[_y_std], _df[_y_agg] - _df[_y_std], color='xkcd:cyan', label=_y_std)
-    # ax.fill_between(_df[x],_df[_y_agg]-_df[_y_std],color=color,label='__nolegend__')
     ax.set_xlabel(x)
     ax.set_ylabel(y)
     ax.legend()
 
-    if _show:
-        plt.show()
-    else:
-        return ax
-
-
-# a wrapper for use with facet wrap
-def aggplot2dy(y, x, **kwargs):
-    return aggplot2d(x=x, y=y, **kwargs)
+    return ax
 
 
 def insert_linebreak(s, pos=None, frac=None, max_breaks=None):
@@ -1937,8 +2135,28 @@ def ax_tick_linebreaks(ax=None, x=True, y=True, **kwargs):
         ax.set_yticklabels([insert_linebreak(_item.get_text(), **kwargs) for _item in ax.get_yticklabels()])
 
 
-def annotate_barplot(ax=None, x=None, y=None, ci=True, ci_newline=True, adj_ylim=.05, nr_format=',.2f', ha='center',
-                     va='center', offset=plt.rcParams['font.size'], **kwargs):
+@export
+def annotate_barplot(ax: plt.Axes = None, x: Sequence = None, y: Sequence = None, ci: bool = True, 
+                     ci_newline: bool = True, adj_ylim: float = .05, nr_format: str = rcParams['float_format'], 
+                     ha: str = 'center', va: str = 'center', offset: int = plt.rcParams['font.size'],
+                     **kwargs) -> plt.Axes:
+    """
+    automatically annotates a barplot with bar values and error bars (if present). Currently does not work with ticks!
+    
+    :param ax: {ax_in} 
+    :param x: {x}
+    :param y: {y}
+    :param ci: whether to annotate error bars [optional]
+    :param ci_newline: whether to add a newline between values and error bar values [optional] 
+    :param adj_ylim: whether to automatically adjust the plot y limits to fit the annotations [optional]
+    :param nr_format: {nr_format}
+    :param ha: horizontal alignment [optional]
+    :param va: vertical alignment [optional]
+    :param offset: offset between bar top and annotation center [optional]
+    :param kwargs: other keyword arguments passed to pyplot.annotate
+    :return: {ax_out}
+    """.format(**docstrings)
+    # catch font warnings
     logging.getLogger().setLevel(logging.CRITICAL)
 
     if ax is None:
@@ -2019,12 +2237,45 @@ def annotate_barplot(ax=None, x=None, y=None, ci=True, ci_newline=True, adj_ylim
     return ax
 
 
-# animate a plot (wrapper for FuncAnimation to be used with pandas dfs)
-def animplot(data=None, x='x', y='y', t='t', lines=None, max_interval=None, interval=200, html=True, title=True,
-             title_prefix='', t_format=None,
-             fig=None, ax=None, color=None, label=None, legend=False, legend_out=False,
-             legend_kws=None, xlim=None, y_lim=None, ax_facecolor=None, grid=False,
-             vline=None, **kwargs):
+@export
+def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't', lines: Mapping = None,
+             max_interval: int = None, time_per_frame: int = 200, html: bool = True, title: bool = True,
+             title_prefix: str = '', t_format: str = None, fig: plt.Figure = None, ax: plt.Axes = None,
+             color: str = None, label: str = None, legend: bool = False, legend_out: bool = False,
+             legend_kws: Mapping = None, xlim: tuple = None, ylim: tuple = None,
+             ax_facecolor: Union[str, Mapping] = None, grid: bool = False, vline: Union[Sequence, float] = None,
+             **kwargs) -> Union[HTML, FuncAnimation]:
+    """
+    wrapper for FuncAnimation to be used with pandas DataFrames. Assumes that you have a DataFrame containing
+    one datapoint for each x-y-t combination.
+    
+    :param data: {data} 
+    :param x: {x}
+    :param y: {y}
+    :param t: {y}
+    :param lines: you can also pass lines that you want to annimate. Details to follow [optional]
+    :param max_interval: max interval at which to abort the animation [optional]
+    :param time_per_frame: time per frame [optional]
+    :param html: whether to return the output as HTML (for jupyter notebook) [optional]
+    :param title: whether to set the time as plot title [optional]
+    :param title_prefix: title prefix to be put in front of the time if title is true [optional]
+    :param t_format: format string used to format the time variable in the title [optional]
+    :param fig: figure to plot on [optional]
+    :param ax: axes to plot on [optional]
+    :param color: {color}
+    :param label: {label}
+    :param legend: {legend}
+    :param legend_out: {legend_out}
+    :param legend_kws: {legend_kws}
+    :param xlim: {xlim}
+    :param ylim: {ylim}
+    :param ax_facecolor: passed to ax.set_facecolor, can also be a conditional mapping to change the faceolor at
+        specific timepoints t [optional]
+    :param grid: {grid}
+    :param vline: {vline}
+    :param kwargs: other keyword arguments passed to pyplot.plot
+    :return: if HTML: HTML code, else: FuncAnimation object
+    """
     # example for lines (a list of dicts)
     # lines = [{'line':line,'data':data,'x':'x','y':'y','t':'t'}]
 
@@ -2034,13 +2285,9 @@ def animplot(data=None, x='x', y='y', t='t', lines=None, max_interval=None, inte
 
     # init fig,ax
     if fig is None:
-        if ax is None:
-            fig, ax = plt.subplots()
-        else:
-            fig = plt.gcf()
-    else:
-        if ax is None:
-            ax = plt.gca()
+        fig = plt.gcf()
+    if ax is None:
+        ax = plt.gca()
 
     _ax_list = ax_as_list(ax)
 
@@ -2175,7 +2422,7 @@ def animplot(data=None, x='x', y='y', t='t', lines=None, max_interval=None, inte
 
         for __ax in _ax_list:
 
-            _xy_lim_set = False
+            _xylim_set = False
             _x_min = None
             _x_max = None
             _y_min = None
@@ -2188,7 +2435,7 @@ def animplot(data=None, x='x', y='y', t='t', lines=None, max_interval=None, inte
 
                 if __ax == __line['ax']:
 
-                    if not _xy_lim_set:
+                    if not _xylim_set:
 
                         # init with limits of first line
 
@@ -2197,7 +2444,7 @@ def animplot(data=None, x='x', y='y', t='t', lines=None, max_interval=None, inte
                         _y_min = __line['data'][__line['y']].min()
                         _y_max = __line['data'][__line['y']].max()
 
-                        _xy_lim_set = True
+                        _xylim_set = True
 
                     else:
 
@@ -2237,9 +2484,9 @@ def animplot(data=None, x='x', y='y', t='t', lines=None, max_interval=None, inte
             else:
                 __ax.set_xlim([_x_min, _x_max])
 
-            if y_lim is not None:
-                if y_lim:
-                    __ax.set_ylim(y_lim)
+            if ylim is not None:
+                if ylim:
+                    __ax.set_ylim(ylim)
             else:
                 __ax.set_ylim([_y_min, _y_max])
 
@@ -2311,7 +2558,7 @@ def animplot(data=None, x='x', y='y', t='t', lines=None, max_interval=None, inte
         _ax.set_xlim(_line['data'][_line['x']].min(), _line['data'][_line['x']].max())
         _ax.set_ylim(_line['data'][_line['y']].min(), _line['data'][_line['y']].max())
 
-    _anim = FuncAnimation(fig, animate, init_func=init, frames=_max_interval, interval=interval, blit=True)
+    _anim = FuncAnimation(fig, animate, init_func=init, frames=_max_interval, interval=time_per_frame, blit=True)
 
     plt.close('all')
 
@@ -2321,8 +2568,21 @@ def animplot(data=None, x='x', y='y', t='t', lines=None, max_interval=None, inte
         return _anim
 
 
-def legend_outside(ax=None, width=.85, loc='right', legend_space=rcParams['legend_outside.legend_space'], offset_x=0,
-                   offset_y=0, **kwargs):
+@export
+def legend_outside(ax: plt.Axes = None, width: float =.85, loc: str ='right',
+                   legend_space: float = rcParams['legend_outside.legend_space'], offset_x: float = 0,
+                   offset_y: float = 0, **kwargs):
+    """
+    draws a legend outside of the subplot
+    :param ax: {ax_in}
+    :param width: how far to shrink down the subplot if loc=='right'
+    :param loc: one of ['right','bottom'], where to put the legend
+    :param legend_space: how far below the subplot to put the legend if loc=='bottom'
+    :param offset_x: x offset for the legend
+    :param offset_y: y offset for the legend
+    :param kwargs: other keyword arguments passed to pyplot.legend
+    :return: None
+    """.format(**docstrings)
     # -- init
     if loc not in ['bottom', 'right']:
         warnings.warn('legend_outside: legend loc not recognized')
@@ -2398,7 +2658,7 @@ def lcurveplot(train, test, labels=None, legend='upper right', ax=None):
         _label_test = labels
 
     if ax is None:
-        _, ax = plt.subplots()
+        ax = plt.gca()
 
     ax.plot(train, color='xkcd:blue', label=_label_train)
     ax.plot(test, color='xkcd:red', label=_label_test)
@@ -2435,8 +2695,19 @@ def dic_to_lcurveplot(dic, width=16, height=9 / 2, **kwargs):
     plt.show()
 
 
-# re implementation of stemplot because customization sucks
 def stemplot(x, y, data=None, ax=None, color=rcParams['palette'][0], baseline=0, kwline=None, **kwargs):
+    """
+    modeled after pyplot.stemplot but more customizeable
+    :param x: {x}
+    :param y: {y}
+    :param data: {data}
+    :param ax: {ax_in}
+    :param color: {color}
+    :param baseline: where to draw the baseline for the stemplot
+    :param kwline: other keyword arguments passed to pyplot.plot
+    :param kwargs: other keyword arguments passed to pyplot.scatter
+    :return: {ax_out}
+    """.format(**docstrings)
     if kwline is None:
         kwline = {}
     if data is None:
@@ -2455,7 +2726,7 @@ def stemplot(x, y, data=None, ax=None, color=rcParams['palette'][0], baseline=0,
         _data = data.copy()
 
     if ax is None:
-        _, ax = plt.subplots()
+        ax = plt.gca()
 
     # baseline
     ax.axhline(baseline, color='k', ls='--', alpha=.5)
@@ -2474,7 +2745,7 @@ def from_to_plot(data: pd.DataFrame, x_from='x_from', x_to='x_to', y_from=0, y_t
                  legend=True, legend_loc=None, ax=None, **kwargs):
     # defaults
     if ax is None:
-        _, ax = plt.subplots()
+        ax = plt.gca()
     if palette is None:
         palette = rcParams['palette']
 
@@ -2512,7 +2783,7 @@ def from_to_plot(data: pd.DataFrame, x_from='x_from', x_to='x_to', y_from=0, y_t
 def vlineplot(data, palette=None, label=None, legend=True, legend_loc=None, ax=None, **kwargs):
     # defaults
     if ax is None:
-        _, ax = plt.subplots()
+        ax = plt.gca()
     if palette is None:
         palette = rcParams['palette']
 
@@ -2812,7 +3083,7 @@ def kdeplot(x, data=None, *args, hue=None, hue_order=None, bins=40, adj_x_range=
         # -- plot
 
         if ax is None:
-            _, ax = plt.subplots()
+            ax = plt.gca()
 
         # hist
         if show_hist:
@@ -2962,7 +3233,7 @@ def q_barplot(pd_series, ax=None, sort=False, percentage=False, **kwargs):
     _name = pd_series.name
 
     if ax is None:
-        _, ax = plt.subplots()
+        ax = plt.gca()
 
     _df_plot = pd_series.value_counts().reset_index()
 
@@ -3013,7 +3284,7 @@ def histplot(x=None, data=None, hue=None, hue_order=None, ax=None, bins=30, use_
 
     # if an axis has not been passed initialize one
     if ax is None:
-        _, ax = plt.subplots()
+        ax = plt.gca()
 
     # if a hue has been passed loop them
     if hue is not None:
@@ -3036,12 +3307,35 @@ def histplot(x=None, data=None, hue=None, hue_order=None, ax=None, bins=30, use_
     return ax
 
 
-def countplot(x=None, data=None, hue=None, ax=None, order=None, hue_order=None, normalize_x=False,
-              normalize_hue=False, palette=None,
-              x_tick_rotation=None, count_twinx=False, hide_legend=False, annotate=True,
-              annotate_format=',.2f', legend_kws=None, barplot_kws=None, count_twinx_kws=None, **kwargs):
-    # normalize_x causes the sum of each x group to be 100 percent
-    # normalize_hue (with normalize=False) causes the sum of each hue group to be 100 percent
+@export
+def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: str = None, ax: plt.Axes = None,
+              order: Union[Sequence, str] = None, hue_order: Union[Sequence, str] = None, normalize_x: bool = False,
+              normalize_hue: bool = False, palette: Union[Mapping, Sequence, str] = None,
+              x_tick_rotation: int = None, count_twinx: bool = False, hide_legend: bool = False, annotate: bool = True,
+              annotate_format: str = rcParams['float_format'], legend_kws: Mapping = None, barplot_kws: Mapping = None,
+              count_twinx_kws: Mapping = None, **kwargs):
+    """
+    Based on seaborn barplot but with a few more options
+    :param x: {x}
+    :param data: {data}
+    :param hue: {hue}
+    :param ax: {ax_in}
+    :param order: {order}
+    :param hue_order: {order}
+    :param normalize_x: whether to normalize x, causes the sum of each x group to be 100 percent [optional]
+    :param normalize_hue: whether to normalize hue, causes the sum of each hue group to be 100 percent [optional]
+    :param palette: {palette}
+    :param x_tick_rotation: {x_tick_rotation}
+    :param count_twinx: whether to plot the count values on the second axis (if using normalize) [optional]
+    :param hide_legend: whether to hide the legend [optional]
+    :param annotate: whether to use annotate_barplot [optional]
+    :param annotate_format: {number_format}
+    :param legend_kws: additional keyword arguments passed to pyplot.legend [optional]
+    :param barplot_kws: additional keyword arguments passed to seaborn.barplot [optional]
+    :param count_twinx_kws: additional keyword arguments passed to pyplot.plot [optional]
+    :param kwargs: additional keyword arguments passed to hpy.ds.df_count [optional]
+    :return: {ax_out}
+    """.format(**docstrings)
 
     # -- init
 
@@ -3072,7 +3366,7 @@ def countplot(x=None, data=None, hue=None, ax=None, order=None, hue_order=None, 
 
     # if an axis has not been passed initialize one
     if ax is None:
-        _, ax = plt.subplots()
+        ax = plt.gca()
 
     if normalize_x:
         _y = 'perc_{}'.format(_x)
@@ -3091,16 +3385,10 @@ def countplot(x=None, data=None, hue=None, ax=None, order=None, hue_order=None, 
         _order = order
 
     if hue is not None:
-        if hue_order is None or hue_order == 'count':
-            _hues = _df_count[[hue, _count_hue]].drop_duplicates().sort_values(by=[_count_hue], ascending=False
-                                                                               )[hue].tolist()
-        elif hue_order == 'sorted':
-            _hues = _df_count[hue].drop_duplicates().sort_values().tolist()
-        else:
-            _hues = hue_order
+       _hues = _get_ordered_levels(data=_df, level=hue, order=hue_order, x=_x)
 
     if palette is None:
-        palette = rcParams['palette']*5
+        palette = rcParams['palette'] * 5
 
     _plot = sns.barplot(data=_df_count, x=_x, y=_y, hue=hue, order=_order, hue_order=hue_order, palette=palette, ax=ax,
                         **barplot_kws)
@@ -3118,9 +3406,9 @@ def countplot(x=None, data=None, hue=None, ax=None, order=None, hue_order=None, 
         # add annotation
         annotate_barplot(_plot, nr_format=annotate_format)
         # enlarge ylims
-        _y_lim = list(ax.get_ylim())
-        _y_lim[1] = _y_lim[1] * 1.1
-        ax.set_ylim(_y_lim)
+        _ylim = list(ax.get_ylim())
+        _ylim[1] = _ylim[1] * 1.1
+        ax.set_ylim(_ylim)
 
     if hide_legend:
         ax.get_legend().remove()
@@ -3152,7 +3440,7 @@ def countplot(x=None, data=None, hue=None, ax=None, order=None, hue_order=None, 
 
 
 # quantile plot
-def quantile_plot(x, data=None, qs=None, x2=None, hue=None, to_abs=False, ax=None, **kwargs):
+def quantile_plot(x, data=None, qs=None, x2=None, hue=None, hue_order=None, to_abs=False, ax=None, **kwargs):
     # long or short format
     if qs is None:
         qs = [.1, .25, .5, .75, .9]
@@ -3175,7 +3463,7 @@ def quantile_plot(x, data=None, qs=None, x2=None, hue=None, to_abs=False, ax=Non
             _x = 'x_delta'
 
     if ax is None:
-        _, ax = plt.subplots()
+        ax = plt.gca()
 
     _label = _x
 
@@ -3186,7 +3474,7 @@ def quantile_plot(x, data=None, qs=None, x2=None, hue=None, to_abs=False, ax=Non
     if hue is None:
         _df_q = _df[_x].quantile(qs).reset_index()
     else:
-        _hues = sorted(_df[hue].unique())
+        _hues = _get_ordered_levels(data=_df, level=hue, order=hue_order, x=_x)
 
         _df_q = []
 

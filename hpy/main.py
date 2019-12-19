@@ -11,13 +11,12 @@ on their own
 import numpy as np
 import pandas as pd
 import warnings
-import collections
 import os
 import sys
 import datetime
 
 # third party imports
-from typing import Any, Callable, Union
+from typing import Any, Callable, Union, Sequence, Mapping
 
 # --- init
 pd.plotting.register_matplotlib_converters()
@@ -417,10 +416,12 @@ def cf_vec(x: Any, func: Callable, *args, **kwargs) -> Any:
 
     _x = np.array(x)
 
+    print(_x.shape)
+
     if _x.shape == ():
         _out = func(_x, *args, **kwargs)
     elif len(_x.shape) == 1:
-        _out = np.array([func(_x_i, *args, **kwargs) for _x_i in _x])
+        _out = [func(_x_i, *args, **kwargs) for _x_i in _x]
     else:
         with np.nditer(_x, op_flags=['readwrite']) as _it:
             for _x_i in _it:
@@ -678,7 +679,7 @@ def append_to_dict_list(dct: dict, append: Union[dict, list], inplace: bool = Tr
         _dic = dct.copy()
 
     # allows lists and dicts
-    if not isinstance(append, collections.Mapping):
+    if not isinstance(append, Mapping):
 
         if is_list_like(append):
             _append = list(append)
@@ -707,7 +708,7 @@ def is_list_like(obj: Any) -> bool:
     :param obj: Any python object
     :return: Boolean
     """
-    return isinstance(obj, collections.Iterable) and not isinstance(obj, (str, bytes))
+    return isinstance(obj, Sequence) and not isinstance(obj, (str, bytes))
 
 
 @export
@@ -784,7 +785,7 @@ def qformat(value: Any, int_format: str = ',', float_format: str = ',.2f', datet
 
     _string = ''
 
-    if isinstance(value, collections.Mapping):
+    if isinstance(value, Mapping):
 
         for _key, _value in value.items():
 

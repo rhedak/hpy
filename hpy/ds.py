@@ -18,7 +18,7 @@ from scipy import stats, signal
 from scipy.spatial import distance
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, median_absolute_error
 from sklearn.preprocessing import StandardScaler
-from collections import Mapping
+from typing import Iterable, Mapping
 
 # local imports
 from hpy.main import export, force_list, tprint, progressbar, qformat, list_intersection, round_signif, is_list_like, \
@@ -552,8 +552,6 @@ def qf(df: pd.DataFrame, fltr: Union[pd.DataFrame, pd.Series, Mapping], remove_u
 
     # logical and filter for all columns in filter df
     for _col in _filter_df.columns:
-        # print(_filter_condition)
-        # print((_df[_col]==_filter_iloc[_col]))
 
         _filter_condition = _filter_condition & (_df[_col] == _filter_iloc[_col])
 
@@ -587,9 +585,11 @@ def quantile_split(s: pd.Series, n: int, signif: int = 2, na_to_med: bool = Fals
     if len(s.unique()) <= n:
         return s
 
-    _s = pd.Series(s).copy()
+    _s = pd.Series(s).copy().astype(float)
+    _s = np.where(~np.isfinite(_s), np.nan, _s)
+    _s = pd.Series(_s)
 
-    _s_out = _s.apply(lambda x: np.nan)
+    _s_out = _s.apply(lambda _: np.nan)
 
     if na_to_med:
         _s = _s.fillna(_s.median())
@@ -597,7 +597,8 @@ def quantile_split(s: pd.Series, n: int, signif: int = 2, na_to_med: bool = Fals
     if signif is not None:
         _s = round_signif(_s, signif)
 
-    _s = pd.Series(_s)
+    if not isinstance(_s, pd.Series):
+        _s = pd.Series(_s)
 
     _i = -1
 
@@ -605,23 +606,24 @@ def quantile_split(s: pd.Series, n: int, signif: int = 2, na_to_med: bool = Fals
 
         _i += 1
 
-        _q_min = _s.quantile(_q)
+        __q_min = np.quantile(_s.dropna().values, _q)
+
         if _q + .1 >= 1:
-            _q_max = _s.max()
+            __q_max = _s.max()
         else:
-            _q_max = _s.quantile(_q + .1)
+            __q_max = np.quantile(_s.dropna().values, _q + .1)
 
         if np.round(_q + .1, 1) == 1.:
-            _q_max_adj = np.inf
+            __q_max_adj = np.inf
             _right_equal_sign = '<='
         else:
-            _q_max_adj = _q_max
+            __q_max_adj = __q_max
             _right_equal_sign = '<'
 
-        _q_name = 'q{}: {}<=_{}{}'.format(_i, round_signif(_q_min, signif), _right_equal_sign,
-                                          round_signif(_q_max, signif))
+        _q_name = 'q{}: {}<=_{}{}'.format(_i, round_signif(__q_min, signif), _right_equal_sign,
+                                          round_signif(__q_max, signif))
 
-        _s_out = np.where((_s >= _q_min) & (_s < _q_max_adj), _q_name, _s_out)
+        _s_out = np.where((_s >= __q_min) & (_s < __q_max_adj), _q_name, _s_out)
 
     # get back the old properties of the series (or you'll screw the index)
     _s_out = pd.Series(_s_out)
@@ -1744,6 +1746,7 @@ def kde(x, df=None, x_range=None, perc_cutoff=.1, range_cutoff=None, x_steps=100
         else:
             _x_name = 'x'
 
+    assert(len(_x) > 0), 'Series {} has zero length'.format(_x_name)
     _x = pd.Series(_x).reset_index(drop=True)
 
     _x_name_max = _x_name + '_max'
@@ -2061,9 +2064,6 @@ def numeric_to_group(pd_series, step=None, outer_limit=4, suffix=None, use_abs=F
     # get sign
     _series_sign = np.sign(_series)
 
-    # print(step)
-    # list_print(_series)
-
     # divide by step, floor and integer
     _series = (np.floor(np.abs(_series) / step)).astype(int) * np.sign(_series).astype(int)
 
@@ -2071,8 +2071,6 @@ def numeric_to_group(pd_series, step=None, outer_limit=4, suffix=None, use_abs=F
     if outer_limit is not None:
         _series = np.where(_series > outer_limit, outer_limit, _series)
         _series = np.where(_series < -outer_limit, -outer_limit, _series)
-
-    # list_print(_series)
 
     # make a pretty string
     _series = pd.Series(_series).apply(lambda x: '{0:n}'.format(x)).astype('str') + suffix

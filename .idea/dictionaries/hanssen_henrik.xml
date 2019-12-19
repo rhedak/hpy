@@ -9,6 +9,7 @@
       <w>autodoc</w>
       <w>automodapi</w>
       <w>bandstop</w>
+      <w>barchart</w>
       <w>barh</w>
       <w>barplot</w>
       <w>btype</w>
@@ -26,7 +27,9 @@
       <w>corrplot</w>
       <w>corrs</w>
       <w>countplot</w>
+      <w>customizeable</w>
       <w>distfit</w>
+      <w>distfits</w>
       <w>distkws</w>
       <w>distplot</w>
       <w>dropna</w>
@@ -77,9 +80,11 @@
       <w>ncols</w>
       <w>nolabel</w>
       <w>nolegend</w>
+      <w>novec</w>
       <w>nrows</w>
       <w>numpydoc</w>
       <w>pcolor</w>
+      <w>pcolormesh</w>
       <w>perc</w>
       <w>performant</w>
       <w>plim</w>
@@ -90,6 +95,7 @@
       <w>prio</w>
       <w>ptypes</w>
       <w>pygments</w>
+      <w>pyplot</w>
       <w>pytest</w>
       <w>qagg</w>
       <w>quantile</w>
@@ -118,9 +124,11 @@
       <w>stemplot</w>
       <w>strftime</w>
       <w>subax</w>
+      <w>subaxes</w>
       <w>suptitle</w>
       <w>tdelta</w>
       <w>ticklabels</w>
+      <w>timepoints</w>
       <w>tprint</w>
       <w>trendline</w>
       <w>twinx</w>
