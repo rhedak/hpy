@@ -809,15 +809,3 @@ def qformat(value: Any, int_format: str = ',', float_format: str = ',.2f', datet
         _string += _qformat(value)
 
     return _string
-
-
-@export
-def tdelta(*args, **kwargs) -> datetime.timedelta:
-    """
-    Wrapper for numpy.timedelta64
-
-    :param args: passed to numpy.timedelta64
-    :param kwargs: passed to numpy.timedelta64
-    :return: Timedelta object
-    """
-    return np.timedelta64(*args, **kwargs)

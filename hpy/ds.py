@@ -22,7 +22,7 @@ from typing import Iterable, Mapping, Sequence
 
 # local imports
 from hpy.main import export, force_list, tprint, progressbar, qformat, list_intersection, round_signif, is_list_like, \
-    dict_list, append_to_dict_list, concat_cols, tdelta
+    dict_list, append_to_dict_list, concat_cols
 
 
 # --- pandas styles
@@ -1466,9 +1466,9 @@ def time_reg(df, t='t', y='y', t_unit='D', window=10, slope_diff_cutoff=.1, int_
     _t_max = _df[t].max()
 
     if isinstance(_df[t].iloc[0], pd.datetime):
-        _df[_t_i] = (_df[t] - _t_min) / tdelta(1, t_unit)
+        _df[_t_i] = (_df[t] - _t_min) / np.timedelta64(1, t_unit)
         _t_i_min = 0
-        _t_i_max = (_df[t].max() - _t_min) / tdelta(1, t_unit)
+        _t_i_max = (_df[t].max() - _t_min) / np.timedelta64(1, t_unit)
     else:
         _df[_t_i] = _df[t]
         _t_i_min = _t_min
@@ -1594,7 +1594,7 @@ def lr(df, x, y, groupby=None, t_unit='D', do_print=True):
         groupby + [_y_slope, _y_int, 'r2', 'rmse', 'error_mean', 'error_std', 'error_abs_mean', 'error_abs_std'])
 
     if isinstance(_df[x].iloc[0], pd.datetime):
-        _df[_x_i] = (_df[x] - _df[x].min()) / tdelta(1, t_unit)
+        _df[_x_i] = (_df[x] - _df[x].min()) / np.timedelta64(1, t_unit)
     else:
         _df[_x_i] = _df[x]
 
@@ -2152,7 +2152,10 @@ def k_split(df: pd.DataFrame, k: int = 5, groupby: Union[Sequence, str] = None,
         if sortby is None:
             _df_i = _df_i.sample(frac=1, random_state=random_state).reset_index(drop=True)
         else:
-            _df_i = _df_i.sort_values(by=sortby).reset_index(drop=True)
+            if sortby == 'index':
+                _df_i = _df_i.sort_index()
+            else:
+                _df_i = _df_i.sort_values(by=sortby).reset_index(drop=True)
 
         # assign k index
         _df_i['_k_index'] = _df_i.index // _k_split

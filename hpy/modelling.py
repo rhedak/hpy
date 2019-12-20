@@ -30,6 +30,8 @@ from hpy.ds import df_merge, k_split
 from hpy.plotting import ax_as_list, legend_outside, docstrings as hpt_docstrings
 
 # --- constants
+__all__ = []
+
 docstrings = {
     'df': 'Pandas DataFrame containing the training and testing data. '
           'Can be saved to the Model object or supplied on an as needed basis.',
