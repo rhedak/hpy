@@ -8,6 +8,7 @@
       <w>animplot</w>
       <w>autodoc</w>
       <w>automodapi</w>
+      <w>axlim</w>
       <w>bandstop</w>
       <w>barchart</w>
       <w>barh</w>
@@ -74,7 +75,9 @@
       <w>maxcount</w>
       <w>maxlevel</w>
       <w>maxperc</w>
+      <w>maxs</w>
       <w>medae</w>
+      <w>mins</w>
       <w>nbviewer</w>
       <w>ncol</w>
       <w>ncols</w>

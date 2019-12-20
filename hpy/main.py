@@ -416,8 +416,6 @@ def cf_vec(x: Any, func: Callable, *args, **kwargs) -> Any:
 
     _x = np.array(x)
 
-    print(_x.shape)
-
     if _x.shape == ():
         _out = func(_x, *args, **kwargs)
     elif len(_x.shape) == 1:
