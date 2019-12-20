@@ -17,17 +17,48 @@ import seaborn as sns
 
 # third party imports
 from copy import deepcopy
-from collections import Mapping
+from typing import Any, Sequence, Mapping, Union, Callable
 
 try:
     from IPython.core import display
 except ImportError:
-    display = None
+    display = print
 
 # local imports
 from hpy.main import export, is_list_like, force_list, tprint, dict_list, append_to_dict_list
-from hpy.ds import df_merge
-from hpy.plotting import ax_as_list, legend_outside
+from hpy.ds import df_merge, k_split
+from hpy.plotting import ax_as_list, legend_outside, docstrings as hpt_docstrings
+
+# --- constants
+docstrings = {
+    'df': 'Pandas DataFrame containing the training and testing data. '
+          'Can be saved to the Model object or supplied on an as needed basis.',
+    'X_ref': 'List of features (predictors) used for training the model',
+    'y_ref': 'List of labels (targets) to be predicted',
+    'X': 'The feature (predictor) data used for training as DataFrame, np.array or column names',
+    'y': 'The label (target) data used for training as DataFrame, np.array or column names',
+    'X_test': 'The feature (predictor) data used for testing as DataFrame, np.array or column names',
+    'y_test': 'The label (target) data used for testing as DataFrame, np.array or column names',
+    'df_train': 'Pandas DataFrame containing the training data, optional if array like data is passed for X/y',
+    'df_test': 'Pandas DataFrame containing the testing data, optional if array like data is passed for X/y test',
+    'X_predict': 'The feature (predictor) data used for predicting as DataFrame, np.array or column names',
+    'df_predict': 'Pandas DataFrame containing the predict data, optional if array like data is passed for X_predict',
+    'model_in': 'Any model object that implements .fit and .predict',
+    'name': 'Name of the model, used for naming columns [optional]',
+    'dropna': 'Whether to drop rows containing NA in the training data [optional]',
+    'scaler_X': 'Scalar object that implements .transform and .inverse_transform, applied to the features (predictors)'
+                'before training and inversely after predicting',
+    'scaler_y': 'Scalar object that implements .transform and .inverse_transform, applied to the labels (targets)'
+                'before training and inversely after predicting',
+    'do_print': 'Whether to print the steps to console',
+    'display_score': 'Whether to display the score DataFrame',
+    # -- validations
+    'Model.predict.valid_return_types': ['y', 'df', 'DataFrame'],
+    'Models.predict.valid_return_types': ['y', 'df', 'DataFrame', 'self'],
+    'Models.score.valid_return_types': ['self', 'df', 'DataFrame'],
+    'Models.score.valid_scores': ['r2', 'rmse', 'mae', 'stdae', 'medae'],
+    'fit.valid_fit_types': ['train_test', 'k_cross', 'final'],
+}
 
 
 # --- classes
@@ -38,9 +69,9 @@ class _BaseModel:
         that is convenient to use
     """
 
-    def __init__(self, name):
+    def __init__(self, name: str):
 
-        self.__name__ = 'cf.Base'
+        self.__name__ = 'hpy.modelling.Base'
         self.__attributes__ = ['__name__', 'name']
         self.name = name
 
@@ -78,12 +109,12 @@ class _BaseModel:
 
         return _dict
 
-    def from_dict(self, dic):
+    def from_dict(self, dct: Mapping):
 
         for _attr_name in self.__attributes__:
-            if _attr_name not in dic.keys():
+            if _attr_name not in dct.keys():
                 continue
-            _attr = dic[_attr_name]
+            _attr = dct[_attr_name]
             if is_list_like(_attr):
                 if isinstance(_attr, Mapping):
 
@@ -132,12 +163,12 @@ class _BaseModel:
 
             self.__setattr__(_attr_name, _attr)
 
-    def save(self, filename, f=pd.to_pickle):
+    def save(self, filename: str, f: Callable = pd.to_pickle):
 
         _dict = self.copy().to_dict()
         f(_dict, filename)
 
-    def load(self, filename, f=pd.read_pickle):
+    def load(self, filename: str, f: Callable = pd.read_pickle):
 
         self.from_dict(f(filename))
 
@@ -148,13 +179,28 @@ class _BaseModel:
 
 @export
 class Model(_BaseModel):
+    """
+    A unified modeling class that is extended from sklearn, accepts any model that implements .fit and .predict
+    
+    :param model: {model_in}
+    :param name: {name}
+    :param X_ref: {X_ref}
+    :param y_ref: {y_ref}
+    """.format(**docstrings)
 
-    def __init__(self, model=None, name='pred', X_ref=None, y_ref=None, trans=None, inv_trans=None, y_trans_lim=None):
+    def __init__(self, model: object = None, name: str = 'pred',
+                 X_ref: Union[Sequence, str] = None, y_ref: Union[Sequence, str] = None):
+        """
+        init method
+
+        :param model: {model_in}
+        :param name: {name}
+        :param X_ref: {X_ref}
+        :param y_ref: {y_ref}
+        """.format(**docstrings)
 
         # -- check
         super().__init__(name)
-        if (trans is not None) and (inv_trans is None):
-            raise ValueError('If you provide trans you most also provide inv_trans')
 
         # -- init
         if X_ref is not None:
@@ -162,32 +208,31 @@ class Model(_BaseModel):
         if y_ref is not None:
             y_ref = force_list(y_ref)
 
-        if trans is not None:
-            _y_trans_ref = trans.split('=')[0]
-            _inv_trans = inv_trans + ''
-            if y_ref is None:
-                raise ValueError('If you provide trans you must also provide y_ref')
-            _inv_trans = _inv_trans.replace(_y_trans_ref, '{}_pred'.format(_y_trans_ref))
-        else:
-            _y_trans_ref = None
-            _inv_trans = None
-
         # -- assign
-        self.__attributes__ = ['__name__', 'name', 'model', 'X_ref', 'y_ref', 'trans', 'y_trans_ref', 'y_trans_lim',
-                               'inv_trans', 'is_fit']
+        self.__attributes__ = ['__name__', 'name', 'model', 'X_ref', 'y_ref', 'is_fit']
         self.__name__ = 'cf.Model'
         if isinstance(model, str):
             model = eval(model)
         self.model = model
         self.X_ref = X_ref
         self.y_ref = y_ref
-        self.trans = trans
-        self.y_trans_ref = _y_trans_ref
-        self.y_trans_lim = y_trans_lim
-        self.inv_trans = _inv_trans
         self.is_fit = False
 
-    def fit(self, X=None, y=None, df=None, dropna=True, X_test=None, y_test=None, df_test=None):
+    def fit(self, X: Union[np.ndarray, Sequence, str] = None, y: Union[np.ndarray, Sequence, str] = None,
+            df: pd.DataFrame = None, dropna: bool = True, X_test: Union[np.ndarray, Sequence, str] = None,
+            y_test: Union[np.ndarray, Sequence, str] = None, df_test: pd.DataFrame = None):
+        """
+        generalized fit method extending on model.fit
+        
+        :param X: {X}
+        :param y: {y}
+        :param df: {df_test}
+        :param dropna: {drona}
+        :param X_test: {X_test}
+        :param y_test: {y_test}
+        :param df_test: {df_test}
+        :return: None
+        """.format(**docstrings)
 
         if df is None:
 
@@ -227,24 +272,11 @@ class Model(_BaseModel):
             _X_test = df_test[self.X_ref]
             _y_test = df_test[self.y_ref]
 
-        # -- use trans (if applicable)
-        if self.trans is not None:
-            _df = _df.eval(self.trans)
-            if self.y_trans_lim is not None:
-                _df[self.y_trans_ref] = np.where(_df[self.y_trans_ref] < self.y_trans_lim[0], self.y_trans_lim[0],
-                                                 _df[self.y_trans_ref])
-                _df[self.y_trans_ref] = np.where(_df[self.y_trans_ref] > self.y_trans_lim[1], self.y_trans_lim[1],
-                                                 _df[self.y_trans_ref])
-
-            _y_fit_ref = self.y_trans_ref
-        else:
-            _y_fit_ref = self.y_ref
-
         if dropna:
             _df = _df.dropna()
 
         _X = _df[self.X_ref]
-        _y = _df[_y_fit_ref]
+        _y = _df[self.y_ref]
 
         # -- fit
         warnings.simplefilter('ignore', FutureWarning)
@@ -260,12 +292,21 @@ class Model(_BaseModel):
         self.is_fit = True
         warnings.simplefilter('default')
 
-    def predict(self, X=None, df=None, return_type='y'):
+    def predict(self, X=None, df=None, return_type='y') -> Union[pd.Series, pd.DataFrame]:
+        """
+        Generalized predict method based on model.predict
+        
+        :param X: {X}
+        :param df: {df}
+        :param return_type: one of {Model.predict.valid_return_types}, if 'y' returns a pandas Series / DataFrame 
+            with only the predictions, if one of 'df','DataFrame' returns the full DataFrame with predictions added
+        :return: see return_type
+        """.format(**predict)
 
         if not self.is_fit:
             raise ValueError('Model is not fit yet')
 
-        _valid_return_types = ['y', 'df']
+        _valid_return_types = docstrings['Model.predict.valid_return_types']
         assert(return_type in _valid_return_types), 'return type must be one of {}'.format(_valid_return_types)
 
         # ensure pandas df
@@ -290,11 +331,6 @@ class Model(_BaseModel):
         _y_pred = pd.DataFrame(_y_pred)
         _y_pred.index = _X.index
 
-        # apply inv_trans if applicable
-        if self.inv_trans is not None:
-            _df[self.y_trans_ref + '_pred'] = _y_pred
-            _y_pred = _df.eval(self.inv_trans)[self.y_ref]
-
         # feed back to df
         _df[_y_ref] = _y_pred
 
@@ -307,95 +343,40 @@ class Model(_BaseModel):
 
 
 @export
-class Ensemble(_BaseModel):
-
-    def __init__(self, *args, name=None, X_ref=None, y_ref=None):
-
-        # -- init
-        super().__init__(name)
-        X_ref = force_list(X_ref)
-        y_ref = force_list(y_ref)
-
-        _models = []
-
-        # ensure cf.Model
-        for _arg in args:
-            for _model in force_list(_arg):
-
-                if not _model.__class__ == Model:
-                    _models.append(Model(_model))
-                else:
-                    _models.append(_model)
-
-        # -- assign
-        self.__attributes__ = ['__name__', 'name', 'models', 'is_fit', 'X_ref', 'y_ref']
-        self.__name__ = 'cf.Ensemble'
-        self.models = _models
-        self.is_fit = False
-        self.X_ref = X_ref
-        self.y_ref = y_ref
-
-    def fit(self, *args, **kwargs):
-
-        for _model in self.models:
-            _model.fit(*args, **kwargs)
-
-        self.is_fit = True
-
-        if self.X_ref is None:
-            self.X_ref = self.models[0].X_ref
-        if self.y_ref is None:
-            self.y_ref = self.models[0].y_ref
-
-    def predict(self, X=None, df=None, return_type='y'):
-
-        _valid_return_types = ['y', 'df', 'DataFrame']
-        assert (return_type in _valid_return_types), 'return type must be one of {}'.format(_valid_return_types)
-
-        if not self.is_fit:
-            raise ValueError('Model is not fit yet')
-
-        # ensure pandas df
-        if df is None:
-            _df = pd.DataFrame(X)
-        else:
-            _df = df.copy()
-            del df
-
-        _i = -1
-        _y_names = []
-        _df_ys = _df.copy()
-
-        for _model in self.models:
-            _i += 1
-            _y_name = '_y_{}'.format(_i)
-            _y_names.append(_y_name)
-
-            _df_ys[_y_name] = _model.predict(df=_df, return_type='y')
-
-        _y_ref = ['{}_pred'.format(_) for _ in self.y_ref]
-        if len(self.y_ref) == 1:
-            _y_ref = _y_ref[0]
-
-        _df[_y_ref] = _df_ys[_y_names].mean(axis=1)
-
-        if return_type == 'y':
-            return _df[_y_ref]
-        else:
-            return _df
-
-
-# A collection of Model and Ensemble Regressors
-@export
 class Models(_BaseModel):
+    """
+    Collection of Models that allow for fitting and predicting with multiple Models at once,
+    comparing accuracy and creating Ensembles
+        
+    :param args: multiple Model objects that will form a Models Collection
+    :param name: name of the collection
+    :param df: {df}
+    :param X_ref: {X_ref}
+    :param y_ref: {y_ref}
+    :param scaler_X: {scaler_X}
+    :param scaler_y: {scaler_y}
+    """.format(**docstrings)
 
-    def __init__(self, *args, name=None, df=None, X_ref=None, y_ref=None, scaler_X=None, scaler_y=None):
+    def __init__(self, *args: Union[Model, Sequence], name: str = None, df: pd.DataFrame = None,
+                 X_ref: Union[Sequence, str] = None, y_ref: Union[Sequence, str] = None, scaler_X: object = None,
+                 scaler_y: object = None):
+        """
+        init method
+
+        :param args: multiple Model objects that will form a Models Collection
+        :param name: name of the collection
+        :param df: {df}
+        :param X_ref: {X_ref}
+        :param y_ref: {y_ref}
+        :param scaler_X: {scaler_X}
+        :param scaler_y: {scaler_y}
+        """.format(**docstrings)
 
         super().__init__(name)
         _models = []
         _model_names = []
 
-        # ensure cf.Model
+        # ensure hpy.modelling.Model
         _it = -1
         for _arg in args:
             for _model in force_list(_arg):
@@ -415,7 +396,7 @@ class Models(_BaseModel):
                 # -- assign
         self.__attributes__ = ['__name__', 'name', 'models', 'fit_type', 'df', 'X_ref', 'y_ref', 'scaler_X', 'scaler_y',
                                'model_names', 'df_score']
-        self.__name__ = 'cf.Models'
+        self.__name__ = 'hpy.modelling.Models'
         self.models = _models
         self.fit_type = None
         self.df = df
@@ -426,48 +407,30 @@ class Models(_BaseModel):
         self.model_names = _model_names
         self.df_score = None
 
-    def train_test_split(self, k=5, df=None, group_by=None, sort_by=None, random_state=None, do_print=True):
+    def k_split(self, **kwargs):
+        """
+        apply hpy.ds.k_split to self to create train-test or k-cross ready data
+
+        :param kwargs: keyword arguments passed to hpy.ds.k_split
+        :return: None
+        """
 
         if do_print:
             tprint('splitting 1:{} ...'.format(k))
 
         # -- init
-        if df is None:
-            if self.df is None:
-                raise ValueError('You must specify a df')
-            else:
-                _df = self.df
-        else:
-            _df = df.copy()
-        _df['_index'] = _df.index
-        _df['_dummy'] = 1
-        _k_split = int(np.ceil(_df.shape[0] / k))
+        assert self.df is not None, 'You must specify a df'
 
-        if group_by is None:
-            group_by = '_dummy'
+        # -- split
+        self.df['_k_index'] = k_split(df=self.df, **kwargs)
 
-        _df_out = []
+    def model_by_name(self, name: Union[list, str]) -> list:
+        """
+        extract a list of Models from the collection by their names
 
-        for _index, _df_i in _df.groupby(group_by):
-
-            # sort (randomly or by given value)
-            if sort_by is None:
-                _df_i = _df_i.sample(frac=1, random_state=random_state).reset_index(drop=True)
-            else:
-                _df_i = _df_i.sort_values(by=sort_by).reset_index(drop=True)
-
-            # assign k index
-            _df_i['_k_index'] = _df_i.index // _k_split
-
-            _df_out.append(_df_i)
-
-        _df_out = df_merge(_df_out).set_index(['_index']).drop(['_dummy'], axis=1).sort_index()
-        _df_out.index = _df_out.index.rename('index')
-
-        # save DataFrame to self
-        self.df = _df_out
-
-    def model_by_name(self, name):
+        :param name: name of the Model
+        :return: list of Models
+        """
 
         _models = []
         for _model in self.models:
@@ -478,15 +441,21 @@ class Models(_BaseModel):
                     _models.append(_model)
         return _models
 
-    def fit(self, fit_type='train_test', do_print=True):
+    def fit(self, fit_type: str = 'train_test', do_print: bool = True):
+        """
+        fit all Model objects in collection
+        
+        :param fit_type: one of {fit.valid_fit_types}
+        :param do_print: {do_print}
+        :return: None
+        """.format(**docstrings)
 
-        _valid_fit_types = ['train_test', 'cross', 'final']
+        # TODO - CROSS VALIDATION
 
-        if fit_type not in _valid_fit_types:
-            raise ValueError('fit type must be one of {}'.format(_valid_fit_types))
-
-        if (fit_type != 'final') and ('_k_index' not in self.df.columns):
-            self.train_test_split()
+        _valid_fit_types = docstrings['fit.valid_fit_types']
+        assert fit_type in _valid_fit_types, 'fit type must be one of {}'.format(_valid_fit_types)
+        assert not ((fit_type != 'final') and ('_k_index' not in self.df.columns)), 'DataFrame is not k_split yet'
+        assert fit_type != 'cross', 'cross validation not implemented yet'
 
         _df_X = self.df[self.X_ref]
         _df_y = self.df[self.y_ref]
@@ -508,7 +477,7 @@ class Models(_BaseModel):
         if fit_type == 'train_test':
             _k_tests = [_df_scaled['_k_index'].max()]
             self.df['_test'] = self.df['_k_index'] == _k_tests[0]
-        elif fit_type == 'cross':
+        elif fit_type == 'k_cross':
             _k_tests = sorted(_df_scaled['_k_index'].unique())
         else:
             _k_tests = [-1]
@@ -518,10 +487,6 @@ class Models(_BaseModel):
             _ = _k_test
             _df_train = _df_scaled.query('_k_index!=@_k_test')
             _df_test = _df_scaled.query('_k_index==@_k_test')
-
-            # TODO - CROSS VALIDATION
-            if fit_type == 'cross':
-                _models_k = {}
 
             for _model in self.models:
 
@@ -533,6 +498,17 @@ class Models(_BaseModel):
         self.fit_type = fit_type
 
     def predict(self, X=None, df=None, return_type='self', ensemble=False, do_print=True):
+        """
+        predict with all models in collection
+        
+        :param X: {X_predict}
+        :param df: {df_predict}
+        :param return_type: one of {Models.predict.valid_return_types}
+        :param ensemble: if True also predict with Ensemble like combinations of models. If True or mean calculate
+            mean of individual predictions. If median calculate median of individual predictions.
+        :param do_print: {do_print}
+        :return: if return_type is self: None, else see Model.predict
+        """.format(**docstrings)
 
         _valid_return_types = ['self', 'df', 'DataFrame']
 
@@ -613,7 +589,18 @@ class Models(_BaseModel):
         elif return_type in ['df', 'DataFrame']:
             return _df
 
-    def score(self, scores=None, return_type='self', scale=None, do_print=True, display_score=True):
+    def score(self, scores: Union[Sequence, str] = None, return_type: str = 'self', scale: float = None,
+              do_print: bool = True, display_score: bool = True):
+        """
+        calculate score of the Model predictions
+
+        :param scores: scoring metrics to use, supports any subset of {Models.score.valid_scores}
+        :param return_type: one of {Models.score.valid_return_types}
+        :param scale: scale the labels (predictors) with this factor before calculating the scores
+        :param do_print: {do_print}
+        :param display_score: {display_score}
+        :return: if self None, else pandas DataFrame containing the scores
+        """
 
         if scores is None:
             scores = ['r2', 'rmse', 'mae', 'stdae', 'medae']
@@ -687,14 +674,31 @@ class Models(_BaseModel):
         else:
             return _df_score
 
-    # wrapper method that combined train_test_split, train, predict and score
-    def train(self, k=5, df=None, group_by=None, sort_by=None, random_state=None, fit_type='train_test', ensemble=False,
-              scores=None, scale=None, do_print=True, display_score=True):
+    def train(self, df: pd.DataFrame = None, k: int = 5, groupby: Union[Sequence, str] = None,
+              sortby: Union[Sequence, str] = None, random_state: int = None, fit_type: str = 'train_test',
+              ensemble: bool = False, scores: Union[Sequence, str] = None, scale: float = None, do_print: bool = True,
+              display_score: bool = True):
+        """
+        wrapper method that combined k_split, train, predict and score
+
+        :param df: {df}
+        :param k: see hpy.ds.k_split see hpy.ds.k_split
+        :param groupby: see hpy.ds.k_split
+        :param sortby: see hpy.ds.k_split
+        :param random_state: see hpy.ds.k_split
+        :param fit_type: see .fit
+        :param ensemble: {ensemble}
+        :param scores: see .score
+        :param scale: see .score
+        :param do_print: {do_print}
+        :param display_score: {display_score}
+        :return: None
+        """
 
         if scores is None:
             scores = ['r2', 'rmse', 'mae', 'stdae', 'medae']
-        self.train_test_split(k=k, df=df, group_by=group_by, sort_by=sort_by, random_state=random_state,
-                              do_print=do_print)
+        self.k_split(k=k, df=df, groupby=groupby, sortby=sortby, random_state=random_state,
+                     do_print=do_print)
         self.fit(fit_type=fit_type, do_print=do_print)
         self.predict(ensemble=ensemble, do_print=do_print)
         self.score(scores=scores, scale=scale, do_print=do_print, display_score=display_score)
@@ -704,6 +708,22 @@ class Models(_BaseModel):
     def scoreplot(self, x='y_ref', y='value', hue='model', hue_order=None, row='score',
                   row_order=None, width=16, height=9 / 2, scale=None, query=None,
                   return_fig_ax=False):
+        """
+        plot the score
+
+        :param x: {x}
+        :param y: {y}
+        :param hue: {hue}
+        :param hue_order: {order}
+        :param row: the variable to wrap around the rows [optional]
+        :param row_order: {order}
+        :param width: {subplot_width}
+        :param height: {subplot_height}
+        :param scale: scale the values [optional
+        :param query: query to be passed to pd.DataFrame.query before plotting [optional]
+        :param return_fig_ax: {return_fig_ax}
+        :return:
+        """.format(**hpt_docstrings)
 
         # -- init
         if row_order is None:
@@ -740,11 +760,17 @@ class Models(_BaseModel):
 
 
 # --- functions
+@export
 def dict_to_model(dic):
+    """
+    restore a Model object from a dictionary
+    :param dic:
+    :return:
+    """
     # init empty model
-    if dic['__name__'] == 'cf.Model':
+    if dic['__name__'] == 'Model':
         _model = Model()
-    elif dic['__name__'] == 'cf.Ensemble':
+    elif dic['__name__'] == 'hpy.modelling.Ensemble':
         _model = Ensemble()
     else:
         raise ValueError('__name__ not recognized')
@@ -754,12 +780,21 @@ def dict_to_model(dic):
     return _model
 
 
-def force_model(model):
+@export
+def force_model(model: Union[object, Mapping]) -> Model:
+    """
+    takes any Model, model object or dictionary and converts to Model
+    :param model: Mapping or object containing  a model
+    :return: Model
+    """
+
     if not isinstance(model, Mapping):
+        if not isinstance(model, Model):
+            return Model(model)
         return model
 
     if '__name__' in model.keys():
-        if model['__name__'] in ['cf.Model', 'cf.Ensemble']:
+        if model['__name__'] in ['hpy.modelling.Model', 'hpy.modelling.Ensemble']:
             _model = dict_to_model(model)
         else:
             raise ValueError('__name__ not recognized')
@@ -769,14 +804,23 @@ def force_model(model):
     return _model
 
 
-# get coefficients of a linear regression in a sorted data frame
-def get_coefs(model, y):
+@export
+def get_coefs(model: object, y: Union[Sequence, str]):
+    """
+    # get coefficients of a linear regression in a sorted data frame
+    :param model: model object
+    :param y: name of the coefficients
+    :return: pandas DataFrame containing the coefficient names and values
+    """
     _df = pd.DataFrame()
 
-    _coef = model.coef_.tolist()
+    if isinstance(model, Model):
+        _coef = model.model.coef_.tolist()
+    else:
+        _coef = model.coef_.tolist()
     _coef.append(model.intercept_)
 
-    _df['feature'] = y + ['intercept']
+    _df['feature'] = force_list(y) + ['intercept']
     _df['coef'] = _coef
 
     _df = _df.sort_values(['coef'], ascending=False).reset_index(drop=True)
@@ -786,9 +830,16 @@ def get_coefs(model, y):
     return _df
 
 
-# get feature importance of a decision tree like model in a sorted data frame
 @export
-def get_feature_importance(model, predictors, features_to_sum=None):
+def get_feature_importance(model: object, predictors: Union[Sequence, str],
+                           features_to_sum: Mapping = None) -> pd.DataFrame:
+    """
+    get feature importance of a decision tree like model in a sorted data frame
+    :param model: model object
+    :param predictors: names of the predictors properly sorted
+    :param features_to_sum: if you want to sum features please provide name mappings
+    :return: pandas DataFrame containing the feature importances
+    """
 
     def _get_feature_importance_rf(_f_model, _f_predictors, _f_features_to_sum=None):
 
@@ -846,10 +897,12 @@ def get_feature_importance(model, predictors, features_to_sum=None):
         return __df
 
     try:
+        # noinspection PyTypeChecker
         _df = _get_feature_importance_rf(model, predictors, features_to_sum)
         # this is supposed to also work for XGBoost but it was broken in a recent release
         # so below serves as fallback
     except ValueError:
+        # noinspection PyTypeChecker
         _df = _get_feature_importance_xgb(model, predictors, features_to_sum)
 
     return _df
@@ -1379,3 +1432,81 @@ def get_feature_importance(model, predictors, features_to_sum=None):
 #
 # def backward_reg(f=reg, goal='rmse_test_scaled', ascending=False, cutoff=0, **kwargs):
 #     return backward_modelling(f=f, goal=goal, ascending=ascending, cutoff=cutoff, **kwargs)
+#
+# OLD CODE
+# class Ensemble(_BaseModel):
+#
+#     def __init__(self, *args, name=None, X_ref=None, y_ref=None):
+#
+#         # -- init
+#         super().__init__(name)
+#         X_ref = force_list(X_ref)
+#         y_ref = force_list(y_ref)
+#
+#         _models = []
+#
+#         # ensure hpy.modelling.Model
+#         for _arg in args:
+#             for _model in force_list(_arg):
+#
+#                 if not _model.__class__ == Model:
+#                     _models.append(Model(_model))
+#                 else:
+#                     _models.append(_model)
+#
+#         # -- assign
+#         self.__attributes__ = ['__name__', 'name', 'models', 'is_fit', 'X_ref', 'y_ref']
+#         self.__name__ = 'hpy.modelling.Ensemble'
+#         self.models = _models
+#         self.is_fit = False
+#         self.X_ref = X_ref
+#         self.y_ref = y_ref
+#
+#     def fit(self, *args, **kwargs):
+#
+#         for _model in self.models:
+#             _model.fit(*args, **kwargs)
+#
+#         self.is_fit = True
+#
+#         if self.X_ref is None:
+#             self.X_ref = self.models[0].X_ref
+#         if self.y_ref is None:
+#             self.y_ref = self.models[0].y_ref
+#
+#     def predict(self, X=None, df=None, return_type='y'):
+#
+#         _valid_return_types = ['y', 'df', 'DataFrame']
+#         assert (return_type in _valid_return_types), 'return type must be one of {}'.format(_valid_return_types)
+#
+#         if not self.is_fit:
+#             raise ValueError('Model is not fit yet')
+#
+#         # ensure pandas df
+#         if df is None:
+#             _df = pd.DataFrame(X)
+#         else:
+#             _df = df.copy()
+#             del df
+#
+#         _i = -1
+#         _y_names = []
+#         _df_ys = _df.copy()
+#
+#         for _model in self.models:
+#             _i += 1
+#             _y_name = '_y_{}'.format(_i)
+#             _y_names.append(_y_name)
+#
+#             _df_ys[_y_name] = _model.predict(df=_df, return_type='y')
+#
+#         _y_ref = ['{}_pred'.format(_) for _ in self.y_ref]
+#         if len(self.y_ref) == 1:
+#             _y_ref = _y_ref[0]
+#
+#         _df[_y_ref] = _df_ys[_y_names].mean(axis=1)
+#
+#         if return_type == 'y':
+#             return _df[_y_ref]
+#         else:
+#             return _df

@@ -18,7 +18,7 @@ from scipy import stats, signal
 from scipy.spatial import distance
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, median_absolute_error
 from sklearn.preprocessing import StandardScaler
-from typing import Iterable, Mapping
+from typing import Iterable, Mapping, Sequence
 
 # local imports
 from hpy.main import export, force_list, tprint, progressbar, qformat, list_intersection, round_signif, is_list_like, \
@@ -2106,3 +2106,67 @@ def top_n_coding(s, n, other_name='other', na_to_other=False):
     _s = _s.astype('category')
 
     return _s
+
+
+@export
+def k_split(df: pd.DataFrame, k: int = 5, groupby: Union[Sequence, str] = None,
+            sortby: Union[Sequence, str] = None, random_state: int = None, do_print: bool = True,
+            return_type: Union[str, int] = 1) -> Union[pd.Series, tuple]:
+    """
+    performs a train test split
+    :param df: pandas DataFrame to be split
+    :param k: how many (equal sized) parts to split the DataFrame into [optional]
+    :param groupby: passed to pandas.DataFrame.groupby before splitting,
+        ensures that each group will be represented equally in each split part [optional]
+    :param sortby: if True the DataFrame is ordered by these column(s) and then sliced into parts from the top
+        if False the DataFrame is sorted randomly before slicing [optional]
+    :param random_state: random_state to be used in random sorting, ignore if sortby is True [optional]
+    :param do_print: whether to print steps to console [optional]
+    :param return_type: if one of ['Series', 's'] returns a pandas Series containing the k indices range(k)
+        if a positive integer < k returns tuple of shape (df_train, df_test) where the return_type'th part
+        is equal to df_test and the other parts are equal to df_train
+    :return: depending on return_type either a pandas Series or a tuple
+    """
+
+    if do_print:
+        tprint('splitting 1:{} ...'.format(k))
+
+    # -- init
+    _df = df.copy()
+    del df
+
+    _index_name = df.index.name
+    _df['_index'] = _df.index
+    _k_split = int(np.ceil(_df.shape[0] / k))
+
+    if groupby is None:
+        groupby = '_dummy'
+        _df['_dummy'] = 1
+
+    _df_out = []
+
+    for _index, _df_i in _df.groupby(groupby):
+
+        # sort (randomly or by given value)
+        if sortby is None:
+            _df_i = _df_i.sample(frac=1, random_state=random_state).reset_index(drop=True)
+        else:
+            _df_i = _df_i.sort_values(by=sortby).reset_index(drop=True)
+
+        # assign k index
+        _df_i['_k_index'] = _df_i.index // _k_split
+
+        _df_out.append(_df_i)
+
+    _df_out = df_merge(_df_out).set_index(['_index']).sort_index()
+    _df_out.index = _df_out.index.rename(None)
+
+    if '_dummy' in _df_out.columns:
+        _df_out = _df_out.drop(['_dummy'], axis=1)
+
+    if return_type in range(k):
+        _df_train = _df_out[_df_out['_k_index'] != return_type].drop('_k_index', axis=1)
+        _df_test = _df_out[_df_out['_k_index'] == return_type].drop('_k_index', axis=1)
+        return _df_train, _df_test
+    else:
+        return _df_out['_k_index']

@@ -137,7 +137,7 @@ def mem_usage(pandas_obj, *args, **kwargs) -> str:
 
 
 @export
-def tprint(*args, sep=' ', **kwargs):
+def tprint(*args, sep: str = ' ', **kwargs):
     """
     Wrapper for print() but with a carriage return at the end.
     This results in the text being overwritten by the next print call.
