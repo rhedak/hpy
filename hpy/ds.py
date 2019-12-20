@@ -2113,7 +2113,8 @@ def k_split(df: pd.DataFrame, k: int = 5, groupby: Union[Sequence, str] = None,
             sortby: Union[Sequence, str] = None, random_state: int = None, do_print: bool = True,
             return_type: Union[str, int] = 1) -> Union[pd.Series, tuple]:
     """
-    performs a train test split
+    splits a DataFrame into k (equal sized) parts that can be used for train test splitting or k_cross splitting
+
     :param df: pandas DataFrame to be split
     :param k: how many (equal sized) parts to split the DataFrame into [optional]
     :param groupby: passed to pandas.DataFrame.groupby before splitting,

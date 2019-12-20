@@ -52,6 +52,8 @@ docstrings = {
                 'before training and inversely after predicting',
     'do_print': 'Whether to print the steps to console',
     'display_score': 'Whether to display the score DataFrame',
+    'ensemble': 'if True also predict with Ensemble like combinations of models. If True or mean calculate'
+            'mean of individual predictions. If median calculate median of individual predictions.',
     # -- validations
     'Model.predict.valid_return_types': ['y', 'df', 'DataFrame'],
     'Models.predict.valid_return_types': ['y', 'df', 'DataFrame', 'self'],
@@ -504,8 +506,7 @@ class Models(_BaseModel):
         :param X: {X_predict}
         :param df: {df_predict}
         :param return_type: one of {Models.predict.valid_return_types}
-        :param ensemble: if True also predict with Ensemble like combinations of models. If True or mean calculate
-            mean of individual predictions. If median calculate median of individual predictions.
+        :param ensemble: {ensemble}
         :param do_print: {do_print}
         :return: if return_type is self: None, else see Model.predict
         """.format(**docstrings)
@@ -600,7 +601,7 @@ class Models(_BaseModel):
         :param do_print: {do_print}
         :param display_score: {display_score}
         :return: if self None, else pandas DataFrame containing the scores
-        """
+        """.format(**docstrings)
 
         if scores is None:
             scores = ['r2', 'rmse', 'mae', 'stdae', 'medae']
@@ -693,7 +694,7 @@ class Models(_BaseModel):
         :param do_print: {do_print}
         :param display_score: {display_score}
         :return: None
-        """
+        """.format(**docstrings)
 
         if scores is None:
             scores = ['r2', 'rmse', 'mae', 'stdae', 'medae']
@@ -807,7 +808,7 @@ def force_model(model: Union[object, Mapping]) -> Model:
 @export
 def get_coefs(model: object, y: Union[Sequence, str]):
     """
-    # get coefficients of a linear regression in a sorted data frame
+    get coefficients of a linear regression in a sorted data frame
     :param model: model object
     :param y: name of the coefficients
     :return: pandas DataFrame containing the coefficient names and values
