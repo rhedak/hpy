@@ -2136,7 +2136,7 @@ def k_split(df: pd.DataFrame, k: int = 5, groupby: Union[Sequence, str] = None,
     _df = df.copy()
     del df
 
-    _index_name = df.index.name
+    _index_name = _df.index.name
     _df['_index'] = _df.index
     _k_split = int(np.ceil(_df.shape[0] / k))
 

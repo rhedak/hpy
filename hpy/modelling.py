@@ -19,15 +19,17 @@ import seaborn as sns
 from copy import deepcopy
 from typing import Any, Sequence, Mapping, Union, Callable
 
+from sklearn.exceptions import DataConversionWarning
+
 try:
-    from IPython.core import display
+    from IPython.core.display import display
 except ImportError:
     display = print
 
 # local imports
 from hpy.main import export, is_list_like, force_list, tprint, dict_list, append_to_dict_list
-from hpy.ds import df_merge, k_split
-from hpy.plotting import ax_as_list, legend_outside, docstrings as hpt_docstrings
+from hpy.ds import df_merge, k_split, r2, rmse, mae, medae, stdae
+from hpy.plotting import ax_as_list, legend_outside, docstrings as hpt_docstrings, rcParams as hpt_rcParams
 
 # --- constants
 __all__ = []
@@ -57,11 +59,11 @@ docstrings = {
     'ensemble': 'if True also predict with Ensemble like combinations of models. If True or mean calculate'
             'mean of individual predictions. If median calculate median of individual predictions.',
     # -- validations
-    'Model.predict.valid_return_types': ['y', 'df', 'DataFrame'],
-    'Models.predict.valid_return_types': ['y', 'df', 'DataFrame', 'self'],
-    'Models.score.valid_return_types': ['self', 'df', 'DataFrame'],
-    'Models.score.valid_scores': ['r2', 'rmse', 'mae', 'stdae', 'medae'],
-    'fit.valid_fit_types': ['train_test', 'k_cross', 'final'],
+    'Model_predict_valid_return_types': ['y', 'df', 'DataFrame'],
+    'Models_predict_valid_return_types': ['y', 'df', 'DataFrame', 'self'],
+    'Models_score_valid_return_types': ['self', 'df', 'DataFrame'],
+    'Models_score_valid_scores': ['r2', 'rmse', 'mae', 'stdae', 'medae'],
+    'fit_valid_fit_types': ['train_test', 'k_cross', 'final'],
 }
 
 
@@ -224,14 +226,14 @@ class Model(_BaseModel):
 
     def fit(self, X: Union[np.ndarray, Sequence, str] = None, y: Union[np.ndarray, Sequence, str] = None,
             df: pd.DataFrame = None, dropna: bool = True, X_test: Union[np.ndarray, Sequence, str] = None,
-            y_test: Union[np.ndarray, Sequence, str] = None, df_test: pd.DataFrame = None):
+            y_test: Union[np.ndarray, Sequence, str] = None, df_test: pd.DataFrame = None) -> None:
         """
         generalized fit method extending on model.fit
         
         :param X: {X}
         :param y: {y}
         :param df: {df_test}
-        :param dropna: {drona}
+        :param dropna: {dropna}
         :param X_test: {X_test}
         :param y_test: {y_test}
         :param df_test: {df_test}
@@ -283,7 +285,6 @@ class Model(_BaseModel):
         _y = _df[self.y_ref]
 
         # -- fit
-        warnings.simplefilter('ignore', FutureWarning)
 
         _kwargs = {'X': _X, 'y': _y}
 
@@ -292,9 +293,10 @@ class Model(_BaseModel):
         if 'y_test' in self.model.fit.__code__.co_varnames:
             _kwargs['y_test'] = _y_test
 
+        warnings.simplefilter('ignore', (FutureWarning, DataConversionWarning))
         self.model.fit(**_kwargs)
+        warnings.simplefilter('default', (FutureWarning, DataConversionWarning))
         self.is_fit = True
-        warnings.simplefilter('default')
 
     def predict(self, X=None, df=None, return_type='y') -> Union[pd.Series, pd.DataFrame]:
         """
@@ -302,15 +304,15 @@ class Model(_BaseModel):
         
         :param X: {X}
         :param df: {df}
-        :param return_type: one of {Model.predict.valid_return_types}, if 'y' returns a pandas Series / DataFrame 
+        :param return_type: one of {Model_predict_valid_return_types}, if 'y' returns a pandas Series / DataFrame 
             with only the predictions, if one of 'df','DataFrame' returns the full DataFrame with predictions added
         :return: see return_type
-        """.format(**predict)
+        """.format(**docstrings)
 
         if not self.is_fit:
             raise ValueError('Model is not fit yet')
 
-        _valid_return_types = docstrings['Model.predict.valid_return_types']
+        _valid_return_types = docstrings['Model_predict_valid_return_types']
         assert(return_type in _valid_return_types), 'return type must be one of {}'.format(_valid_return_types)
 
         # ensure pandas df
@@ -361,7 +363,7 @@ class Models(_BaseModel):
     :param scaler_y: {scaler_y}
     """.format(**docstrings)
 
-    def __init__(self, *args: Union[Model, Sequence], name: str = None, df: pd.DataFrame = None,
+    def __init__(self, *args: Union[object, Sequence], name: str = None, df: pd.DataFrame = None,
                  X_ref: Union[Sequence, str] = None, y_ref: Union[Sequence, str] = None, scaler_X: object = None,
                  scaler_y: object = None):
         """
@@ -387,23 +389,25 @@ class Models(_BaseModel):
 
                 _it += 1
 
-                if not _model.__class__ == Model:
+                if not isinstance(_model, Model):
                     if 'name' in dir(_model):
                         _name = _model.name
+                    elif '__name__' in dir(_model):
+                        _name = '{}_{}'.format(_model.__name__, _it)
                     else:
                         _name = 'model_{}'.format(_it)
                     _model = Model(_model, name=_name)
-                _models.append(_model)
+                _models.append(deepcopy(_model))
                 if _model.name not in _model_names:
                     _model_names.append(_model.name)
 
-                # -- assign
+        # -- assign
         self.__attributes__ = ['__name__', 'name', 'models', 'fit_type', 'df', 'X_ref', 'y_ref', 'scaler_X', 'scaler_y',
                                'model_names', 'df_score']
         self.__name__ = 'hpy.modelling.Models'
         self.models = _models
         self.fit_type = None
-        self.df = df
+        self.df = df.copy()
         self.X_ref = force_list(X_ref)
         self.y_ref = force_list(y_ref)
         self.scaler_X = scaler_X
@@ -414,19 +418,16 @@ class Models(_BaseModel):
     def k_split(self, **kwargs):
         """
         apply hpy.ds.k_split to self to create train-test or k-cross ready data
-
+        
         :param kwargs: keyword arguments passed to hpy.ds.k_split
         :return: None
-        """
-
-        if do_print:
-            tprint('splitting 1:{} ...'.format(k))
+        """.format(**docstrings)
 
         # -- init
         assert self.df is not None, 'You must specify a df'
 
         # -- split
-        self.df['_k_index'] = k_split(df=self.df, **kwargs)
+        self.df['_k_index'] = k_split(df=self.df, return_type='s', **kwargs)
 
     def model_by_name(self, name: Union[list, str]) -> list:
         """
@@ -449,14 +450,14 @@ class Models(_BaseModel):
         """
         fit all Model objects in collection
         
-        :param fit_type: one of {fit.valid_fit_types}
+        :param fit_type: one of {fit_valid_fit_types}
         :param do_print: {do_print}
         :return: None
         """.format(**docstrings)
 
         # TODO - CROSS VALIDATION
 
-        _valid_fit_types = docstrings['fit.valid_fit_types']
+        _valid_fit_types = docstrings['fit_valid_fit_types']
         assert fit_type in _valid_fit_types, 'fit type must be one of {}'.format(_valid_fit_types)
         assert not ((fit_type != 'final') and ('_k_index' not in self.df.columns)), 'DataFrame is not k_split yet'
         assert fit_type != 'cross', 'cross validation not implemented yet'
@@ -507,7 +508,7 @@ class Models(_BaseModel):
         
         :param X: {X_predict}
         :param df: {df_predict}
-        :param return_type: one of {Models.predict.valid_return_types}
+        :param return_type: one of {Models_predict_valid_return_types}
         :param ensemble: {ensemble}
         :param do_print: {do_print}
         :return: if return_type is self: None, else see Model.predict
@@ -535,6 +536,7 @@ class Models(_BaseModel):
             _X = X
 
         if self.scaler_X is not None:
+            # noinspection PyUnresolvedReferences
             _X = self.scaler_X.transform(_X)
         _X = pd.DataFrame(_X, columns=self.X_ref)
 
@@ -551,7 +553,7 @@ class Models(_BaseModel):
             _y_ref_preds += ['{}_{}'.format(_, _model.name) for _ in _model.y_ref]
             _y_pred_scaled = _model.predict(X=_X)
             if self.scaler_y is None:
-                _y_pred = _y_pred_scaled
+                _y_pred = deepcopy(_y_pred_scaled)
             else:
                 _df_y_pred_scaled = pd.DataFrame(_y_pred_scaled)
                 _df_y_pred_scaled.columns = _model.y_ref
@@ -592,13 +594,13 @@ class Models(_BaseModel):
         elif return_type in ['df', 'DataFrame']:
             return _df
 
-    def score(self, scores: Union[Sequence, str] = None, return_type: str = 'self', scale: float = None,
-              do_print: bool = True, display_score: bool = True):
+    def score(self, scores: Union[Sequence, Callable] = None, return_type: str = 'self',
+              scale: Union[Mapping, Sequence, float] = None, do_print: bool = True, display_score: bool = True):
         """
         calculate score of the Model predictions
 
-        :param scores: scoring metrics to use, supports any subset of {Models.score.valid_scores}
-        :param return_type: one of {Models.score.valid_return_types}
+        :param scores: scoring metrics to use, supports any subset of {Models_score_valid_scores}
+        :param return_type: one of {Models_score_valid_return_types}
         :param scale: scale the labels (predictors) with this factor before calculating the scores
         :param do_print: {do_print}
         :param display_score: {display_score}
@@ -606,7 +608,7 @@ class Models(_BaseModel):
         """.format(**docstrings)
 
         if scores is None:
-            scores = ['r2', 'rmse', 'mae', 'stdae', 'medae']
+            scores = [r2, rmse, mae, stdae, medae]
         if do_print:
             tprint('scoring...')
 
@@ -650,9 +652,6 @@ class Models(_BaseModel):
                     if _y_ref_pred not in _df.columns:
                         _df = self.predict(_df)
 
-                    if isinstance(_score, str):
-                        _score = eval(_score)
-
                     _value = _score(_y_ref, _y_ref_pred, df=_df)
 
                     append_to_dict_list(_df_score, {
@@ -667,7 +666,6 @@ class Models(_BaseModel):
         if display_score:
             _display_score = _df_score.pivot_table(index=['y_ref', 'model'], columns='score', values='value')
             if display is not None:
-                # noinspection PyCallingNonCallable
                 display(_display_score)
             else:
                 print(_display_score)
@@ -698,9 +696,9 @@ class Models(_BaseModel):
         :return: None
         """.format(**docstrings)
 
-        if scores is None:
-            scores = ['r2', 'rmse', 'mae', 'stdae', 'medae']
-        self.k_split(k=k, df=df, groupby=groupby, sortby=sortby, random_state=random_state,
+        if df is not None:
+            self.df = df
+        self.k_split(k=k, groupby=groupby, sortby=sortby, random_state=random_state,
                      do_print=do_print)
         self.fit(fit_type=fit_type, do_print=do_print)
         self.predict(ensemble=ensemble, do_print=do_print)
@@ -709,10 +707,10 @@ class Models(_BaseModel):
             tprint('done')
 
     def scoreplot(self, x='y_ref', y='value', hue='model', hue_order=None, row='score',
-                  row_order=None, width=16, height=9 / 2, scale=None, query=None,
-                  return_fig_ax=False):
+                  row_order=None, palette=hpt_rcParams['palette'], width=16, height=9 / 2, scale=None,
+                  query=None, return_fig_ax=False, **kwargs):
         """
-        plot the score
+        plot the score(s) using sns.barplot
 
         :param x: {x}
         :param y: {y}
@@ -720,11 +718,13 @@ class Models(_BaseModel):
         :param hue_order: {order}
         :param row: the variable to wrap around the rows [optional]
         :param row_order: {order}
+        :param palette: {palette}
         :param width: {subplot_width}
         :param height: {subplot_height}
         :param scale: scale the values [optional
         :param query: query to be passed to pd.DataFrame.query before plotting [optional]
         :param return_fig_ax: {return_fig_ax}
+        :param kwargs: other keyword arguments passed to sns.barplot
         :return:
         """.format(**hpt_docstrings)
 
@@ -747,7 +747,7 @@ class Models(_BaseModel):
             _row += 1
             _ax = _ax_list[_row]
             sns.barplot(x=x, y=y, hue=hue, hue_order=hue_order, data=_df_score.query('{}==@_row_value'.format(row)),
-                        ax=_ax)
+                        ax=_ax, palette=palette, **kwargs)
             _y_label = _row_value
             if scale:
                 _y_label += '_scale={}'.format(scale)
