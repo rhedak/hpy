@@ -29,10 +29,12 @@
       <w>corrs</w>
       <w>countplot</w>
       <w>customizeable</w>
+      <w>datapoint</w>
       <w>distfit</w>
       <w>distfits</w>
       <w>distkws</w>
       <w>distplot</w>
+      <w>docstr</w>
       <w>dropna</w>
       <w>dtype</w>
       <w>edgecolor</w>

@@ -30,11 +30,9 @@ except ImportError:
     HTML = None
 
 # local imports
-from hpy.main import export, concat_cols, is_list_like, floor_signif, ceil_signif, tprint, list_intersection, \
-    force_list, progressbar
+from hpy.main import export, concat_cols, is_list_like, floor_signif, ceil_signif, list_intersection, \
+    force_list, progressbar, DocstringProcessor
 from hpy.ds import get_df_corr, lfit, kde, df_count, quantile_split, top_n_coding, df_rmsd, df_agg
-
-# colors for plotting
 
 # --- constants
 
@@ -63,69 +61,81 @@ rcParams = {
     'corr_cutoff': 0,
 }
 
-docstrings = {
-    'ax_in': 'The axes object to plot on, defaults to current axis [optional]',
-    'ax_out': 'The axes object with the plot on it',
-    'fig_ax_out': 'if return_fig_ax: figure and axis objects as tuple, else None',
-    'x': 'Name of the x variable in data or vector data',
-    'y': 'Name of the y variable in data or vector data',
-    't': 'Name of the t variable in data or vector data',
-    'x_novec': 'Name of the x variable in data',
-    'y_novec': 'Name of the y variable in data',
-    't_novec': 'Name of the t variable in data',
-    'data': 'Pandas DataFrame containing named data, optional if vector data is used',
-    'hue': 'Further split the plot by the levels of this variable [optional]',
-    'order': '''Either a string describing how the (hue) levels or to be ordered or an explicit list of levels to be 
-    used for plotting. Accepted strings are:
-        * sorted: following python standard sorting conventions (alphabetical for string, ascending for value)
-        * inv: following sort of python standard sorting conventions but in inverse order
-        * count: sorted by value counts
-        * mean, mean_ascending, mean_descending: sorted by mean value, defaults to descending
-        * median, mean_ascending, median_descending: sorted by median value, defaults to descending
-    ''',
-    'color': 'color used for plotting, must be known to matplotlib.pyplot',
-    'palette': 'Collection of colors to be used for plotting. Can be a dictionary for with names for each level or '
-               'a list of colors or an individual color name. Must be valid colors known to pyplot [optional]',
-    'cmap': 'Color map to use [optional]',
-    'annotations': 'Whether to display annotations [optional]',
-    'number_format': 'The format string used for annotations [optional]',
-    'float_format': 'The format string used for displaying floats [optional]',
-    'int_format': 'The format string used for displaying floats [optional]',
-    'corr_target': 'target variable name, if specified only correlations with the target are shown [optional]',
-    'corr_cutoff': 'filter all correlation whose absolute value is below the cutoff [optional]',
-    'col_wrap': 'After how many columns to create a new line of subplots [optional]',
-    'subplot_width': 'Width of each individual subplot [optional]',
-    'subplot_height': 'Height of each individual subplot [optional]',
-    'trendline': 'Whether to add a trendline [optional]',
-    'alpha': 'Alpha transparency level [optional]',
-    'max_n': 'Maximum number of samples to be used for plotting, if this number is exceeded max_n samples are drawn'
-             'at random from the data which triggers a warning unless sample_warn is set to False.'
-             'Set to False or None to use all samples for plotting. [optional]',
-    'max_n_random_state': 'Random state (seed) used for drawing the random samples [optional]',
-    'max_n_sample_warn': 'Whether to trigger a warning if the data has more samples than max_n [optional]',
-    'return_fig_ax': 'Whether to return the figure and axes objects as tuple to be captured as fig,ax = ... .'
-                     'If False pyplot.show() is called and the plot returns None [optional]',
-    'legend': 'Whether to show a legend [optional]',
-    'legend_loc': 'Location of the legend, one of [\'bottom\', \'right\'] or accepted value of pyplot.legend'
-                  'If in {bottom, right} legend_outside is used, else pyplot.legend [optional]',
-    'legend_ncol': 'Number of columns to use in legend [optional]',
-    'legend_space': 'Only valid if legend_loc is bottom. The space between the main plot and the legend [optional]',
-    'kde_steps': 'Nr of steps the range is split into for kde fitting [optional]',
-    'linestyle': 'Linestyle used, must a valid linestyle recognized by pyplot.plot [optional]',
-    'bins': 'Nr of bins of the histogram [optional]',
-    'sharex': 'Whether to share the x axis [optional]',
-    'sharey': 'Whether to share the y axis [optional]',
-    'row': 'Row index [optional]',
-    'col': 'Column index [optional]',
-    'legend_out': 'Whether to draw the legend outside of the axis, can also be a location string [optional]',
-    'legend_kws': 'Other keyword arguments passed to pyplot.legend [optional]',
-    'xlim': 'X limits for the axis as tuple, passed to ax.set_xlim() [optional]',
-    'ylim': 'Y limits for the axis as tuple, passed to ax.set_ylim() [optional]',
-    'grid': 'Whether to toggle ax.grid() [optional]',
-    'vline': 'A list of x positions to draw vlines at [optional]',
-    'to_abs': 'whether to cast the values to absolute before proceeding [optional]',
-    'valid_distfits': ['kde', 'gauss', False, None],
+validations = {
+    'valid_distfits': ['kde', 'gauss', 'False', 'None']
 }
+
+docstr = DocstringProcessor(
+    ax_in='The axes object to plot on, defaults to current axis [optional]',
+    ax_out='The axes object with the plot on it',
+    fig_ax_out='if return_fig_ax: figure and axis objects as tuple, else None',
+    x='Name of the x variable in data or vector data',
+    y='Name of the y variable in data or vector data',
+    t='Name of the t variable in data or vector data',
+    x_novec='Name of the x variable in data',
+    y_novec='Name of the y variable in data',
+    t_novec='Name of the t variable in data',
+    data='Pandas DataFrame containing named data, optional if vector data is used',
+    data_novec='Pandas DataFrame containing named data',
+    hue='Further split the plot by the levels of this variable [optional]',
+    order='Either a string describing how the (hue) levels or to be ordered or an explicit list of levels to be'
+    'used for plotting. Accepted strings are:'
+    '''
+    
+        * ``sorted``: following python standard sorting conventions (alphabetical for string, ascending for value)
+        
+        * ``inv``: following sort of python standard sorting conventions but in inverse order
+        
+        * ``count``: sorted by value counts
+        
+        * ``mean``, ``mean_ascending``, ``mean_descending``: sorted by mean value, defaults to descending
+        
+        * ``median``, ``mean_ascending``, ``median_descending``: sorted by median value, defaults to descending
+        
+    ''',
+    color='color used for plotting, must be known to matplotlib.pyplot [optional]',
+    palette='Collection of colors to be used for plotting. Can be a dictionary for with names for each level or '
+            'a list of colors or an individual color name. Must be valid colors known to pyplot [optional]',
+    cmap='Color map to use [optional]',
+    annotations='Whether to display annotations [optional]',
+    number_format='The format string used for annotations [optional]',
+    float_format='The format string used for displaying floats [optional]',
+    int_format='The format string used for displaying floats [optional]',
+    corr_target='target variable name, if specified only correlations with the target are shown [optional]',
+    corr_cutoff='filter all correlation whose absolute value is below the cutoff [optional]',
+    col_wrap='After how many columns to create a new line of subplots [optional]',
+    subplot_width='Width of each individual subplot [optional]',
+    subplot_height='Height of each individual subplot [optional]',
+    trendline='Whether to add a trendline [optional]',
+    alpha='Alpha transparency level [optional]',
+    max_n='Maximum number of samples to be used for plotting, if this number is exceeded max_n samples are drawn'
+          'at random from the data which triggers a warning unless sample_warn is set to False.'
+          'Set to False or None to use all samples for plotting. [optional]',
+    max_n_random_state='Random state (seed) used for drawing the random samples [optional]',
+    max_n_sample_warn='Whether to trigger a warning if the data has more samples than max_n [optional]',
+    return_fig_ax='Whether to return the figure and axes objects as tuple to be captured as fig,ax = ..., '
+                  'If False pyplot.show() is called and the plot returns None [optional]',
+    legend='Whether to show a legend [optional]',
+    legend_loc='Location of the legend, one of [bottom, right] or accepted value of pyplot.legend'
+               'If in [bottom, right] legend_outside is used, else pyplot.legend [optional]',
+    legend_ncol='Number of columns to use in legend [optional]',
+    legend_space='Only valid if legend_loc is bottom. The space between the main plot and the legend [optional]',
+    kde_steps='Nr of steps the range is split into for kde fitting [optional]',
+    linestyle='Linestyle used, must a valid linestyle recognized by pyplot.plot [optional]',
+    bins='Nr of bins of the histogram [optional]',
+    sharex='Whether to share the x axis [optional]',
+    sharey='Whether to share the y axis [optional]',
+    row='Row index [optional]',
+    col='Column index [optional]',
+    legend_out='Whether to draw the legend outside of the axis, can also be a location string [optional]',
+    legend_kws='Other keyword arguments passed to pyplot.legend [optional]',
+    xlim='X limits for the axis as tuple, passed to ax.set_xlim() [optional]',
+    ylim='Y limits for the axis as tuple, passed to ax.set_ylim() [optional]',
+    grid='Whether to toggle ax.grid() [optional]',
+    vline='A list of x positions to draw vlines at [optional]',
+    to_abs='whether to cast the values to absolute before proceeding [optional]',
+    **validations
+)
 
 
 # --- functions
@@ -152,22 +162,23 @@ def _get_ordered_levels(data: pd.DataFrame, level: str, order: Union[list, str, 
     return _hues
 
 
+@docstr
 @export
 def heatmap(x: str, y: str, z: str, data: pd.DataFrame, ax: plt.Axes = None,
             cmap: object = None, invert_y: bool = True, **kwargs) -> plt.Axes:
     """
     wrapper for seaborn heatmap in x-y-z format
-    
+
     :param x: Variable name for x axis value
     :param y: Variable name for y axis value
     :param z: Variable name for z value, used to color the heatmap
-    :param data: {data}
-    :param ax: {ax_in}
-    :param cmap: {cmap}
-    :param invert_y: Whether to call ax.invert_yaxis (orders the heatmap as expected)
+    :param data: %(data)s
+    :param ax: %(ax_in)s
+    :param cmap: %(cmap)s
+    :param invert_y: Whether to call ax invert_yaxis (orders the heatmap as expected)
     :param kwargs: Other keyword arguments passed to seaborn heatmap
-    :return: {ax_out}
-    """.format(**docstrings)
+    :return: %(ax_out)s
+    """
     if cmap is None:
         cmap = sns.diverging_palette(10, 220, as_cmap=True)
 
@@ -185,18 +196,19 @@ def heatmap(x: str, y: str, z: str, data: pd.DataFrame, ax: plt.Axes = None,
     return ax
 
 
+@docstr
 @export
 def corrplot(data: pd.DataFrame, annotations: bool = True, number_format: str = rcParams['float_format'], ax=None):
     """
     function to create a correlation plot using a seaborn heatmap
     based on: https://www.linkedin.com/pulse/generating-correlation-heatmaps-seaborn-python-andrew-holt
         
-    :param number_format: {number_format}
-    :param data: {data}
-    :param annotations: {annotations}
-    :param ax: {ax_in}
-    :return: {ax_out}
-    """.format(**docstrings)
+    :param number_format: %(number_format)s
+    :param data: %(data_novec)s
+    :param annotations: %(annotations)s
+    :param ax: %(ax_in)s
+    :return: %(ax_out)s
+    """
     # Create Correlation df
     _corr = data.corr()
 
@@ -221,6 +233,7 @@ def corrplot(data: pd.DataFrame, annotations: bool = True, number_format: str = 
     return ax
 
 
+@docstr
 @export
 def corrplot_bar(data: pd.DataFrame, target: str = None, columns: Sequence[str] = None,
                  corr_cutoff: float = rcParams['corr_cutoff'], corr_as_alpha: bool = False,
@@ -228,16 +241,16 @@ def corrplot_bar(data: pd.DataFrame, target: str = None, columns: Sequence[str] 
     """
     correlation plot as barchart
     
-    :param data: {data}
-    :param target: {corr_target}
+    :param data: %(data)s
+    :param target: %(corr_target)s
     :param columns: columns for which to calculate the correlations, defaults to all numeric columns [optional]
-    :param corr_cutoff: {corr_cutoff}
+    :param corr_cutoff: %(corr_cutoff)s
     :param corr_as_alpha: whether to set alpha value of bars to scale with correlation [optional]
     :param xlim: xlim scale for plot, defaults to (-1, 1) to show the absolute scale of the correlations.
         set to None if you want the plot x limits to scale to the highest correlation values [optional]
-    :param ax: {ax_in}
-    :return: {ax_out}
-    """.format(**docstrings)
+    :param ax: %(ax_in)s
+    :return: %(ax_out)s
+    """
     _df_corr = get_df_corr(data, target=target)
     _df_corr = _df_corr[_df_corr['corr_abs'] >= corr_cutoff]
 
@@ -287,6 +300,7 @@ def corrplot_bar(data: pd.DataFrame, target: str = None, columns: Sequence[str] 
     return ax
 
 
+@docstr
 @export
 def pairwise_corrplot(data: pd.DataFrame, corr_cutoff: float = rcParams['corr_cutoff'], col_wrap: int = 4,
                       hue: str = None, hue_order: Union[list, str] = None,
@@ -300,25 +314,25 @@ def pairwise_corrplot(data: pd.DataFrame, corr_cutoff: float = rcParams['corr_cu
     print a pairwise_corrplot to for all variables in the df, by default only plots those with a correlation
     coefficient of >= corr_cutoff
     
-    :param data: {data}
-    :param corr_cutoff: {corr_cutoff}
-    :param col_wrap: {col_wrap}
-    :param hue: {hue}
-    :param hue_order: {order}
-    :param width: {subplot_width}
-    :param height: {subplot_height}
-    :param trendline: {trendline}
-    :param alpha: {alpha}
-    :param ax: {ax_in}
-    :param target: {corr_target}
-    :param palette: {palette}
-    :param max_n: {max_n}
-    :param random_state: {max_n_random_state}
-    :param sample_warn: {max_n_sample_warn}
-    :param return_fig_ax: {return_fig_ax}
+    :param data: %(data_novec)s
+    :param corr_cutoff: %(corr_cutoff)s
+    :param col_wrap: %(col_wrap)s
+    :param hue: %(hue)s
+    :param hue_order: %(order)s
+    :param width: %(subplot_width)s
+    :param height: %(subplot_height)s
+    :param trendline: %(trendline)s
+    :param alpha: %(alpha)s
+    :param ax: %(ax_in)s
+    :param target: %(corr_target)s
+    :param palette: %(palette)s
+    :param max_n: %(max_n)s
+    :param random_state: %(max_n_random_state)s
+    :param sample_warn: %(max_n_sample_warn)s
+    :param return_fig_ax: %(return_fig_ax)s
     :param kwargs: other keyword arguments passed to pyplot.subplots
-    :return: {fig_ax_out}
-    """.format(**docstrings)
+    :return: %(fig_ax_out)s
+    """
 
     # actual plot function
     def _f_plot(_f_x, _f_y, _f_data, _f_color, _f_color_trendline, _f_label, _f_ax):
@@ -459,6 +473,7 @@ def pairwise_corrplot(data: pd.DataFrame, corr_cutoff: float = rcParams['corr_cu
         plt.show()
 
 
+@docstr
 @export
 def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None,
              hue_order: Union[Sequence, str] = 'sorted', palette: Union[Mapping, Sequence, str] = None,
@@ -479,14 +494,14 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
     :param x: the name of the variable(s) in data or vector data, if data is provided and x is a list of columns
         the DataFrame is automatically melted and the newly generated column used as hue. i.e. you plot
         the distributions of multiple columns on the same axis
-    :param data: {data}
-    :param hue: {hue}
-    :param hue_order: {order}
-    :param palette: {palette}
+    :param data: %(data)s
+    :param hue: %(hue)s
+    :param hue_order: %(order)s
+    :param palette: %(palette)s
     :param linecolor: Color of the kde fit line, overwritten with palette by hue level if hue is specified [optional]
     :param edgecolor: Color of the histogram edges [optional]
-    :param alpha: {alpha}
-    :param bins: {bins}
+    :param alpha: %(alpha)s
+    :param bins: %(bins)s
     :param perc: Whether to display the y-axes as percentage, if false count is displayed.
         Defaults if hue: True, else False [optional]
     :param top_nr: limit hue to top_nr levels using hpy.ds.top_n, the rest will be cast to other [optional]
@@ -497,30 +512,30 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
     :param std_cutoff: automatically cutoff data outside of the std_cutoff standard deviations range,
         by default this is off but a recommended value for a good visual experience without outliers is 3 [optional]
     :param hist: whether to show the histogram, default False if hue else True [optional]
-    :param distfit: one of {valid_distfits}. If 'kde' fits a kernel density distribution to the data.
+    :param distfit: one of %(valid_distfits)s. If 'kde' fits a kernel density distribution to the data.
         If gauss fits a gaussian distribution with the observed mean and std to the data. [optional]
     :param fill: whether to fill the area under the distfit curve, ignored if hist is True [optional]
-    :param legend: {legend}
-    :param legend_loc: {legend_loc}
-    :param legend_space: {legend_space}
-    :param legend_ncol: {legend_ncol}
+    :param legend: %(legend)s
+    :param legend_loc: %(legend_loc)s
+    :param legend_space: %(legend_space)s
+    :param legend_ncol: %(legend_ncol)s
     :param agg_func: one of ['mean', 'median']. The agg function used to find the center of the distribution [optional]
-    :param number_format: {number_format}
-    :param kde_steps: {kde_steps}
-    :param max_n: {max_n}
-    :param random_state: {max_n_random_state}
-    :param sample_warn: {max_n_sample_warn}
-    :param xlim: {xlim}
-    :param linestyle: {linestyle}
+    :param number_format: %(number_format)s
+    :param kde_steps: %(kde_steps)s
+    :param max_n: %(max_n)s
+    :param random_state: %(max_n_random_state)s
+    :param sample_warn: %(max_n_sample_warn)s
+    :param xlim: %(xlim)s
+    :param linestyle: %(linestyle)s
     :param label_style: one of ['mu_sigma', 'plain']. If mu_sigma then the mean (or median) and std value are displayed
         inside the label [optional]
     :param x_offset_perc: the amount whitespace to display next to x_min and x_max in percent of x_range [optional]
-    :param ax: {ax_in}
+    :param ax: %(ax_in)s
     :param kwargs: additional keyword arguments passed to pyplot.plot
-    :return: {ax_out}
-    """.format(**docstrings)
+    :return: %(ax_out)s
+    """
     # -- asserts
-    assert (distfit in docstrings['valid_distfits']), 'distfit must be one of {}'.format(docstrings['valid_distfits'])
+    assert (distfit in validations['valid_distfits']), 'distfit must be one of {}'.format(validations['valid_distfits'])
     # -- defaults
     if palette is None:
         palette = rcParams['palette']
@@ -890,20 +905,20 @@ def hist_2d(x: str, y: str, data: pd.DataFrame, bins: int = 100, std_cutoff: int
     generic 2d histogram created by splitting the 2d area into equal sized cells, counting data points in them and
     drawn using pyplot.pcolormesh
     
-    :param x: {x}
-    :param y: {y}
-    :param data: {data}
-    :param bins: {bins}
-    :param std_cutoff: {std_cutoff}
+    :param x: %(x)s
+    :param y: %(y)s
+    :param data: %(data)s
+    :param bins: %(bins)s
+    :param std_cutoff: %(std_cutoff)s
     :param cutoff_perc: if less than this percentage of data points is in the cell then the data is ignored [optional]
     :param cutoff_abs: if less than this amount of data points is in the cell then the data is ignored [optional]
-    :param cmap: {cmap}
-    :param ax: {ax_in}
+    :param cmap: %(cmap)s
+    :param ax: %(ax_in)s
     :param color_sigma: color to highlight the sigma range in, must be a valid pyplot.plot color [optional] 
     :param draw_sigma: whether to highlight the sigma range [optional]
     :param kwargs: other keyword arguments passed to pyplot.pcolormesh [optional]
-    :return: 
-    """.format(**docstrings)
+    :return: %(ax_out)s
+    """
     _df = data.copy()
     del data
 
@@ -960,14 +975,14 @@ def paired_plot(data: pd.DataFrame, cols: Sequence, color: str = None, cmap: str
     """
     create a facet grid to analyze various aspects of correlation between two variables using seaborn.PairGrid
     
-    :param data: {data}
+    :param data: %(data)s
     :param cols: list of exactly two variables to be compared
-    :param color: {color}
-    :param cmap: {cmap}
-    :param alpha: {alpha}
+    :param color: %(color)s
+    :param cmap: %(cmap)s
+    :param alpha: %(alpha)s
     :param kwargs: other arguments passed to seaborn.PairGrid
     :return: seaborn FacetGrid object with the plots on it
-    """.format(**docstrings)
+    """
     def _f_corr(_f_x, _f_y, _f_s=10, **_f_kwargs):
         # Calculate the value
         _coef = np.corrcoef(_f_x, _f_y)[0][1]
@@ -1013,7 +1028,7 @@ def q_plim(s: pd.Series, q_min: float = .1, q_max: float = .9, offset_perc: floa
     :param limit_min_max: whether to truncate the plot limits at the data limits
     :param offset: whether to apply the offset
     :return: a tuple containing the x limits
-    """.format(**docstrings)
+    """
     _lower_bound = floor_signif(s.quantile(q=q_min))
     _upper_bound = ceil_signif(s.quantile(q=q_max))
 
@@ -1046,25 +1061,27 @@ def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str =
                     summary_title: bool = True, level_title: bool = True, do_print: bool = False,
                     width: int = rcParams['fig_width'], height: int = rcParams['fig_height'],
                     return_fig_ax: bool = rcParams['return_fig_ax'],
-                    kwargs_subplots_adjust: Mapping = None, kwargs_summary: Mapping = None, **kwargs):
+                    kwargs_subplots_adjust: Mapping = None, kwargs_summary: Mapping = None,
+                    **kwargs) -> Union[None, tuple]:
     """
     Plots a plot for each specified column for each level of a certain column plus a summary plot
-    :param data: {data}
+    
+    :param data: %(data)s
     :param level: the name of the column to split the plots by, must be in data
     :param cols: the columns to create plots for, defaults to all numeric columns [optional]  
-    :param hue: {hue}
-    :param order: {order}
-    :param hue_order: {order}
+    :param hue: %(hue)s
+    :param order: %(order)s
+    :param hue_order: %(order)s
     :param func: function to use for plotting, must support 1 positional argument, data, hue, ax and kwargs [optional]
     :param summary_title: whether to automatically set the summary plot title [optional]
     :param level_title: whether to automatically set the level plot title [optional]
-    :param width: {subplot_width}
-    :param height: {subplot_height}
-    :param return_fig_ax: {return_fig_ax}
+    :param width: %(subplot_width)s
+    :param height: %(subplot_height)s
+    :param return_fig_ax: %(return_fig_ax)s
     :param kwargs_summary: other_keyword arguments passed to summary distplot, if None uses kwargs [optional]
     :param kwargs: other keyword arguments passed to func [optional]
-    :return: 
-    """.format(**docstrings)
+    :return: see return_fig_ax
+    """
     if kwargs_summary is None:
         kwargs_summary = kwargs
 
@@ -1133,9 +1150,9 @@ def get_legends(ax: plt.Axes = None) -> list:
     """
     returns all legends on a given axis, useful if you have a secaxis
     
-    :param ax: {ax_in}
+    :param ax: %(ax_in)s
     :return: list of legends
-    """.format(**docstrings)
+    """
     if ax is None:
         ax = plt.gca()
     return [_ for _ in ax.get_children() if isinstance(_, Legend)]
@@ -1264,7 +1281,7 @@ def facet_wrap(func: Callable, data: pd.DataFrame, facet: Union[list, str], *arg
     a new line after col_wrap columns. Uses a given plot function and creates a new plot for each facet level.
     
     :param func: Any plot function. Must support keyword arguments data and ax
-    :param data: {data}
+    :param data: %(data)s
     :param facet: The column / list of columns to facet over.
     :param args: passed to func
     :param facet_type: one of ['group', 'cols', None]. 
@@ -1272,22 +1289,22 @@ def facet_wrap(func: Callable, data: pd.DataFrame, facet: Union[list, str], *arg
         If cols each facet is in turn passed as the first positional argument to the plot function func. 
         If None then the facet_type is inferred: a single facet value will be treated as group and multiple
         facet values will be treated as cols. 
-    :param col_wrap: {col_wrap}
-    :param width: {subplot_width}
-    :param height: {subplot_height}
-    :param catch_error: whether to keep going in case of an error being encounted in the plot function [optional] 
-    :param return_fig_ax: {return_fig_ax}
-    :param sharex: {sharex}
-    :param sharey: {sharey}
+    :param col_wrap: %(col_wrap)s
+    :param width: %(subplot_width)s
+    :param height: %(subplot_height)s
+    :param catch_error: whether to keep going in case of an error being encountered in the plot function [optional] 
+    :param return_fig_ax: %(return_fig_ax)s
+    :param sharex: %(sharex)s
+    :param sharey: %(sharey)s
     :param show_xlabel: whether to show the x label for each subplot
     :param x_tick_rotation: x tick rotation for each subplot
     :param y_tick_rotation: y tick rotation for each subplot
     :param ax_title: one of ['set','hide'], if set sets axis title to facet name, if hide forcefully hids axis title
-    :param order: {order}
+    :param order: %(order)s
     :param subplots_kws: other keyword arguments passed to pyplot.subplots
     :param kwargs: other keyword arguments passed to func
-    :return: {fig_ax_out}
-    """.format(**docstrings)
+    :return: %(fig_ax_out)s
+    """
 
     if subplots_kws is None:
         subplots_kws = {}
@@ -1308,10 +1325,9 @@ def facet_wrap(func: Callable, data: pd.DataFrame, facet: Union[list, str], *arg
     if facet_type == 'cols':
         _facets = facet
     else:
-        if is_list_like(facet):
-            _df['_facet'] = concat_cols(_df, facet)
-            facet = '_facet'
-            _facets = _get_ordered_levels(data, facet, order)
+        _df['_facet'] = concat_cols(_df, facet)
+        facet = '_facet'
+        _facets = _get_ordered_levels(_df, facet, order)
 
     # init a grid
     if len(_facets) > col_wrap:
@@ -1388,12 +1404,12 @@ def get_subax(ax: Union[plt.Axes, np.ndarray], row: int = None, col: int = None,
     """
     shorthand to get around the fact that ax can be a 1D array or a 2D array (for subplots that can be 1x1,1xn,nx1)
     
-    :param ax: {ax_in}
-    :param row: {row}
-    :param col: {col}
+    :param ax: %(ax_in)s
+    :param row: %(row)s
+    :param col: %(col)s
     :param rows_prio: decides if to use row or col in case of a 1xn / nx1 shape (False means cols get priority)
-    :return: {ax_out}
-    """.format(**docstrings)
+    :return: %(ax_out)s
+    """
 
     if isinstance(ax, np.ndarray):
         _dims = len(ax.shape)
@@ -1418,9 +1434,9 @@ def ax_as_list(ax: Union[plt.Axes, np.ndarray]) -> list:
     """
     takes any Axes and turns them into a list
     
-    :param ax: {ax_in}
+    :param ax: %(ax_in)s
     :return: List containing the subaxes
-    """.format(**docstrings)
+    """
     
     if isinstance(ax, np.ndarray):
         _dims = len(ax.shape)
@@ -1442,9 +1458,9 @@ def ax_as_array(ax: Union[plt.Axes, np.ndarray]) -> np.ndarray:
     """
     takes any Axes and turns them into a numpy 2D array
 
-    :param ax: {ax_in}
+    :param ax: %(ax_in)s
     :return: Numpy 2D array containing the subaxes
-    """.format(**docstrings)
+    """
     if isinstance(ax, np.ndarray):
         if len(ax.shape) == 2:
             return ax
@@ -1630,7 +1646,7 @@ def bubblecountplot(x, y, hue, data, agg_function='median', show_std=True, top_n
     bubbleplot(x=x, y=y, hue=hue, s='_perc', text='_text', data=_df, show_std=show_std, **kwargs)
 
 
-# plot rmsd
+@docstr
 @export
 def rmsdplot(x: str, data: pd.DataFrame, groups: Union[Sequence, str] = None, hue: str = None,
              hue_order: Union[Sequence, str] = None, cutoff: float = 0, ax: plt.Axes = None,
@@ -1638,22 +1654,23 @@ def rmsdplot(x: str, data: pd.DataFrame, groups: Union[Sequence, str] = None, hu
              sort_by_hue: bool = False, palette=None, barh_kws=None, **kwargs):
     """
     creates a seaborn.barplot showing the rmsd calculating hpy.ds.df_rmsd
-    :param x: {x}
-    :param data: {data}
+    
+    :param x: %(x)s
+    :param data: %(data)s
     :param groups: the columns to calculate the rmsd for, defaults to all columns [optional]
-    :param hue: {hue}
-    :param hue_order: {order} 
+    :param hue: %(hue)s
+    :param hue_order: %(order)s 
     :param cutoff: drop rmsd values smaller than cutoff [optional]
-    :param ax: {ax_in}
+    :param ax: %(ax_in)s
     :param color_as_balance: whether to color the bars based on how balanced the levels are [optional] 
     :param balance_cutoff: if specified the balance coloring red for worse balance than balance cutoff [optional]
     :param rmsd_as_alpha: whether to use set the alpha values of the columns based on the rmsd value [optional]
     :param sort_by_hue: passed to hpy.ds.df_rmsd [optional]
-    :param palette: {palette}
+    :param palette: %(palette)s
     :param barh_kws: other keyword arguments passed to seaborn.barplot [optional]
-    :param kwargs: other keyword arguments passed to hpy.ds.rf_rmsd [otional]
-    :return: {ax_out}
-    """.format(**docstrings)
+    :param kwargs: other keyword arguments passed to hpy.ds.rf_rmsd [optional]
+    :return: %(ax_out)s
+    """
     if palette is None:
         palette = rcParams['palette']
     if barh_kws is None:
@@ -1997,8 +2014,6 @@ def aggplot2d(x, y, data, aggfunc='mean', ax=None, x_int=None, time_int=None,
     # time int should be something like '<M8[D]'
     # D can be any datetime unit from numpy https://docs.scipy.org/doc/numpy-1.13.0/reference/arrays.datetime.html
 
-    # consts
-
     _y_agg = '{}_{}'.format(y, aggfunc)
     _y_std = '{}_std'.format(y)
 
@@ -2033,6 +2048,7 @@ def aggplot2d(x, y, data, aggfunc='mean', ax=None, x_int=None, time_int=None,
 def insert_linebreak(s: str, pos: int = None, frac: float = None, max_breaks: int = None) -> str:
     """
     used to insert linebreaks in strings, useful for formatting axes labels
+
     :param s: string to insert linebreaks into
     :param pos: inserts a linebreak every pos characters [optional]
     :param frac: inserts a linebreak after frac percent of characters [optional]
@@ -2072,17 +2088,18 @@ def insert_linebreak(s: str, pos: int = None, frac: float = None, max_breaks: in
     return _s
 
 
+@docstr
 @export
 def ax_tick_linebreaks(ax: plt.Axes = None, x: bool = True, y: bool = True, **kwargs) -> None:
     """
     uses insert_linebreaks to insert linebreaks into the axes ticklabels
     
-    :param ax: {ax_in}
+    :param ax: %(ax_in)s
     :param x: whether to insert linebreaks into the x axis label [optional]
     :param y: whether to insert linebreaks into the y axis label [optional]
     :param kwargs: other keyword arguments passed to insert_linebreaks
     :return: None
-    """.format(**docstrings)
+    """
     if ax is None:
         ax = plt.gca()
 
@@ -2092,6 +2109,7 @@ def ax_tick_linebreaks(ax: plt.Axes = None, x: bool = True, y: bool = True, **kw
         ax.set_yticklabels([insert_linebreak(_item.get_text(), **kwargs) for _item in ax.get_yticklabels()])
 
 
+@docstr
 @export
 def annotate_barplot(ax: plt.Axes = None, x: Sequence = None, y: Sequence = None, ci: bool = True, 
                      ci_newline: bool = True, adj_ylim: float = .05, nr_format: str = rcParams['float_format'], 
@@ -2100,19 +2118,19 @@ def annotate_barplot(ax: plt.Axes = None, x: Sequence = None, y: Sequence = None
     """
     automatically annotates a barplot with bar values and error bars (if present). Currently does not work with ticks!
     
-    :param ax: {ax_in} 
-    :param x: {x}
-    :param y: {y}
+    :param ax: %(ax_in)s 
+    :param x: %(x)s
+    :param y: %(y)s
     :param ci: whether to annotate error bars [optional]
     :param ci_newline: whether to add a newline between values and error bar values [optional] 
     :param adj_ylim: whether to automatically adjust the plot y limits to fit the annotations [optional]
-    :param nr_format: {nr_format}
+    :param nr_format: %(nr_format)s
     :param ha: horizontal alignment [optional]
     :param va: vertical alignment [optional]
     :param offset: offset between bar top and annotation center [optional]
     :param kwargs: other keyword arguments passed to pyplot.annotate
-    :return: {ax_out}
-    """.format(**docstrings)
+    :return: %(ax_out)s
+    """
     # catch font warnings
     logging.getLogger().setLevel(logging.CRITICAL)
 
@@ -2194,6 +2212,7 @@ def annotate_barplot(ax: plt.Axes = None, x: Sequence = None, y: Sequence = None
     return ax
 
 
+@docstr
 @export
 def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't', lines: Mapping = None,
              max_interval: int = None, time_per_frame: int = 200, html: bool = True, title: bool = True,
@@ -2206,11 +2225,11 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
     wrapper for FuncAnimation to be used with pandas DataFrames. Assumes that you have a DataFrame containing
     one datapoint for each x-y-t combination.
     
-    :param data: {data} 
-    :param x: {x}
-    :param y: {y}
-    :param t: {y}
-    :param lines: you can also pass lines that you want to annimate. Details to follow [optional]
+    :param data: %(data)s 
+    :param x: %(x_novec)s
+    :param y: %(y_novec)s
+    :param t: %(y_novec)s
+    :param lines: you can also pass lines that you want to animate. Details to follow [optional]
     :param max_interval: max interval at which to abort the animation [optional]
     :param time_per_frame: time per frame [optional]
     :param html: whether to return the output as HTML (for jupyter notebook) [optional]
@@ -2219,17 +2238,17 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
     :param t_format: format string used to format the time variable in the title [optional]
     :param fig: figure to plot on [optional]
     :param ax: axes to plot on [optional]
-    :param color: {color}
-    :param label: {label}
-    :param legend: {legend}
-    :param legend_out: {legend_out}
-    :param legend_kws: {legend_kws}
-    :param xlim: {xlim}
-    :param ylim: {ylim}
+    :param color: %(color)s
+    :param label: %(label)s
+    :param legend: %(legend)s
+    :param legend_out: %(legend_out)s
+    :param legend_kws: %(legend_kws)s
+    :param xlim: %(xlim)s
+    :param ylim: %(ylim)s
     :param ax_facecolor: passed to ax.set_facecolor, can also be a conditional mapping to change the faceolor at
         specific timepoints t [optional]
-    :param grid: {grid}
-    :param vline: {vline}
+    :param grid: %(grid)s
+    :param vline: %(vline)s
     :param kwargs: other keyword arguments passed to pyplot.plot
     :return: if HTML: HTML code, else: FuncAnimation object
     """
@@ -2525,13 +2544,15 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
         return _anim
 
 
+@docstr
 @export
-def legend_outside(ax: plt.Axes = None, width: float =.85, loc: str ='right',
+def legend_outside(ax: plt.Axes = None, width: float = .85, loc: str = 'right',
                    legend_space: float = rcParams['legend_outside.legend_space'], offset_x: float = 0,
                    offset_y: float = 0, **kwargs):
     """
     draws a legend outside of the subplot
-    :param ax: {ax_in}
+    
+    :param ax: %(ax_in)s
     :param width: how far to shrink down the subplot if loc=='right'
     :param loc: one of ['right','bottom'], where to put the legend
     :param legend_space: how far below the subplot to put the legend if loc=='bottom'
@@ -2539,7 +2560,7 @@ def legend_outside(ax: plt.Axes = None, width: float =.85, loc: str ='right',
     :param offset_y: y offset for the legend
     :param kwargs: other keyword arguments passed to pyplot.legend
     :return: None
-    """.format(**docstrings)
+    """
     # -- init
     if loc not in ['bottom', 'right']:
         warnings.warn('legend_outside: legend loc not recognized')
@@ -2571,15 +2592,17 @@ def legend_outside(ax: plt.Axes = None, width: float =.85, loc: str ='right',
         logging.getLogger().setLevel(logging.DEBUG)
 
 
+@docstr
 @export
 def set_ax_sym(ax: plt.Axes, x: bool = True, y: bool = True):
     """
     automatically sets the select axes to be symmetrical
-    :param ax: {ax_in}
+    
+    :param ax: %(ax_in)s
     :param x: whether to set x axis to be symmetrical
     :param y: whether to set y axis to be symmetrical
     :return: None
-    """.format(**docstrings)
+    """
     if x:
         _x_max = np.max(np.abs(np.array(ax.get_xlim())))
         # noinspection PyTypeChecker
@@ -2590,10 +2613,12 @@ def set_ax_sym(ax: plt.Axes, x: bool = True, y: bool = True):
         ax.set_ylim((-_y_max, _y_max))
 
 
+@docstr
 @export
 def custom_legend(colors: Union[list, str], labels: Union[list, str], do_show=True) -> Union[list, None]:
     """
     uses patches to create a custom legend with the specified colors
+
     :param colors: list of matplotlib colors to use for the legend
     :param labels: list of labels to use for the legend
     :param do_show: whether to show the created legend
@@ -2668,20 +2693,22 @@ def dic_to_lcurveplot(dic, width=16, height=9 / 2, **kwargs):
     plt.show()
 
 
+@docstr
 @export
 def stemplot(x, y, data=None, ax=None, color=rcParams['palette'][0], baseline=0, kwline=None, **kwargs):
     """
     modeled after pyplot.stemplot but more customizeable
-    :param x: {x}
-    :param y: {y}
-    :param data: {data}
-    :param ax: {ax_in}
-    :param color: {color}
+    
+    :param x: %(x)s
+    :param y: %(y)s
+    :param data: %(data)s
+    :param ax: %(ax_in)s
+    :param color: %(color)s
     :param baseline: where to draw the baseline for the stemplot
     :param kwline: other keyword arguments passed to pyplot.plot
     :param kwargs: other keyword arguments passed to pyplot.scatter
-    :return: {ax_out}
-    """.format(**docstrings)
+    :return: %(ax_out)s
+    """
     if kwline is None:
         kwline = {}
     if data is None:
@@ -2803,14 +2830,15 @@ def show_ax_ticklabels(ax, x=None, y=None):
             plt.setp(_ax.get_yticklabels(), visible=y)
 
 
+@docstr
 @export
 def get_twin(ax: plt.Axes) -> Union[plt.Axes, None]:
     """
     get the twin axis from an Axes object
     
-    :param ax: {ax_in}
+    :param ax: %(ax_in)s
     :return: the twin axis if it exists, else None
-    """.format(**docstrings)
+    """
     for _other_ax in ax.figure.axes:
         if _other_ax is ax:
             continue
@@ -2819,15 +2847,16 @@ def get_twin(ax: plt.Axes) -> Union[plt.Axes, None]:
     return None
 
 
+@docstr
 @export
 def get_axlim(ax: plt.Axes, xy: Union[str, None] = None) -> Union[tuple, Mapping]:
     """
     Wrapper function to get x limits, y limits or both with one function call
     
-    :param ax: {ax_in}
+    :param ax: %(ax_in)s
     :param xy: one of ['x', 'y', 'xy', None]
     :return: if xy is 'xy' or None returns a dictionary else returns x or y lims as tuple
-    """.format(**docstrings)
+    """
     if xy == 'x':
         return ax.get_xlim()
     elif xy == 'y':
@@ -2836,19 +2865,22 @@ def get_axlim(ax: plt.Axes, xy: Union[str, None] = None) -> Union[tuple, Mapping
         return {'x': ax.get_xlim(), 'y': ax.get_ylim()}
 
 
+@docstr
 @export
 def set_axlim(ax: plt.Axes, lim: Union[Sequence, Mapping], xy: Union[str, None] = None):
     """
     Wrapper function to set both x and y limits with one call
     
-    :param ax: {ax_in}
+    :param ax: %(ax_in)s
     :param lim: axes limits as tuple or Mapping
     :param xy: one of ['x', 'y', 'xy', None]
     :return: None
-    """.format(**docstrings)
+    """
     if xy == 'x':
+        # noinspection PyTypeChecker
         ax.set_xlim(lim)
     elif xy == 'y':
+        # noinspection PyTypeChecker
         ax.set_ylim(lim)
     else:
         if isinstance(lim, Mapping):
@@ -2858,19 +2890,20 @@ def set_axlim(ax: plt.Axes, lim: Union[Sequence, Mapping], xy: Union[str, None] 
             raise ValueError('Specify xy parameter or pass a dictionary')
 
 
+@docstr
 @export
 def share_xy(ax: plt.Axes, x: bool = True, y: bool = True, mode: str = 'all', adj_twin_ax: bool = True):
     """
     set the subplots on the Axes to share x and/or y limits WITHOUT sharing x and y legends.
     If you want that please use pyplot.subplots(share_x=True,share_y=True) when creating the plots.
     
-    :param ax: {ax}
+    :param ax: %(ax_in)s
     :param x: whether to share x limits [optional]
     :param y: whether to share y limits [optional]
     :param mode: one of ['all', 'row', 'col'], if all shares across all subplots, else just across rows / columns
     :param adj_twin_ax: whether to also adjust twin axes
     :return: None
-    """.format(*docstrings)
+    """
     _xys = []
     if x:
         _xys.append('x')
@@ -2946,14 +2979,15 @@ def share_xy(ax: plt.Axes, x: bool = True, y: bool = True, mode: str = 'all', ad
                     set_axlim(_ax2, lim=_new_lim_2, xy=_xy)
 
 
+@docstr
 @export
-def share_legend(ax: plt.Axes, keep_i: int= None):
+def share_legend(ax: plt.Axes, keep_i: int = None):
     """
     removes all legends except for i from an Axes object
-    :param ax: {ax_in}
+    :param ax: %(ax_in)s
     :param keep_i: index of the plot whose legend you want to keep
     :return: None
-    """.format(**docstrings)
+    """
 
     _ax_list = ax_as_list(ax)
 
@@ -3325,6 +3359,7 @@ def histplot(x=None, data=None, hue=None, hue_order=None, ax=None, bins=30, use_
     return ax
 
 
+@docstr
 @export
 def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: str = None, ax: plt.Axes = None,
               order: Union[Sequence, str] = None, hue_order: Union[Sequence, str] = None, normalize_x: bool = False,
@@ -3334,26 +3369,27 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
               count_twinx_kws: Mapping = None, **kwargs):
     """
     Based on seaborn barplot but with a few more options
-    :param x: {x}
-    :param data: {data}
-    :param hue: {hue}
-    :param ax: {ax_in}
-    :param order: {order}
-    :param hue_order: {order}
+    
+    :param x: %(x)s
+    :param data: %(data)s
+    :param hue: %(hue)s
+    :param ax: %(ax_in)s
+    :param order: %(order)s
+    :param hue_order: %(order)s
     :param normalize_x: whether to normalize x, causes the sum of each x group to be 100 percent [optional]
     :param normalize_hue: whether to normalize hue, causes the sum of each hue group to be 100 percent [optional]
-    :param palette: {palette}
-    :param x_tick_rotation: {x_tick_rotation}
+    :param palette: %(palette)s
+    :param x_tick_rotation: %(x_tick_rotation)s
     :param count_twinx: whether to plot the count values on the second axis (if using normalize) [optional]
     :param hide_legend: whether to hide the legend [optional]
     :param annotate: whether to use annotate_barplot [optional]
-    :param annotate_format: {number_format}
+    :param annotate_format: %(number_format)s
     :param legend_kws: additional keyword arguments passed to pyplot.legend [optional]
     :param barplot_kws: additional keyword arguments passed to seaborn.barplot [optional]
     :param count_twinx_kws: additional keyword arguments passed to pyplot.plot [optional]
     :param kwargs: additional keyword arguments passed to hpy.ds.df_count [optional]
-    :return: {ax_out}
-    """.format(**docstrings)
+    :return: %(ax_out)s
+    """
 
     # -- init
 
@@ -3457,6 +3493,7 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
     return ax
 
 
+@docstr
 @export
 def quantile_plot(x: Union[Sequence, str], data: pd.DataFrame = None, qs: Union[Sequence, float] = None, x2: str =None,
                   hue: str = None, hue_order: Union[Sequence, str] = None, to_abs: bool = False, ax: plt.Axes = None,
@@ -3464,17 +3501,17 @@ def quantile_plot(x: Union[Sequence, str], data: pd.DataFrame = None, qs: Union[
     """
     plots the specified quantiles of a Series using seaborn.barplot
     
-    :param x: {x}
-    :param data: {data}
+    :param x: %(x)s
+    :param data: %(data)s
     :param qs: Quantile levels [optional]
     :param x2: is specified: subtracts x2 from x before calculating quantiles [optional]
-    :param hue: {hue}
-    :param hue_order: {order} 
-    :param to_abs: {to_abs}
-    :param ax: {ax_in}
+    :param hue: %(hue)s
+    :param hue_order: %(order)s 
+    :param to_abs: %(to_abs)s
+    :param ax: %(ax_in)s
     :param kwargs: other keyword arguments passed to seaborn.barplot
-    :return: {ax_out}
-    """.format(**docstrings)
+    :return: %(ax_out)s
+    """
     # long or short format
     if qs is None:
         qs = [.1, .25, .5, .75, .9]

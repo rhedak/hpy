@@ -1,5 +1,5 @@
 .. hpy documentation master file, created by
-   sphinx-quickstart on Wed Dec 18 10:02:38 2019.
+   sphinx-quickstart on Wed Dec 25 13:31:03 2019.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
@@ -14,6 +14,7 @@ Welcome to hpy's documentation!
 .. automodapi:: hpy.ipython
 .. automodapi:: hpy.modelling
 .. automodapi:: hpy.plotting
+
 
 Indices and tables
 ==================

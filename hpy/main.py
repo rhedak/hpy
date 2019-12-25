@@ -18,6 +18,15 @@ import datetime
 # third party imports
 from typing import Any, Callable, Union, Sequence, Mapping
 
+# optional imports
+try:
+    # noinspection PyPackageRequirements
+    from docrep import DocstringProcessor
+except ImportError:
+    # noinspection PyPep8Naming
+    def DocstringProcessor(arg):
+        return arg
+
 # --- init
 pd.plotting.register_matplotlib_converters()
 pd.options.mode.chained_assignment = None
