@@ -17,7 +17,7 @@ import seaborn as sns
 
 # third party imports
 from copy import deepcopy
-from typing import Any, Sequence, Mapping, Union, Callable
+from typing import Any, Sequence, Mapping, Union, Callable, Optional
 
 from sklearn.exceptions import DataConversionWarning
 
@@ -618,7 +618,7 @@ class Models(_BaseModel):
         :param scale: scale the labels (predictors) with this factor before calculating the scores
         :param do_print: %(do_print)s
         :param display_score: %(display_score)s
-        :return: if self None, else pandas DataFrame containing the scores
+        :return: if return_type is 'self': None, else: pandas DataFrame containing the scores
         """
 
         if scores is None:
@@ -724,7 +724,7 @@ class Models(_BaseModel):
     @docstr_hpt
     def scoreplot(self, x='y_ref', y='value', hue='model', hue_order=None, row='score',
                   row_order=None, palette=hpt_rcParams['palette'], width=16, height=9 / 2, scale=None,
-                  query=None, return_fig_ax=False, **kwargs):
+                  query=None, return_fig_ax=False, **kwargs) -> Optional[tuple]:
         """
         plot the score(s) using sns.barplot
 
@@ -741,7 +741,7 @@ class Models(_BaseModel):
         :param query: query to be passed to pd.DataFrame.query before plotting [optional]
         :param return_fig_ax: %(return_fig_ax)s
         :param kwargs: other keyword arguments passed to sns.barplot
-        :return:
+        :return: see return_fig_ax
         """
 
         # -- init

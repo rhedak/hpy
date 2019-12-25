@@ -34,7 +34,7 @@ for _line in open('../hpy/__version__.py', 'r').read().split('\n'):
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.autodoc', 'sphinx_automodapi.automodapi'
+    'sphinx.ext.autodoc', 'sphinx_automodapi.automodapi',
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -54,7 +54,7 @@ master_doc = 'index'
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = 'default'
+html_theme = 'sphinx_rtd_theme'
 
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
@@ -64,3 +64,11 @@ html_static_path = ['_static']
 # -- Extension configuration -------------------------------------------------
 numpydoc_show_class_members = False
 pygments_style = 'sphinx'
+
+html_theme_options = {
+    'collapse_navigation': True,
+    'sticky_navigation': False,
+    # 'navigation_depth': 4,
+    # 'includehidden': False,
+    # 'titles_only': False
+}

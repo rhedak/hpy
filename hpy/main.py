@@ -24,7 +24,7 @@ try:
     from docrep import DocstringProcessor
 except ImportError:
     # noinspection PyPep8Naming
-    def DocstringProcessor(arg, *args, **kwargs):
+    def DocstringProcessor(arg=None, *args, **kwargs):
         return arg
 
 # --- init

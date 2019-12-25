@@ -59,6 +59,7 @@
       <w>hspace</w>
       <w>iloc</w>
       <w>importances</w>
+      <w>includehidden</w>
       <w>isin</w>
       <w>iterpolate</w>
       <w>iterrows</w>
@@ -105,6 +106,7 @@
       <w>qagg</w>
       <w>quantile</w>
       <w>quantiles</w>
+      <w>quickstart</w>
       <w>regressors</w>
       <w>resample</w>
       <w>resampling</w>
@@ -135,6 +137,7 @@
       <w>tdelta</w>
       <w>ticklabels</w>
       <w>timepoints</w>
+      <w>toctree</w>
       <w>tprint</w>
       <w>trendline</w>
       <w>twinx</w>

@@ -1,8 +1,5 @@
-hpy
-===
-
-.. toctree::
-   :maxdepth: 4
+python API reference
+====================
 
 .. automodapi:: hpy.main
 .. automodapi:: hpy.ds

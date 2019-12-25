@@ -9,12 +9,10 @@ Welcome to hpy's documentation!
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
-.. automodapi:: hpy.main
-.. automodapi:: hpy.ds
-.. automodapi:: hpy.ipython
-.. automodapi:: hpy.modelling
-.. automodapi:: hpy.plotting
 
+   modules
+   examples
+   quickstart
 
 Indices and tables
 ==================

@@ -134,6 +134,8 @@ docstr = DocstringProcessor(
     grid='Whether to toggle ax.grid() [optional]',
     vline='A list of x positions to draw vlines at [optional]',
     to_abs='whether to cast the values to absolute before proceeding [optional]',
+    label='label to use for the data [optional]',
+    x_tick_rotation='Set x tick label rotation to this value [optional]',
     **validations
 )
 
@@ -2124,7 +2126,7 @@ def annotate_barplot(ax: plt.Axes = None, x: Sequence = None, y: Sequence = None
     :param ci: whether to annotate error bars [optional]
     :param ci_newline: whether to add a newline between values and error bar values [optional] 
     :param adj_ylim: whether to automatically adjust the plot y limits to fit the annotations [optional]
-    :param nr_format: %(nr_format)s
+    :param nr_format: %(number_format)s
     :param ha: horizontal alignment [optional]
     :param va: vertical alignment [optional]
     :param offset: offset between bar top and annotation center [optional]
