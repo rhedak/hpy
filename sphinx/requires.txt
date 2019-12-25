@@ -1,0 +1,12 @@
+numpy
+pandas
+scipy
+matplotlib
+scikit-learn
+seaborn
+colour
+pytest
+requests
+IPython
+sphinx-automodapi
+docrep
