@@ -166,10 +166,10 @@ def _get_ordered_levels(data: pd.DataFrame, level: str, order: Union[list, str, 
 
 @docstr
 @export
-def heatmap(x: str, y: str, z: str, data: pd.DataFrame, ax: plt.Axes = None,
-            cmap: object = None, invert_y: bool = True, **kwargs) -> plt.Axes:
+def heatmap(x: str, y: str, z: str, data: pd.DataFrame, ax: plt.Axes = None, cmap: object = None,
+            agg_func: str = 'mean', invert_y: bool = True, **kwargs) -> plt.Axes:
     """
-    wrapper for seaborn heatmap in x-y-z format
+    Wrapper for seaborn heatmap in x-y-z format
 
     :param x: Variable name for x axis value
     :param y: Variable name for y axis value
@@ -177,14 +177,16 @@ def heatmap(x: str, y: str, z: str, data: pd.DataFrame, ax: plt.Axes = None,
     :param data: %(data)s
     :param ax: %(ax_in)s
     :param cmap: %(cmap)s
-    :param invert_y: Whether to call ax invert_yaxis (orders the heatmap as expected)
+    :param agg_func: If more than one z value per x,y pair exists agg_func is used to aggregate the data.
+        Must be a function name understood by pandas.DataFrame.agg
+    :param invert_y: Whether to call ax.invert_yaxis (orders the heatmap as expected)
     :param kwargs: Other keyword arguments passed to seaborn heatmap
     :return: %(ax_out)s
     """
     if cmap is None:
         cmap = sns.diverging_palette(10, 220, as_cmap=True)
 
-    _df = data.groupby([x, y]).agg({z: 'mean'}).reset_index().pivot(x, y, z)
+    _df = data.groupby([x, y]).agg({z: agg_func}).reset_index().pivot(x, y, z)
 
     if ax is None:
         ax = plt.gca()
@@ -899,6 +901,7 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
     return ax
 
 
+@docstr
 @export
 def hist_2d(x: str, y: str, data: pd.DataFrame, bins: int = 100, std_cutoff: int = 3, cutoff_perc: float = .01,
             cutoff_abs: float = 0, cmap: str = 'rainbow', ax: plt.Axes = None, color_sigma: str = 'xkcd:red',
@@ -971,6 +974,7 @@ def hist_2d(x: str, y: str, data: pd.DataFrame, bins: int = 100, std_cutoff: int
     return ax
 
 
+@docstr
 @export
 def paired_plot(data: pd.DataFrame, cols: Sequence, color: str = None, cmap: str = None, alpha: float = 1,
                 **kwargs) -> sns.FacetGrid:
@@ -1056,6 +1060,7 @@ def q_plim(s: pd.Series, q_min: float = .1, q_max: float = .9, offset_perc: floa
     return _lower_bound - _offset, _upper_bound + _offset
 
 
+@docstr
 @export
 def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str = None,
                     order: Union[list, str] = None, hue_order: Union[list, str] = None,
@@ -1147,6 +1152,7 @@ def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str =
         plt.show()
 
 
+@docstr
 @export
 def get_legends(ax: plt.Axes = None) -> list:
     """
@@ -1272,6 +1278,7 @@ def four_comp_plot(data, x_1, y_1, x_2, y_2, hue_1=None, hue_2=None, lim=None, r
         plt.show()
 
 
+@docstr
 @export
 def facet_wrap(func: Callable, data: pd.DataFrame, facet: Union[list, str], *args, facet_type: str = None,
                col_wrap: int = 4, width: int = rcParams['fig_width'], height: int = rcParams['fig_height'],
@@ -1401,6 +1408,7 @@ def facet_wrap(func: Callable, data: pd.DataFrame, facet: Union[list, str], *arg
         plt.show()
 
 
+@docstr
 @export
 def get_subax(ax: Union[plt.Axes, np.ndarray], row: int = None, col: int = None, rows_prio: bool = True) -> plt.Axes:
     """
@@ -1431,6 +1439,7 @@ def get_subax(ax: Union[plt.Axes, np.ndarray], row: int = None, col: int = None,
     return _ax
 
 
+@docstr
 @export
 def ax_as_list(ax: Union[plt.Axes, np.ndarray]) -> list:
     """
@@ -1455,6 +1464,7 @@ def ax_as_list(ax: Union[plt.Axes, np.ndarray]) -> list:
     return _ax_list
 
 
+@docstr
 @export
 def ax_as_array(ax: Union[plt.Axes, np.ndarray]) -> np.ndarray:
     """

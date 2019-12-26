@@ -34,7 +34,7 @@ for _line in open('../hpy/__version__.py', 'r').read().split('\n'):
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.autodoc', 'sphinx_automodapi.automodapi',
+    'sphinx.ext.autodoc', 'sphinx_automodapi.automodapi', 'sphinx.ext.viewcode'
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -68,7 +68,4 @@ pygments_style = 'sphinx'
 html_theme_options = {
     'collapse_navigation': True,
     'sticky_navigation': False,
-    # 'navigation_depth': 4,
-    # 'includehidden': False,
-    # 'titles_only': False
 }

@@ -8,3 +8,4 @@ colour
 pytest
 requests
 IPython
+docrep

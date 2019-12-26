@@ -19,13 +19,7 @@ import datetime
 from typing import Any, Callable, Union, Sequence, Mapping
 
 # optional imports
-try:
-    # noinspection PyPackageRequirements
-    from docrep import DocstringProcessor
-except ImportError:
-    # noinspection PyPep8Naming
-    def DocstringProcessor(arg=None, *args, **kwargs):
-        return arg
+from docrep import DocstringProcessor
 
 # --- init
 pd.plotting.register_matplotlib_converters()
@@ -562,7 +556,7 @@ def list_flatten(lst: list) -> list:
     :param lst: list of lists
     :return: flattened list
     """
-    return np.array(force_list(lst)).flat
+    return list(np.array(force_list(lst)).flat)
 
 
 @export
@@ -766,7 +760,7 @@ def qformat(value: Any, int_format: str = ',', float_format: str = ',.2f', datet
     :param datetime_format: Format string for datetime
     :param sep: Separator
     :param key_sep: Separator used between key and value if print_key is True
-    :param print_key: weather to print keys as well as values (if object has keys)
+    :param print_key: whether to print keys as well as values (if object has keys)
     :return: Formated string
     """
 
