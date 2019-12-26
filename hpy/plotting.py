@@ -136,6 +136,7 @@ docstr = DocstringProcessor(
     to_abs='whether to cast the values to absolute before proceeding [optional]',
     label='label to use for the data [optional]',
     x_tick_rotation='Set x tick label rotation to this value [optional]',
+    std_cutoff='remove data outside of std_cutoff standard deviations, for a good visual experience try 3 [optional]',
     **validations
 )
 
