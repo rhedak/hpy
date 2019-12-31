@@ -28,7 +28,7 @@ except ImportError:
 
 # local imports
 from hpy.main import export, is_list_like, force_list, tprint, dict_list, append_to_dict_list, DocstringProcessor
-from hpy.ds import k_split, r2, rmse, mae, medae, stdae
+from hpy.ds import k_split, r2, rmse, mae, medae, stdae, get_duplicate_cols
 from hpy.plotting import ax_as_list, legend_outside, rcParams as hpt_rcParams, docstr as docstr_hpt
 
 # --- constants
@@ -440,7 +440,7 @@ class Models(_BaseModel):
         self.df['_k_index'] = k_split(df=self.df, return_type='s', **kwargs)
 
     @docstr
-    def model_by_name(self, name: Union[list, str]) -> list:
+    def model_by_name(self, name: Union[list, str]) -> Union[Model, list]:
         """
         extract a list of Models from the collection by their names
 

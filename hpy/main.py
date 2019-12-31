@@ -725,7 +725,7 @@ def force_list(*args) -> list:
     # None case
     if len(args) == 1:
         if args[0] is None:
-            return None
+            return []
 
     _i = -1
     for _arg in args:

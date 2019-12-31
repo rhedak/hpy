@@ -231,14 +231,36 @@ def drop_zero_cols(df: pd.DataFrame) -> pd.DataFrame:
 
 
 @export
-def get_duplicate_cols(df: pd.DataFrame) -> list:
+def get_duplicate_indices(df: pd.DataFrame) -> Sequence:
+    """
+    Returns duplicate indices from a pandas DataFrame
+
+    :param df: pandas DataFrame
+    :return: List of indices that are duplicate
+    """
+    return df.index[df.index.duplicated()]
+
+
+@export
+def get_duplicate_cols(df: pd.DataFrame) -> Sequence:
     """
     Returns names of duplicate columns from a pandas DataFrame
 
     :param df: pandas DataFrame
     :return: List of column names that are duplicate
     """
-    return df.columns.duplicated().to_list()
+    return df.columns[df.columns.duplicated()]
+
+
+@export
+def drop_duplicate_indices(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Drop duplicate indices from pandas DataFrame
+
+    :param df: pandas DataFrame
+    :return: pandas DataFrame without the duplicates indices
+    """
+    return df.loc[~df.indices.duplicated(), :]
 
 
 @export
@@ -247,7 +269,7 @@ def drop_duplicate_cols(df: pd.DataFrame) -> pd.DataFrame:
     Drop duplicate columns from pandas DataFrame
 
     :param df: pandas DataFrame
-    :return: panads DataFrame without the duplicates columns
+    :return: pandas DataFrame without the duplicates columns
     """
     return df.loc[:, ~df.columns.duplicated()]
 
