@@ -1,4 +1,4 @@
-# HPY - Data Science convenience project
+# hhpy - Data Science convenience project
 
 
 Built with [Python Package Template Project](https://github.com/AlexIoannides/py-package-template/). 
@@ -10,12 +10,12 @@ Also provides several extensions on pandas, matplotlib and seaborn for convenien
 
 ## Installing
 
-Install and update using [pip](https://pip.pypa.io/en/stable/quickstart/):
+Install and update using [pip](https://pypi.org/project/hhpy/):
 
 ```bash
-pip install git+https://github.com/rhedak/hpy
+pip install hhpy
 ```
 
 ## Documentation
 
-Documentation is available at [https://hpy.readthedocs.io/](https://hpy.readthedocs.io/)
+Documentation is available at [https://hhpy.readthedocs.io/](https://hhpy.readthedocs.io/)

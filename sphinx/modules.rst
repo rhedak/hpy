@@ -1,8 +1,8 @@
 python API reference
 ====================
 
-.. automodapi:: hpy.main
-.. automodapi:: hpy.ds
-.. automodapi:: hpy.ipython
-.. automodapi:: hpy.modelling
-.. automodapi:: hpy.plotting
+.. automodapi:: hhpy.main
+.. automodapi:: hhpy.ds
+.. automodapi:: hhpy.ipython
+.. automodapi:: hhpy.modelling
+.. automodapi:: hhpy.plotting

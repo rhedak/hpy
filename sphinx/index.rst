@@ -1,9 +1,9 @@
-.. hpy documentation master file, created by
+.. hhpy documentation master file, created by
    sphinx-quickstart on Wed Dec 25 13:31:03 2019.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to hpy's documentation!
+Welcome to hhpy's documentation!
 ===============================
 
 .. toctree::
