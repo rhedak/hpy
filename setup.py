@@ -6,7 +6,7 @@ from setuptools import setup
 # get key package details from py_pkg/__version__.py
 about = {}  # type: ignore
 here = os.path.abspath(os.path.dirname(__file__))
-with open(os.path.join(here, 'hpy', '__version__.py')) as f:
+with open(os.path.join(here, 'hhpy', '__version__.py')) as f:
     exec(f.read(), about)
 
 # load the README file and use it as the long_description for PyPI
@@ -24,7 +24,7 @@ setup(
     author=about['__author__'],
     author_email=about['__author_email__'],
     url=about['__url__'],
-    packages=['hpy'],
+    packages=['hhpy'],
     include_package_data=True,
     python_requires=">=3.6.*",
     install_requires=['numpy', 'pandas', 'scipy', 'matplotlib', 'scikit-learn', 'seaborn', 'colour', 'pytest',
@@ -32,7 +32,7 @@ setup(
     license=about['__license__'],
     zip_safe=False,
     entry_points={
-        'console_scripts': ['main=hpy.entry_points:main'],
+        'console_scripts': ['main=hhpy.entry_points:main'],
     },
     classifiers=[
         'Development Status :: 4 - Beta',

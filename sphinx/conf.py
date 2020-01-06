@@ -17,14 +17,14 @@
 
 # -- Project information -----------------------------------------------------
 
-project = 'hpy'
+project = 'hhpy'
 # noinspection PyShadowingBuiltins
 copyright = '2019, Henrik Hanssen'
 author = 'Henrik Hanssen'
 
 # The full version, including alpha/beta/rc tags
 release = ''
-for _line in open('../hpy/__version__.py', 'r').read().split('\n'):
+for _line in open('../hhpy/__version__.py', 'r').read().split('\n'):
     if '__version__' in _line and ' = ' in _line:
         release = _line.split(' = ')[1].lstrip('\'').rstrip('\'')
 

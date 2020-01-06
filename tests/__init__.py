@@ -2,5 +2,5 @@
 tests
 ~~~~~
 
-Test suite for the hpy package.
+Test suite for the hhpy package.
 """

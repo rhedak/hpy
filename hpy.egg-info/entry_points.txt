@@ -1,3 +1,0 @@
-[console_scripts]
-main = hpy.entry_points:main
-
