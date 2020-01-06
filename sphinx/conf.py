@@ -34,7 +34,10 @@ for _line in open('../hpy/__version__.py', 'r').read().split('\n'):
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    'sphinx.ext.autodoc', 'sphinx_automodapi.automodapi', 'sphinx.ext.viewcode'
+    'sphinx.ext.autodoc',
+    'sphinx_automodapi.automodapi',
+    'sphinx.ext.viewcode',
+    'sphinx.ext.autosectionlabel',
 ]
 
 # Add any paths that contain templates here, relative to this directory.

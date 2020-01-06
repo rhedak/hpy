@@ -11,7 +11,6 @@ Welcome to hpy's documentation!
    :caption: Contents:
 
    modules
-   examples
    quickstart
 
 Indices and tables

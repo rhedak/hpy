@@ -13,12 +13,11 @@ import warnings
 
 # third party imports
 from copy import deepcopy
-from typing import Callable, Union
 from scipy import stats, signal
 from scipy.spatial import distance
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, median_absolute_error
 from sklearn.preprocessing import StandardScaler
-from typing import Iterable, Mapping, Sequence
+from typing import Mapping, Sequence, Callable, Union, List
 
 # local imports
 from hpy.main import export, force_list, tprint, progressbar, qformat, list_intersection, round_signif, is_list_like, \
@@ -1678,23 +1677,32 @@ def flatten(lst):
     return list(_flatten_generator(lst))
 
 
-# splits a df by column value and returns a list or dict
-def df_split(df, split_by, out_type='dict', print_key=False, sep='_', key_sep='=='):
-    # out type can be 'list' or 'dict'
+@export
+def df_split(df: pd.DataFrame, split_by: Union[List[str], str], return_type: str = 'dict', print_key: bool = False,
+             sep: str = '_', key_sep: str = '==') -> Union[list, dict]:
+    """
+    Split a pandas DataFrame by column value and returns a list or dict
 
-    if is_list_like(split_by):
-        _split_by = split_by + []
-    else:
-        _split_by = [split_by]
+    :param df: pandas DataFrame to be split
+    :param split_by: Column(s) to split by, creates a sub-DataFrame for each level
+    :param return_type: one of ['list', 'dict'], if list returns a list of sub-DataFrame, if dict returns a dictionary
+        with each level as keys
+    :param print_key: whether to include the column names in the key labels
+    :param sep: separator to use in the key labels between columns
+    :param key_sep: separator to use in the key labels between key and value
+    :return: see return_type
+    """
 
-    if out_type == 'list':
+    _split_by = force_list(split_by)
+
+    if return_type == 'list':
         _dfs = []
     else:
         _dfs = {}
 
     for _i, _df in df.groupby(_split_by):
 
-        if out_type == 'list':
+        if return_type == 'list':
             _dfs.append(_df)
         else:
             _key = qformat(pd.DataFrame(_df[_split_by]).head(1), print_key=print_key, sep=sep, key_sep=key_sep)
@@ -1843,7 +1851,18 @@ def qagg(df: pd.DataFrame, groupby, columns=None, agg=None, reset_index=True):
     return _df_agg
 
 
-def mahalanobis(point, df=None, params=None, do_print=True):
+@export
+def mahalanobis(point: Union[pd.DataFrame, pd.Series, np.ndarray], df: pd.DataFrame = None, params: List[str] = None,
+                do_print: bool = True) -> Union[float, List[float]]:
+    """
+    Calculates the Mahalanobis distance for a single point or a DataFrame of points
+
+    :param point: The point(s) to calculate the Mahalanobis distance for
+    :param df: The reference DataFrame against which to calculate the Mahalanobis distance
+    :param params: The columns to calculate the Mahalanobis distance for
+    :param do_print: Whether to print intermediate steps to the console
+    :return: if a single point is passed: Mahalanobis distance as float, else a list of floats
+    """
     if df is None:
         df = point
 

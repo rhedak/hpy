@@ -14,9 +14,10 @@ import warnings
 import os
 import sys
 import datetime
+import h5py
 
 # third party imports
-from typing import Any, Callable, Union, Sequence, Mapping
+from typing import Any, Callable, Union, Sequence, Mapping, List
 
 # optional imports
 from docrep import DocstringProcessor
@@ -41,10 +42,12 @@ def export(fn):
 
 
 # --- classes
+@export
 class Infix:
     """
         Class for representing the pipe operator |__|
         The operator is based on the r %>% operator
+
     """
     def __init__(self, function):
         self.__name__ = 'Infix'
@@ -669,8 +672,8 @@ def append_to_dict_list(dct: dict, append: Union[dict, list], inplace: bool = Tr
     """
     Appends to a dictionary of named lists. Useful for iteratively creating a pandas DataFrame.
 
-    :param dct: dictionary to append to
-    :param append: List of Dictionary of values to append
+    :param dct: Dictionary to append to
+    :param append: List or dictionary of values to append
     :param inplace: Modify inplace or return modified copy
     :return: None if inplace, else modified dictionary
     """
@@ -760,7 +763,7 @@ def qformat(value: Any, int_format: str = ',', float_format: str = ',.2f', datet
     :param datetime_format: Format string for datetime
     :param sep: Separator
     :param key_sep: Separator used between key and value if print_key is True
-    :param print_key: whether to print keys as well as values (if object has keys)
+    :param print_key: Whether to print keys as well as values (if object has keys)
     :return: Formated string
     """
 
@@ -812,3 +815,135 @@ def qformat(value: Any, int_format: str = ',', float_format: str = ',.2f', datet
         _string += _qformat(value)
 
     return _string
+
+
+@export
+def to_hdf(df: pd.DataFrame, file: str, groupby: Union[str, List[str]] = None, key: str = None, replace: bool = False,
+           do_print=True, **kwargs) -> None:
+    """
+    saves a pandas DataFrame as h5 file, if groupby is supplied will save each group with a different key.
+    Needs with groupby OR key to be supplied. Extends on pandas.DataFrame.to_hdf.
+
+    :param df: DataFrame to save
+    :param file: filename to save the DataFrame as
+    :param groupby: if supplied will save each sub-DataFrame as a different key. [optional]
+    :param key: The key to write as. Ignored if groupby is supplies.
+    :param replace: Whether to replace or append to existing files. Defaults to append. [optional]
+    :param do_print: Whether to print intermediate steps to console [optional]
+    :param kwargs: Other keyword arguments passed to pd.DataFrame.to_hdf [optional]
+    :return: None
+    """
+    assert (groupby is not None) or (key is not None), "You must supply either groupby or key"
+
+    if groupby is None:
+        groupby = ['_dummy']
+        df = df.assign(_dummy=1)
+
+    if replace and os.path.exists(file):
+
+        os.remove(file)
+        if do_print:
+            print('removed old {}'.format(file))
+
+    _i = 0
+    _i_max = df[groupby].drop_duplicates().shape[0]
+
+    for _index, _df_i in df.groupby(groupby):
+
+        _i += 1
+
+        if key is None:
+            _key = qformat(_index, as_string=True)
+        else:
+            _key = key
+
+        if do_print:
+            tprint('writing key {} / {} - {}...'.format(_i, _i_max, _key))
+
+        if '_dummy' in _df_i.columns:
+            _df_i = _df_i.drop(['_dummy'], axis=1)
+
+        pd.DataFrame.to_hdf(_df_i, file, key=_key, format='table', **kwargs)
+
+    if do_print:
+        print('{}saved to {}'.format('\n', file))
+
+
+@export
+def get_hdf_keys(file: str) -> List[str]:
+    """
+    Reads all keys from an hdf file and returns as list
+
+    :param file: The path of the file to read the keys of
+    :return: List of keys
+    """
+
+    with h5py.File(file) as _file:
+        _keys = list(_file.keys())
+        _file.close()
+
+    return _keys
+
+
+@export
+def read_hdf(file: str, key: Union[str, List[str]] = None, sample: int = None, random_state: int = None,
+             do_print: bool = True, catch_error: bool = True) -> pd.DataFrame:
+    """
+    read a DataFrame from hdf file
+
+    :param file: The path to the file to read from
+    :param key: The key(s) to read, if not specified all keys are read [optional]
+    :param sample: If specified will read sample keys at random from the file, ignored if key is specified [optional]
+    :param random_state: Random state for sample [optional]
+    :param do_print: Whether to print intermediate steps [optional]
+    :param catch_error: Whether to catch errors when reading [optional]
+    :return: pandas DataFrame
+    """
+
+    if not os.path.exists(file): 
+        raise ValueError('{} does not exist'.format(file))
+
+    # if key was not specified: read all keys
+    if key is None:
+        _keys = get_hdf_keys(file)
+        _read_keys = 'all'
+        if sample is not None:
+            np.random.seed(random_state)
+            _keys = np.random.sample(_keys, sample)
+            _read_keys = ','.join(_keys)
+    else:
+        if not isinstance(key, list):
+            _keys = [key]
+        else:
+            _keys = key
+        _read_keys = ','.join(_keys)
+
+    _df = []
+
+    _i = 0
+
+    for _key in _keys:
+
+        _i += 1
+
+        if do_print: tprint('reading {} - key {} / {} : {}...'.format(file, _i, len(_keys), _key))
+        if catch_error:
+            try:
+                _df.append(pd.read_hdf(file, key=_key))
+            except KeyboardInterrupt:
+                raise KeyboardInterrupt
+            except Exception as exc:
+                print('error "{}" at key {} / {} : {}...'.format(exc, _i, len(_keys), _key))
+        else:
+            _df.append(pd.read_hdf(file, key=_key))
+
+    if do_print:
+        tprint('concat...')
+    _df = pd.concat(_df, ignore_index=True, sort=False)
+
+    if do_print:
+        tprint('read {} ; keys: {}'.format(file, _read_keys))
+        print('')
+
+    return _df
+
