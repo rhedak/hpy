@@ -1,12 +1,12 @@
 Metadata-Version: 2.1
 Name: hhpy
-Version: 0.0.7
+Version: 0.0.8
 Summary: hhpy - convenient data science
 Home-page: https://github.com/rhedak/hhpy
 Author: Henrik Hanssen
 Author-email: henrik.hanssen@gmail.com
 License: Apache 2.0
-Description: # HPY - Data Science convenience project
+Description: # hhpy - Data Science convenience project
         
         
         Built with [Python Package Template Project](https://github.com/AlexIoannides/py-package-template/). 
@@ -18,15 +18,15 @@ Description: # HPY - Data Science convenience project
         
         ## Installing
         
-        Install and update using [pip](https://pip.pypa.io/en/stable/quickstart/):
+        Install and update using [pip](https://pypi.org/project/hhpy/):
         
         ```bash
-        pip install git+https://github.com/rhedak/hpy
+        pip install hhpy
         ```
         
         ## Documentation
         
-        Documentation is available at [https://hpy.readthedocs.io/](https://hpy.readthedocs.io/)
+        Documentation is available at [https://hhpy.readthedocs.io/](https://hhpy.readthedocs.io/)
         
 Keywords: package development template
 Platform: UNKNOWN
