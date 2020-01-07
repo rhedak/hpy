@@ -2239,13 +2239,14 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
     """
     wrapper for FuncAnimation to be used with pandas DataFrames. Assumes that you have a DataFrame containing
     one data point for each x-y-t combination.
-    If mode is set to jshtml is set to true the function is optimized for use with Jupyter Notebook and returns an
-    Interactive JavaScript Widgets.
+
+    If mode is set to jshtml the function is optimized for use with Jupyter Notebook and returns an
+    Interactive JavaScript Widget.
 
     :param data: %(data)s 
     :param x: %(x_novec)s
     :param y: %(y_novec)s
-    :param t: %(y_novec)s
+    :param t: %(t_novec)s
     :param lines: you can also pass lines that you want to animate. Details to follow [optional]
     :param max_interval: max interval at which to abort the animation [optional]
     :param time_per_frame: time per frame [optional]
