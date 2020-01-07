@@ -6,11 +6,19 @@ This module contains the entry-point functions for the py_pkg module,
 that are referenced in setup.py.
 """
 
+import os
+import requests
+
 from os import remove
 from sys import argv
 from zipfile import ZipFile
 
-import requests
+
+# get key package details from py_pkg/__version__.py
+about = {}
+here = os.path.abspath(os.path.dirname(__file__))
+with open(os.path.join(here, '__version__.py')) as f:
+    exec(f.read(), about)
 
 
 def main() -> None:
@@ -40,7 +48,7 @@ def install_from_github() -> None:
         return None
 
     # download ZIP archive of GitHub repository
-    url = 'https://github.com/rhedak/hpy/archive/master.zip'
+    url = about['__download_url__']
     r = requests.get(url)
     with open('temp.zip', 'wb') as f:
         f.write(r.content)

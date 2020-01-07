@@ -18,4 +18,7 @@ pip install hhpy
 
 ## Documentation
 
-Documentation is available at [https://hhpy.readthedocs.io/](https://hhpy.readthedocs.io/)
+Documentation is available at [https://hpy.readthedocs.io/](https://hpy.readthedocs.io/)
+
+Pending change to [https://hhpy.readthedocs.io/](https://hhpy.readthedocs.io/), because the package had to be
+renamed from **hpy** to **hhpy** for PyPi

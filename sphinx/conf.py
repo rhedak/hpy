@@ -10,7 +10,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
+import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
@@ -22,11 +22,14 @@ project = 'hhpy'
 copyright = '2019, Henrik Hanssen'
 author = 'Henrik Hanssen'
 
-# The full version, including alpha/beta/rc tags
-release = ''
-for _line in open('../hhpy/__version__.py', 'r').read().split('\n'):
-    if '__version__' in _line and ' = ' in _line:
-        release = _line.split(' = ')[1].lstrip('\'').rstrip('\'')
+# get key package details from __version__.py
+about = {}
+here = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+with open(os.path.join(here, 'hhpy', '__version__.py')) as f:
+    exec(f.read(), about)
+
+# the full version
+release = about['__version__']
 
 # -- General configuration ---------------------------------------------------
 

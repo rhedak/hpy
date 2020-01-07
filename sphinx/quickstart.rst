@@ -34,3 +34,4 @@ Animated plots and distribution plots
 
 - :ref:`animplot`
 - :ref:`distplot`
+- :ref:`facet_wrap`

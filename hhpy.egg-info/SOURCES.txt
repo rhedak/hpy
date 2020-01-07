@@ -1,4 +1,5 @@
 README.md
+setup.cfg
 setup.py
 hhpy/__init__.py
 hhpy/__version__.py

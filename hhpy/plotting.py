@@ -57,8 +57,9 @@ rcParams = {
     'max_n': 10000,
     'max_n.random_state': None,
     'max_n.sample_warn': True,
-    'return_fig_ax': False,
+    'return_fig_ax': True,
     'corr_cutoff': 0,
+    'animplot.mode': 'jshtml',
 }
 
 validations = {
@@ -1365,7 +1366,7 @@ def facet_wrap(func: Callable, data: pd.DataFrame, facet: Union[list, str], *arg
             _df_facet = _df.copy()
             _args = force_list(_facet) + list(args)
         else:
-            _df_facet = _df[_df[_facet] == _facet]
+            _df_facet = _df[_df[facet] == _facet]
             _args = args
 
         # apply function on target (try catch)
@@ -2218,6 +2219,7 @@ def annotate_barplot(ax: plt.Axes = None, x: Sequence = None, y: Sequence = None
             _ylim[0] = _ylim[0] - _y_adj
         if _adj_plus:
             _ylim[1] = _ylim[1] + _y_adj
+        # noinspection PyTypeChecker
         ax.set_ylim(_ylim)
 
     logging.getLogger().setLevel(logging.DEBUG)
@@ -2228,16 +2230,18 @@ def annotate_barplot(ax: plt.Axes = None, x: Sequence = None, y: Sequence = None
 @docstr
 @export
 def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't', lines: Mapping = None,
-             max_interval: int = None, time_per_frame: int = 200, html: bool = True, title: bool = True,
-             title_prefix: str = '', t_format: str = None, fig: plt.Figure = None, ax: plt.Axes = None,
-             color: str = None, label: str = None, legend: bool = False, legend_out: bool = False,
+             max_interval: int = None, time_per_frame: int = 200, mode: str = rcParams['animplot.mode'],
+             title: bool = True, title_prefix: str = '', t_format: str = None, fig: plt.Figure = None,
+             ax: plt.Axes = None, color: str = None, label: str = None, legend: bool = False, legend_out: bool = False,
              legend_kws: Mapping = None, xlim: tuple = None, ylim: tuple = None,
              ax_facecolor: Union[str, Mapping] = None, grid: bool = False, vline: Union[Sequence, float] = None,
              **kwargs) -> Union[HTML, FuncAnimation]:
     """
     wrapper for FuncAnimation to be used with pandas DataFrames. Assumes that you have a DataFrame containing
-    one datapoint for each x-y-t combination.
-    
+    one data point for each x-y-t combination.
+    If mode is set to jshtml is set to true the function is optimized for use with Jupyter Notebook and returns an
+    Interactive JavaScript Widgets.
+
     :param data: %(data)s 
     :param x: %(x_novec)s
     :param y: %(y_novec)s
@@ -2245,7 +2249,14 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
     :param lines: you can also pass lines that you want to animate. Details to follow [optional]
     :param max_interval: max interval at which to abort the animation [optional]
     :param time_per_frame: time per frame [optional]
-    :param html: whether to return the output as HTML (for jupyter notebook) [optional]
+    :param mode: one of the below [optional]
+
+        * ``matplotlib``: Return the matplotlib FuncAnimation object
+
+        * ``html``: Returns an HTML5 movie (You need to install ffmpeg for this to work)
+
+        * ``jshtml``: Returns an interactive Javascript Widget
+
     :param title: whether to set the time as plot title [optional]
     :param title_prefix: title prefix to be put in front of the time if title is true [optional]
     :param t_format: format string used to format the time variable in the title [optional]
@@ -2258,12 +2269,12 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
     :param legend_kws: %(legend_kws)s
     :param xlim: %(xlim)s
     :param ylim: %(ylim)s
-    :param ax_facecolor: passed to ax.set_facecolor, can also be a conditional mapping to change the faceolor at
+    :param ax_facecolor: passed to ax.set_facecolor, can also be a conditional mapping to change the facecolor at
         specific timepoints t [optional]
     :param grid: %(grid)s
     :param vline: %(vline)s
     :param kwargs: other keyword arguments passed to pyplot.plot
-    :return: if HTML: HTML code, else: FuncAnimation object
+    :return: see mode
     """
     # example for lines (a list of dicts)
     # lines = [{'line':line,'data':data,'x':'x','y':'y','t':'t'}]
@@ -2544,15 +2555,17 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
         else:
             _ax = plt.gca()
 
-        _ax.set_xlim(_line['data'][_line['x']].min(), _line['data'][_line['x']].max())
-        _ax.set_ylim(_line['data'][_line['y']].min(), _line['data'][_line['y']].max())
+        # _ax.set_xlim(_line['data'][_line['x']].min(), _line['data'][_line['x']].max())
+        # _ax.set_ylim(_line['data'][_line['y']].min(), _line['data'][_line['y']].max())
 
     _anim = FuncAnimation(fig, animate, init_func=init, frames=_max_interval, interval=time_per_frame, blit=True)
 
     plt.close('all')
 
-    if html:
+    if mode == 'html':
         return HTML(_anim.to_html5_video())
+    elif mode == 'jshtml':
+        return HTML(_anim.to_jshtml())
     else:
         return _anim
 

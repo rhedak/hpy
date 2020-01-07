@@ -1,4 +1,5 @@
 pip install -e .. --no-dependencies
+make clean
 make html
 
 # sphinx-apidoc -f -o . ../hhpy
