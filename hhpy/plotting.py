@@ -474,8 +474,6 @@ def pairwise_corrplot(data: pd.DataFrame, corr_cutoff: float = rcParams['corr_cu
     if return_fig_ax:
         return fig, ax
     else:
-        plt.tight_layout()
-        fig.patch.set_facecolor('white')
         plt.show()
 
 
@@ -485,14 +483,14 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
              hue_order: Union[Sequence, str] = 'sorted', palette: Union[Mapping, Sequence, str] = None,
              linecolor: str = 'black', edgecolor: str = 'black', alpha: float = None, bins: Union[Sequence,int] = 40,
              perc: bool = None, top_nr: int = None, other_name: str = 'other', title: bool = True,
-             title_prefix: str = '', value_name: str = '__value', std_cutoff: float = None, hist: bool = None,
+             title_prefix: str = '', std_cutoff: float = None, hist: bool = None,
              distfit: Union[str, bool, None] = 'kde', fill: bool = True, legend: bool = True,
              legend_loc: str = rcParams['distplot.legend_loc'],
              legend_space: float = rcParams['legend_outside.legend_space'], legend_ncol: int = 1,
              agg_func: str = 'mean', number_format: str = rcParams['float_format'], kde_steps: int = 1000,
              max_n: int = 100000, random_state: int = None, sample_warn: bool = True, xlim: Sequence = None,
              linestyle: str = None, label_style: str = rcParams['distplot.label_style'], x_offset_perc: float = .025,
-             ax=None, **kwargs):
+             ax: plt.Axes = None, **kwargs) -> plt.Axes:
     """
     Similar to seaborn.distplot but supports hues and some other things. Plots a combination of a histogram and
     a kernel density estimation.
@@ -514,7 +512,6 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
     :param other_name: name of the other group created by hhpy.ds.top_n [optional]
     :param title: whether to set the plot title equal to x's name [optional]
     :param title_prefix: prefix to be used in plot title [optional]
-    :param value_name: if x is a list and data is not None this will be the name of the newly created column [optional]
     :param std_cutoff: automatically cutoff data outside of the std_cutoff standard deviations range,
         by default this is off but a recommended value for a good visual experience without outliers is 3 [optional]
     :param hist: whether to show the histogram, default False if hue else True [optional]
@@ -548,9 +545,11 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
     if not top_nr:
         top_nr = None
 
+    # case: vector data
     if data is None:
 
         if 'name' in dir(x):
+            # noinspection PyUnresolvedReferences
             _x = x.name
             _x_name = _x
         else:
@@ -559,56 +558,49 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
 
         _df = pd.DataFrame.from_dict({_x: x})
 
+    # data: DataFrame
     else:
 
         _df = data.copy()  # avoid inplace operations
         del data
 
-        if is_list_like(x):
-
-            _df = pd.melt(_df, value_vars=x, value_name=value_name)
-            _x = value_name
+        if is_list_like(x) and len(x) > 1:
+            hue = '__variable'
+            _x = '__value'
             _x_name = _x
-            hue = 'variable'
             hue_order = x
-
+            title = False
+            _df = pd.melt(_df, value_vars=x, value_name=_x, var_name=hue)
         else:
-
             _x = x
             _x_name = _x
 
     del x
 
+    # handle hue and default values
     if hue is None:
-
         if perc is None:
             perc = False
         if hist is None:
             hist = True
-
+        if alpha is None:
+            alpha = .75
     else:
-
         _df = _df[~_df[hue].isnull()]
         if perc is None:
             perc = True
         if hist is None:
             hist = False
-
-    # in case that there are more than max_n samples: take  a random sample for calc speed
-    if max_n:
-        if len(_df) > max_n:
-            if sample_warn:
-                warnings.warn(
-                    'Limiting samples to {:,} for calc speed. Turn this off with max_n=None or suppress this warning '
-                    'with sample_warn=False.'.format(max_n))
-            _df = _df.sample(max_n, random_state=random_state)
-
-    if alpha is None:
-
-        if hue is None:
-            alpha = .75
-        else:
+        if alpha is None:
             alpha = .5
+
+    # case more than max_n samples: take a random sample for calc speed
+    if max_n and (len(_df) > max_n):
+        if sample_warn:
+            warnings.warn(
+                'Limiting samples to {:,} for calc speed. Turn this off with max_n=None or suppress this warning '
+                'with sample_warn=False.'.format(max_n))
+        _df = _df.sample(max_n, random_state=random_state)
 
     # the actual plot
     def _f_distplot(_f_x, _f_data, _f_x_label, _f_facecolor, _f_distfit_color, _f_bins,
@@ -648,8 +640,7 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
         _x_mins.append(_df_i[_x_name].min())
         _x_maxs.append(_df_i[_x_name].max())
 
-        # the histogram of the data
-
+        # handle label
         try:
             _mu_label = format(_mu, number_format)
         except ValueError:
@@ -670,6 +661,7 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
         else:
             _label = _f_x_label
 
+        # plot histogam
         if hist:
             _hist_n, _hist_bins = _f_ax.hist(_df_i[_f_x], _f_bins, density=perc, facecolor=_f_facecolor,
                                              edgecolor=edgecolor,
@@ -684,8 +676,10 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
             if _f_distfit_line is None:
                 _f_distfit_line = '-'
 
+        # plot distfit
         if distfit:
 
+            # if a histogram was plot on the primary axis, the distfit goes on the secondary axis
             if hist:
                 _ax = _f_ax2
             else:
@@ -745,8 +739,7 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
 
         return _f_ax, _f_ax2
 
-    # preparing the data frame
-
+    # -- preparing the data frame
     # drop nan values
     _df = _df[np.isfinite(_df[_x])]
 
@@ -759,9 +752,9 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
     _x_mins = []
     _x_maxs = []
 
-    # hue case
     if hue is None:
 
+        # handle x limits
         if xlim is not None:
 
             _x_min = xlim[0]
@@ -777,6 +770,7 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
             _x_min = _df[_x].min()
             _x_max = _df[_x].max()
 
+        # hadle bins
         if not is_list_like(bins):
             _x_step = (_x_max - _x_min) / bins
             _bins = np.arange(_x_min, _x_max + _x_step, _x_step)
@@ -788,6 +782,7 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
             _plot_x_min = np.min(bins)
             _plot_x_max = np.max(bins)
 
+        # handle palette / color
         if isinstance(palette, Mapping):
             _color = list(palette.values())[0]
         elif is_list_like(palette):
@@ -795,13 +790,13 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
         else:
             _color = palette
 
-        # just plot
+        # plot
         ax, ax2 = _f_distplot(_f_x=_x, _f_data=_df, _f_x_label=_x_name, _f_facecolor=_color,
                               _f_distfit_color=linecolor,
                               _f_bins=_bins, _f_std_cutoff=std_cutoff,
                               _f_xlim=xlim, _f_distfit_line=linestyle, _f_ax=ax, _f_ax2=ax2, _f_fill=fill)
 
-    else:
+    else:  # no hue
 
         # group values outside of top_n to other_name
         if top_nr is not None:
@@ -842,6 +837,7 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
 
             _std_cutoff_hues = [_x_min, _x_max]
 
+        # handle bins
         _x_step = (_x_max - _x_min) / bins
 
         _plot_x_min = _df[_x].min() - _x_step
@@ -849,6 +845,7 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
 
         _bins = np.arange(_x_min, _x_max + _x_step, _x_step)
 
+        # loop hues
         for _it, _hue in enumerate(_hues):
 
             if isinstance(palette, Mapping):
@@ -867,12 +864,15 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
 
             _df_hue = _df[_df[hue] == _hue]
 
+            # one plot per hue
             ax, ax2 = _f_distplot(_f_x=_x, _f_data=_df_hue, _f_x_label=_hue, _f_facecolor=_color,
                                   _f_distfit_color=_color, _f_bins=_bins,
                                   _f_std_cutoff=_std_cutoff_hues,
                                   _f_xlim=xlim, _f_distfit_line=_linestyle, _f_ax=ax, _f_ax2=ax2, _f_fill=fill)
-    if legend:
 
+    # -- postprocessing
+    # handle legend
+    if legend:
         if legend_loc in ['bottom', 'right']:
             legend_outside(ax, loc=legend_loc, legend_space=legend_space, ncol=legend_ncol)
             legend_outside(ax2, loc=legend_loc, legend_space=legend_space, ncol=legend_ncol)
@@ -885,14 +885,15 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
             if len(_labels) > 0:
                 ax2.legend(loc=legend_loc, ncol=legend_ncol)
 
-    # postprocessing
-
+    # handle title
     if title:
         _title = '{}{}'.format(title_prefix, _x_name)
         if hue is not None:
             _title += ' by {}'.format(hue)
         ax.set_title(_title)
-    if xlim is not None:
+
+    # handle xlim
+    if xlim is not None and xlim:
         ax.set_xlim(xlim)
     else:
         _x_min = np.min(_x_mins)
@@ -3011,6 +3012,7 @@ def share_xy(ax: plt.Axes, x: bool = True, y: bool = True, mode: str = 'all', ad
 def share_legend(ax: plt.Axes, keep_i: int = None):
     """
     removes all legends except for i from an Axes object
+
     :param ax: %(ax_in)s
     :param keep_i: index of the plot whose legend you want to keep
     :return: None

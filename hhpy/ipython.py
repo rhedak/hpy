@@ -124,3 +124,62 @@ def display_df(df, int_format=',', float_format=',.2f', exclude=None, full=True,
         display_full(_df, **kwargs)
     else:
         display(_df, **kwargs)
+
+
+# --- pandas styles
+@export
+def highlight_max(df: pd.DataFrame, color: str = 'xkcd:cyan') -> pd.DataFrame:
+    """
+    highlights the largest value in each column of a pandas DataFrame
+
+    :param df: pandas DataFrame
+    :param color: color used for highlighting
+    :return: the pandas DataFrame with the style applied to it
+    """
+    def cond_max(s: pd.Series):
+        return ['background-color: {}'.format(color) if v else '' for v in s == s.max()]
+
+    return df.style.apply(cond_max)
+
+
+@export
+def highlight_min(df: pd.DataFrame, color: str = 'xkcd:light red') -> pd.DataFrame:
+    """
+    highlights the smallest value in each column of a pandas DataFrame
+
+    :param df: pandas DataFrame
+    :param color: color used for highlighting
+    :return: the pandas DataFrame with the style applied to it
+    """
+    def cond_min(s: pd.Series):
+        return ['background-color: {}'.format(color) if v else '' for v in s == s.min()]
+
+    return df.style.apply(cond_min)
+
+
+@export
+def highlight_max_min(df: pd.DataFrame, max_color: str = 'xkcd:cyan', min_color: str = 'xkcd:light red'):
+    """
+    highlights the largest and smallest value in each column of a pandas DataFrame
+
+    :param df: pandas DataFrame
+    :param max_color: color used for highlighting largest value
+    :param min_color: color used for highlighting smallest value
+    :return: the pandas DataFrame with the style applied to it
+    """
+    def cond_max_min(s):
+
+        _out = []
+
+        for _i in s:
+
+            if _i == s.max():
+                _out.append('background-color: {}'.format(max_color))
+            elif _i == s.min():
+                _out.append('background-color: {}'.format(min_color))
+            else:
+                _out.append('')
+
+        return _out
+
+    return df.style.apply(cond_max_min)
