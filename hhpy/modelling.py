@@ -66,6 +66,7 @@ docstr = DocstringProcessor(
     display_score='Whether to display the score DataFrame',
     ensemble='if True also predict with Ensemble like combinations of models. If True or mean calculate'
              'mean of individual predictions. If median calculate median of individual predictions.',
+    printf='print function to use for logging',
     **validations
 )
 
@@ -369,23 +370,12 @@ class Models(_BaseModel):
     :param y_ref: %(y_ref)s
     :param scaler_X: %(scaler_X)s
     :param scaler_y: %(scaler_y)s
+    :param printf: %(printf)s
     """
 
-    @docstr
     def __init__(self, *args: Union[object, Sequence], name: str = None, df: pd.DataFrame = None,
                  X_ref: Union[Sequence, str] = None, y_ref: Union[Sequence, str] = None, scaler_X: object = None,
-                 scaler_y: object = None):
-        """
-        init method
-
-        :param args: multiple Model objects that will form a Models Collection
-        :param name: name of the collection
-        :param df: %(df)s
-        :param X_ref: %(X_ref)s
-        :param y_ref: %(y_ref)s
-        :param scaler_X: %(scaler_X)s
-        :param scaler_y: %(scaler_y)s
-        """
+                 scaler_y: object = None, printf: Callable = tprint):
 
         super().__init__(name)
         _models = []
@@ -416,13 +406,14 @@ class Models(_BaseModel):
         self.__name__ = 'hhpy.modelling.Models'
         self.models = _models
         self.fit_type = None
-        self.df = df.copy()
+        self.df = df
         self.X_ref = force_list(X_ref)
         self.y_ref = force_list(y_ref)
         self.scaler_X = scaler_X
         self.scaler_y = scaler_y
         self.model_names = _model_names
         self.df_score = None
+        self.printf = printf
 
     @docstr
     def k_split(self, **kwargs):
@@ -508,7 +499,7 @@ class Models(_BaseModel):
             for _model in self.models:
 
                 if do_print:
-                    tprint('fitting model {}...'.format(_model.name))
+                    self.printf('fitting model {}...'.format(_model.name))
 
                 _model.fit(X=self.X_ref, y=self.y_ref, df=_df_train, df_test=_df_test)
 
@@ -560,7 +551,7 @@ class Models(_BaseModel):
         for _model in self.models:
 
             if do_print:
-                tprint('predicting model {}...'.format(_model.name))
+                self.printf('predicting model {}...'.format(_model.name))
 
             _model_names.append(_model.name)
             _y_ref_preds += ['{}_{}'.format(_, _model.name) for _ in _model.y_ref]
@@ -624,7 +615,7 @@ class Models(_BaseModel):
         if scores is None:
             scores = [r2, rmse, mae, stdae, medae]
         if do_print:
-            tprint('scoring...')
+            self.printf('scoring...')
 
         _valid_return_types = ['self', 'df', 'DataFrame']
         assert(return_type in _valid_return_types),\
@@ -719,7 +710,7 @@ class Models(_BaseModel):
         self.predict(ensemble=ensemble, do_print=do_print)
         self.score(scores=scores, scale=scale, do_print=do_print, display_score=display_score)
         if do_print:
-            tprint('done')
+            self.printf('done')
 
     @docstr_hpt
     def scoreplot(self, x='y_ref', y='value', hue='model', hue_order=None, row='score',

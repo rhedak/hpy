@@ -9,7 +9,7 @@ Contains convenience wrappers for ipython
 import pandas as pd
 
 # third party imports
-from IPython.core.display import display, HTML
+from IPython.display import display, HTML
 
 # local imports
 from hhpy.main import export
