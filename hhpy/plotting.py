@@ -22,7 +22,7 @@ from matplotlib.animation import FuncAnimation
 from matplotlib.legend import Legend
 from colour import Color
 from scipy import stats
-from typing import Union, Sequence, Mapping, Callable
+from typing import Union, Sequence, Mapping, Callable, List
 
 try:
     from IPython.core.display import HTML
@@ -51,6 +51,7 @@ rcParams = {
     'fig_width': 7,
     'fig_height': 7,
     'float_format': '.2f',
+    'int_format': ',.0f',
     'legend_outside.legend_space': .1,
     'distplot.label_style': 'mu_sigma',
     'distplot.legend_loc': None,
@@ -138,6 +139,7 @@ docstr = DocstringProcessor(
     label='label to use for the data [optional]',
     x_tick_rotation='Set x tick label rotation to this value [optional]',
     std_cutoff='remove data outside of std_cutoff standard deviations, for a good visual experience try 3 [optional]',
+    do_print='whether to print intermediate steps to console [optional]',
     **validations
 )
 
@@ -241,7 +243,7 @@ def corrplot(data: pd.DataFrame, annotations: bool = True, number_format: str = 
 
 @docstr
 @export
-def corrplot_bar(data: pd.DataFrame, target: str = None, columns: Sequence[str] = None,
+def corrplot_bar(data: pd.DataFrame, target: str = None, columns: List[str] = None,
                  corr_cutoff: float = rcParams['corr_cutoff'], corr_as_alpha: bool = False,
                  xlim: tuple = (-1, 1), ax: plt.Axes = None):
     """
@@ -481,7 +483,7 @@ def pairwise_corrplot(data: pd.DataFrame, corr_cutoff: float = rcParams['corr_cu
 @export
 def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None,
              hue_order: Union[Sequence, str] = 'sorted', palette: Union[Mapping, Sequence, str] = None,
-             linecolor: str = 'black', edgecolor: str = 'black', alpha: float = None, bins: Union[Sequence,int] = 40,
+             linecolor: str = 'black', edgecolor: str = 'black', alpha: float = None, bins: Union[Sequence, int] = 40,
              perc: bool = None, top_nr: int = None, other_name: str = 'other', title: bool = True,
              title_prefix: str = '', std_cutoff: float = None, hist: bool = None,
              distfit: Union[str, bool, None] = 'kde', fill: bool = True, legend: bool = True,
@@ -894,11 +896,13 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
 
     # handle xlim
     if xlim is not None and xlim:
+        # noinspection PyTypeChecker
         ax.set_xlim(xlim)
     else:
         _x_min = np.min(_x_mins)
         _x_max = np.max(_x_maxs)
         _x_offset = (_x_max - _x_min) * x_offset_perc
+        # noinspection PyTypeChecker
         ax.set_xlim((_x_min - _x_offset, _x_max + _x_offset))
 
     return ax
@@ -1025,7 +1029,7 @@ def paired_plot(data: pd.DataFrame, cols: Sequence, color: str = None, cmap: str
 
 
 @export
-def q_plim(s: pd.Series, q_min: float = .1, q_max: float = .9, offset_perc: float =.1, limit_min_max: bool = False,
+def q_plim(s: pd.Series, q_min: float = .1, q_max: float = .9, offset_perc: float = .1, limit_min_max: bool = False,
            offset=True) -> tuple:
     """
     returns quick x limits for plotting (cut off data not in q_min to q_max quantile)
@@ -1085,10 +1089,12 @@ def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str =
     :param func: function to use for plotting, must support 1 positional argument, data, hue, ax and kwargs [optional]
     :param summary_title: whether to automatically set the summary plot title [optional]
     :param level_title: whether to automatically set the level plot title [optional]
+    :param do_print: %(do_print)s
     :param width: %(subplot_width)s
     :param height: %(subplot_height)s
     :param return_fig_ax: %(return_fig_ax)s
-    :param kwargs_summary: other_keyword arguments passed to summary distplot, if None uses kwargs [optional]
+    :param kwargs_subplots_adjust: other keyword arguments passed to pyplot.subplots_adjust [optional]
+    :param kwargs_summary: other keyword arguments passed to summary distplot, if None uses kwargs [optional]
     :param kwargs: other keyword arguments passed to func [optional]
     :return: see return_fig_ax
     """
@@ -1291,7 +1297,7 @@ def facet_wrap(func: Callable, data: pd.DataFrame, facet: Union[list, str], *arg
     """
     modeled after r's facet_wrap function. Wraps a number of subplots onto a 2d grid of subplots while creating
     a new line after col_wrap columns. Uses a given plot function and creates a new plot for each facet level.
-    
+
     :param func: Any plot function. Must support keyword arguments data and ax
     :param data: %(data)s
     :param facet: The column / list of columns to facet over.
@@ -1316,6 +1322,10 @@ def facet_wrap(func: Callable, data: pd.DataFrame, facet: Union[list, str], *arg
     :param subplots_kws: other keyword arguments passed to pyplot.subplots
     :param kwargs: other keyword arguments passed to func
     :return: %(fig_ax_out)s
+
+    **examples**
+
+    Check out the `example notebook <https://colab.research.google.com/drive/1bAEFRoWJgwPzkEqOoPBHVX849qQjxLYC>`_
     """
 
     if subplots_kws is None:
@@ -2277,6 +2287,10 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
     :param vline: %(vline)s
     :param kwargs: other keyword arguments passed to pyplot.plot
     :return: see mode
+
+    **examples**
+
+    Check out the `example notebook <https://drive.google.com/open?id=1hJRfZn3Zwnc1n4cK7h2-UPSEj4BmsxhY>`_
     """
     # example for lines (a list of dicts)
     # lines = [{'line':line,'data':data,'x':'x','y':'y','t':'t'}]
@@ -3290,7 +3304,23 @@ def draw_ellipse(ax, *args, **kwargs):
     ax.add_artist(_e)
 
 
-def barplot_err(x, y, xerr=None, yerr=None, data=None, **kwargs):
+@docstr
+@export
+def barplot_err(x: str, y: str, xerr: str = None, yerr: str = None, data: pd.DataFrame = None, **kwargs) -> plt.Axes:
+    """
+    extension on `seaborn barplot <https://seaborn.pydata.org/generated/seaborn.barplot.html>`_ that allows
+    for plotting errorbars with preprocessed data. The idea is based on this `StackOverflow question
+    <https://datascience.stackexchange.com/questions/31736/unable-to-generate-error-bars-with-seaborn/64128>`_
+
+    :param x: %(x_novec)s
+    :param y: %(y_novec)s
+    :param xerr: variable to use as x error bars [optional]
+    :param yerr: variable to use as y error bars [optional]
+    :param data: %(data_novec)s
+    :param kwargs: other keyword arguments passed to `seaborn barplot
+        <https://seaborn.pydata.org/generated/seaborn.barplot.html>`_
+    :return: %(ax_out)s
+    """
     _data = []
     for _it in data.index:
 
@@ -3394,7 +3424,7 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
               order: Union[Sequence, str] = None, hue_order: Union[Sequence, str] = None, normalize_x: bool = False,
               normalize_hue: bool = False, palette: Union[Mapping, Sequence, str] = None,
               x_tick_rotation: int = None, count_twinx: bool = False, hide_legend: bool = False, annotate: bool = True,
-              annotate_format: str = rcParams['float_format'], legend_kws: Mapping = None, barplot_kws: Mapping = None,
+              annotate_format: str = rcParams['int_format'], legend_kws: Mapping = None, barplot_kws: Mapping = None,
               count_twinx_kws: Mapping = None, **kwargs):
     """
     Based on seaborn barplot but with a few more options
@@ -3468,13 +3498,14 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
         _order = order
 
     if hue is not None:
-       _hues = _get_ordered_levels(data=_df, level=hue, order=hue_order, x=_x)
+        _hues = _get_ordered_levels(data=_df, level=hue, order=hue_order, x=_x)
 
     if palette is None:
         palette = rcParams['palette'] * 5
 
-    _plot = sns.barplot(data=_df_count, x=_x, y=_y, hue=hue, order=_order, hue_order=hue_order, palette=palette, ax=ax,
-                        **barplot_kws)
+    sns.barplot(data=_df_count, x=_x, y=_y, hue=hue, order=_order, hue_order=hue_order, palette=palette, ax=ax,
+                **barplot_kws)
+    ax.set_xlabel('')
 
     # cleanup for x=None
     if x is None:
@@ -3487,10 +3518,11 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
 
     if annotate:
         # add annotation
-        annotate_barplot(_plot, nr_format=annotate_format)
+        annotate_barplot(ax, nr_format=annotate_format)
         # enlarge ylims
         _ylim = list(ax.get_ylim())
         _ylim[1] = _ylim[1] * 1.1
+        # noinspection PyTypeChecker
         ax.set_ylim(_ylim)
 
     if hide_legend:
@@ -3507,13 +3539,13 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
 
         _ax = ax.twinx()
 
-        count_twinx_kws_keys = list(count_twinx_kws.keys())
+        _count_twinx_kws_keys = list(count_twinx_kws.keys())
 
-        if 'marker' not in count_twinx_kws_keys:
+        if 'marker' not in _count_twinx_kws_keys:
             count_twinx_kws['marker'] = '_'
-        if 'color' not in count_twinx_kws_keys:
+        if 'color' not in _count_twinx_kws_keys:
             count_twinx_kws['color'] = 'k'
-        if 'alpha' not in count_twinx_kws_keys:
+        if 'alpha' not in _count_twinx_kws_keys:
             count_twinx_kws['alpha'] = .5
 
         _ax.scatter(_x, _count_x, data=_df_count[[x, _count_x]].drop_duplicates(), **count_twinx_kws)
@@ -3524,7 +3556,7 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
 
 @docstr
 @export
-def quantile_plot(x: Union[Sequence, str], data: pd.DataFrame = None, qs: Union[Sequence, float] = None, x2: str =None,
+def quantile_plot(x: Union[Sequence, str], data: pd.DataFrame = None, qs: Union[Sequence, float] = None, x2: str = None,
                   hue: str = None, hue_order: Union[Sequence, str] = None, to_abs: bool = False, ax: plt.Axes = None,
                   **kwargs) -> plt.Axes:
     """
@@ -3533,7 +3565,7 @@ def quantile_plot(x: Union[Sequence, str], data: pd.DataFrame = None, qs: Union[
     :param x: %(x)s
     :param data: %(data)s
     :param qs: Quantile levels [optional]
-    :param x2: is specified: subtracts x2 from x before calculating quantiles [optional]
+    :param x2: if specified: subtracts x2 from x before calculating quantiles [optional]
     :param hue: %(hue)s
     :param hue_order: %(order)s 
     :param to_abs: %(to_abs)s

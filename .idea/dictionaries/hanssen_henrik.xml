@@ -6,6 +6,7 @@
       <w>aggplot</w>
       <w>anim</w>
       <w>animplot</w>
+      <w>astype</w>
       <w>autodoc</w>
       <w>automodapi</w>
       <w>autosectionlabel</w>
@@ -31,6 +32,7 @@
       <w>countplot</w>
       <w>customizeable</w>
       <w>datapoint</w>
+      <w>dataset</w>
       <w>distfit</w>
       <w>distfits</w>
       <w>distkws</w>
@@ -40,6 +42,7 @@
       <w>dropna</w>
       <w>dtype</w>
       <w>edgecolor</w>
+      <w>errorbars</w>
       <w>facecolor</w>
       <w>figsize</w>
       <w>fltr</w>

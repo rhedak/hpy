@@ -1,9 +1,9 @@
 """
 hhpy.modelling.py
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~
 
 Contains a model class that is based on pandas DataFrames and wraps around sklearn and other frameworks
-to provide convenient train text functions.
+to provide convenient train test functions.
 
 """
 
@@ -17,7 +17,7 @@ import seaborn as sns
 
 # third party imports
 from copy import deepcopy
-from typing import Any, Sequence, Mapping, Union, Callable, Optional
+from typing import Sequence, Mapping, Union, Callable, Optional
 
 from sklearn.exceptions import DataConversionWarning
 
@@ -27,8 +27,8 @@ except ImportError:
     display = print
 
 # local imports
-from hhpy.main import export, is_list_like, force_list, tprint, dict_list, append_to_dict_list, DocstringProcessor
-from hhpy.ds import k_split, r2, rmse, mae, medae, stdae, get_duplicate_cols
+from hhpy.main import export, is_list_like, force_list, tprint, DocstringProcessor
+from hhpy.ds import k_split, df_score
 from hhpy.plotting import ax_as_list, legend_outside, rcParams as hpt_rcParams, docstr as docstr_hpt
 
 # --- constants
@@ -599,21 +599,19 @@ class Models(_BaseModel):
             return _df
 
     @docstr
-    def score(self, scores: Union[Sequence, Callable] = None, return_type: str = 'self',
-              scale: Union[Mapping, Sequence, float] = None, do_print: bool = True, display_score: bool = True):
+    def score(self, return_type: str = 'self', pivot: bool = False, do_print: bool = True,  display_score: bool = True,
+              **kwargs) -> Optional[pd.DataFrame]:
         """
         calculate score of the Model predictions
 
-        :param scores: scoring metrics to use, supports any subset of %(Models_score_valid_scores)s
         :param return_type: one of %(Models_score_valid_return_types)s
-        :param scale: scale the labels (predictors) with this factor before calculating the scores
+        :param pivot: whether to pivot the DataFrame for easier readability [optional]
         :param do_print: %(do_print)s
         :param display_score: %(display_score)s
+        :param kwargs: other keyword arguments passed to :func: `~hhpy.ds.df_score`
         :return: if return_type is 'self': None, else: pandas DataFrame containing the scores
         """
 
-        if scores is None:
-            scores = [r2, rmse, mae, stdae, medae]
         if do_print:
             self.printf('scoring...')
 
@@ -625,55 +623,17 @@ class Models(_BaseModel):
             raise ValueError('Model is not fit yet')
         elif self.fit_type == 'train_test':
             _df = self.df.query('_test')
-        elif self.fit_type == 'final':
+        else:  # self.fit_type == 'final'
             _df = self.df.copy()
-        else:
-            _df = None
 
-        if isinstance(scale, Mapping):
-            for _key, _value in scale.items():
-                _df[_key] *= _value
-                for _model_name in self.model_names:
-                    _df['{}_{}'.format(_key, _model_name)] *= _value
-        elif is_list_like(scale):
-            _i = -1
-            for _scale in scale:
-                _i += 1
-                _df[self.y_ref[_i]] *= _scale
-                for _model_name in self.model_names:
-                    _df['{}_{}'.format(self.y_ref[_i], _model_name)] *= _scale
-        elif scale is not None:
-            for _y_ref in self.y_ref:
-                _df[_y_ref] *= scale
-                for _model_name in self.model_names:
-                    _df['{}_{}'.format(_y_ref, _model_name)] *= scale
-
-        _df_score = dict_list(['y_ref', 'model', 'score', 'value'])
-        for _y_ref in self.y_ref:
-            for _model_name in self.model_names:
-                for _score in scores:
-
-                    _y_ref_pred = '{}_{}'.format(_y_ref, _model_name)
-                    if _y_ref_pred not in _df.columns:
-                        _df = self.predict(_df)
-
-                    _value = _score(_y_ref, _y_ref_pred, df=_df)
-
-                    append_to_dict_list(_df_score, {
-                        'y_ref': _y_ref,
-                        'model': _model_name,
-                        'score': _score.__name__,
-                        'value': _value
-                    })
-
-        _df_score = pd.DataFrame(_df_score)
+        _df_score = df_score(df=_df, y_true=self.y_ref, pred_suffix=self.model_names, pivot=pivot, **kwargs)
 
         if display_score:
-            _display_score = _df_score.pivot_table(index=['y_ref', 'model'], columns='score', values='value')
-            if display is not None:
-                display(_display_score)
+            if pivot:
+                _display_score = _df_score
             else:
-                print(_display_score)
+                _display_score = _df_score.pivot_table(index=['y_ref', 'model'], columns='score', values='value')
+            display(_display_score)
 
         if return_type == 'self':
             self.df_score = _df_score
@@ -683,8 +643,9 @@ class Models(_BaseModel):
     @docstr
     def train(self, df: pd.DataFrame = None, k: int = 5, groupby: Union[Sequence, str] = None,
               sortby: Union[Sequence, str] = None, random_state: int = None, fit_type: str = 'train_test',
-              ensemble: bool = False, scores: Union[Sequence, str] = None, scale: float = None, do_print: bool = True,
-              display_score: bool = True):
+              ensemble: bool = False, scores: Union[Sequence, str] = None, scale: float = None,
+              do_predict: bool = True, do_score: bool = True, do_split: bool = True, do_fit: bool = True,
+              do_print: bool = True, display_score: bool = True):
         """
         wrapper method that combined k_split, train, predict and score
 
@@ -699,18 +660,25 @@ class Models(_BaseModel):
         :param scale: see .score
         :param do_print: %(do_print)s
         :param display_score: %(display_score)s
+        :param do_split: whether to apply k_split [optional]
+        :param do_fit: whether to fit the Models [optional]
+        :param do_predict: whether to add predictions to DataFrame [optional]
+        :param do_score: whether to create self.df_score [optional]
         :return: None
         """
 
         if df is not None:
             self.df = df
-        self.k_split(k=k, groupby=groupby, sortby=sortby, random_state=random_state,
-                     do_print=do_print)
-        self.fit(fit_type=fit_type, do_print=do_print)
-        self.predict(ensemble=ensemble, do_print=do_print)
-        self.score(scores=scores, scale=scale, do_print=do_print, display_score=display_score)
+        if do_split:
+            self.k_split(k=k, groupby=groupby, sortby=sortby, random_state=random_state, do_print=do_print)
+        if do_fit:
+            self.fit(fit_type=fit_type, do_print=do_print)
+        if do_predict:
+            self.predict(ensemble=ensemble, do_print=do_print)
+        if do_score:
+            self.score(scores=scores, scale=scale, do_print=do_print, display_score=display_score)
         if do_print:
-            self.printf('done')
+            self.printf('training done')
 
     @docstr_hpt
     def scoreplot(self, x='y_ref', y='value', hue='model', hue_order=None, row='score',
@@ -823,20 +791,21 @@ def get_coefs(model: object, y: Union[Sequence, str]):
     :param y: name of the coefficients
     :return: pandas DataFrame containing the coefficient names and values
     """
-    _df = pd.DataFrame()
 
     if isinstance(model, Model):
-        _coef = model.model.coef_.tolist()
+        _model = model.model
     else:
-        _coef = model.coef_.tolist()
+        _model = model
+
+    assert(hasattr(_model, 'coef_')), 'Attribute coef_ not available, did you specify a linear model?'
+
+    _coef = _model.coef_.tolist()
     _coef.append(model.intercept_)
 
+    _df = pd.DataFrame()
     _df['feature'] = force_list(y) + ['intercept']
     _df['coef'] = _coef
-
     _df = _df.sort_values(['coef'], ascending=False).reset_index(drop=True)
-
-    _df['coef'] = np.round(_df['coef'], 5)
 
     return _df
 

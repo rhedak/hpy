@@ -17,11 +17,12 @@ from scipy import stats, signal
 from scipy.spatial import distance
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, median_absolute_error
 from sklearn.preprocessing import StandardScaler
-from typing import Mapping, Sequence, Callable, Union, List
+from typing import Mapping, Sequence, Callable, Union, List, Optional
 
 # local imports
 from hhpy.main import export, force_list, tprint, progressbar, qformat, list_intersection, round_signif, is_list_like, \
     dict_list, append_to_dict_list, concat_cols
+
 
 # --- functions
 @export
@@ -546,7 +547,7 @@ def quantile_split(s: pd.Series, n: int, signif: int = 2, na_to_med: bool = Fals
     if len(s.unique()) <= n:
         return s
 
-    _s = pd.Series(s).copy().astype(float)
+    _s = pd.Series(s).astype(float)
     _s = np.where(~np.isfinite(_s), np.nan, _s)
     _s = pd.Series(_s)
 
@@ -967,8 +968,9 @@ def corr(*args, **kwargs) -> Union[pd.DataFrame, float]:
 
 
 @export
-def df_score(df: pd.DataFrame, y_true: str, pred_suffix: list = None, scores: list = None, pivot: bool = True,
-             scale: Union[dict, list, int] = None, groupby: Union[list, str] = None) -> pd.DataFrame:
+def df_score(df: pd.DataFrame, y_true: Union[List[str], str], pred_suffix: list = None, scores: List[Callable] = None,
+             pivot: bool = True, scale: Union[dict, list, int] = None,
+             groupby: Union[list, str] = None) -> pd.DataFrame:
     """
     creates a DataFrame displaying various kind of scores
 
@@ -985,7 +987,9 @@ def df_score(df: pd.DataFrame, y_true: str, pred_suffix: list = None, scores: li
     if pred_suffix is None:
         pred_suffix = ['pred']
     if scores is None:
-        scores = ['r2', 'rmse', 'mae', 'stdae', 'medae']
+        scores = [r2, rmse, mae, stdae, medae]
+    else:
+        scores = force_list(scores)
     _df = df.copy()
     del df
 
@@ -1025,9 +1029,6 @@ def df_score(df: pd.DataFrame, y_true: str, pred_suffix: list = None, scores: li
                 _y_ref_pred = '{}_{}'.format(_y_ref, _model_name)
                 if _y_ref_pred not in _df.columns:
                     raise KeyError('{} not in columns'.format(_y_ref_pred))
-
-                if isinstance(_score, str):
-                    _score = eval(_score)
 
                 for _index, _df_i in _df.groupby(_groupby):
 
@@ -1251,12 +1252,11 @@ def df_p(x: str, group: str, df: pd.DataFrame, hue: str = None, agg_func: str = 
                 # get t test / median test
                 try:
                     if agg_func == 'median':
-                        _p = stats.median_test(_s_1, _s_2)[1]  # ,nan_policy='omit'
-                    else:
+                        _p = stats.median_test(_s_1, _s_2)[1]
+                    else:  # if not median then mean
                         _p = stats.ttest_ind(_s_1, _s_2, equal_var=False)[1]
                 except ValueError:
                     _p = np.nan
-                # TODO handle other cases than median / mean ?
 
                 _df_dict = {}
 
@@ -2062,26 +2062,51 @@ def numeric_to_group(pd_series, step=None, outer_limit=4, suffix=None, use_abs=F
     return _series
 
 
-# select n elements form a categorical pandas series with the highest counts
-def top_n(s: pd.Series, n: int) -> list:
-    return list(s.value_counts().reset_index()['index'][:n])
+@export
+def top_n(s: Sequence, n: int, w: Optional[Sequence] = None) -> list:
+    """
+    select n elements form a categorical pandas series with the highest counts
+
+    :param s: pandas Series to select from
+    :param n: how many elements to return
+    :param w: weights, if given the weights are summed instead of just counting entries in s [optional]
+    :return: List of top n elements
+    """
+
+    # faster
+    if w is None:
+        return list(pd.Series(s).value_counts().reset_index()['index'][:n])
+    else:
+        return pd.DataFrame({'s': s, 'w': w}).groupby('s').agg({'w': 'sum'})\
+                   .sort_values(by='w', ascending=False).index.tolist()[:n]
 
 
-# returns a modified version of the pandas series where all elements not in top_n become recoded as 'other'
-def top_n_coding(s, n, other_name='other', na_to_other=False):
-    _s = s.astype('str')
-    _top_n = top_n(_s, n)
+@export
+def top_n_coding(s: Sequence, n: int, other_name: str = 'other', na_to_other: bool = False,
+                 w: Optional[Sequence] = None) -> pd.Series:
+    """
+    returns a modified version of the pandas series where all elements not in top_n become recoded as 'other'
 
+    :param s: pandas Series to adjust
+    :param n: how many elements to keep
+    :param other_name: name of the other element [optional]
+    :param na_to_other: whether to cast missing elements to other [optional]
+    :param w: weights, if given the weights are summed instead of just counting entries in s [optional]
+    :return: adjusted pandas Series
+    """
+
+    # we have to cast to string so we can set the other name
+    _s = pd.Series(s).astype('str')
+    _top_n = top_n(_s, n, w=w)
     _s = pd.Series(np.where(_s.isin(_top_n), _s, other_name))
-
     if na_to_other: 
-        _s = pd.Series(np.where(~_s.isin(['nan', 'nat']), _s, other_name))
-
+        _s = np.where(~_s.isin(['nan', 'nat']), _s, other_name)
     _s = pd.Series(_s)
 
     # get back the old properties of the series (or you'll screw the index)
-    _s.name = s.name
-    _s.index = s.index
+    if isinstance(s, pd.Series):
+        _s.name = s.name
+        _s.index = s.index
 
     # convert to cat
     _s = _s.astype('category')

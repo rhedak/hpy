@@ -16,9 +16,12 @@ Install and update using [pip](https://pypi.org/project/hhpy/):
 pip install hhpy
 ```
 
+Or get the latest dev version from github
+
+```bash
+pip install git+https://github.com/rhedak/hhpy
+```
+
 ## Documentation
 
-Documentation is available at [https://hpy.readthedocs.io/](https://hpy.readthedocs.io/)
-
-Pending change to [https://hhpy.readthedocs.io/](https://hhpy.readthedocs.io/), because the package had to be
-renamed from **hpy** to **hhpy** for PyPi
+Documentation is available at [https://hhpy.readthedocs.io/](https://hhpy.readthedocs.io/)

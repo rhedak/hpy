@@ -41,38 +41,6 @@ def export(fn):
     return fn
 
 
-# --- classes
-@export
-class Infix:
-    """
-        Class for representing the pipe operator |__|
-        The operator is based on the r %>% operator
-
-    """
-    def __init__(self, function):
-        self.__name__ = 'Infix'
-        self.function = function
-
-    def __ror__(self, other):
-        return Infix(lambda _x, _self=self, _other=other: self.function(_other, _x))
-
-    def __or__(self, other):
-        return self.function(other)
-
-    def __rlshift__(self, other):
-        return Infix(lambda _x, _self=self, _other=other: self.function(_other, _x))
-
-    def __rshift__(self, other):
-        return self.function(other)
-
-    def __call__(self, value1, value2):
-        return self.function(value1, value2)
-
-
-# pipe operator
-__ = Infix(lambda _o, _f: _f(_o))
-
-
 # --- functions
 @export
 def today(date_format: str = '%Y_%m_%d') -> str:
@@ -81,31 +49,14 @@ def today(date_format: str = '%Y_%m_%d') -> str:
 
     :param date_format: The formating string for the date. Passed to strftime
     :return: Formated String
+
+    **Examples**
+
+    >>> today()
+    '2020_01_14'
+
     """
     return datetime.datetime.today().strftime(date_format)
-
-
-# for pipe operator:
-@export
-def round1(x: float) -> float:
-    """
-    Wrapper for np.round with default digits 1
-
-    :param x: float
-    :return: float
-    """
-    return np.round(x, 1)
-
-
-@export
-def round2(x: float) -> float:
-    """
-    Wrapper for np.round with default digits 2
-
-    :param x: float
-    :return: float
-    """
-    return np.round(x, 2)
 
 
 @export
@@ -117,8 +68,20 @@ def size(byte: int, unit: str = 'MB', dec: int = 2) -> str:
     :param unit: The unit to display the output in, supports 'KB', 'MB', 'GB' and 'TB'
     :param dec: The number of decimals to use
     :return: Formated bytes as string
+
+    **Examples**
+
+    >>> size(1024, unit='KB')
+    '1.0 KB'
+
+    >>> size(1024*1024*10, unit='MB')
+    '10.0 MB'
+
+    >>> size(10**10, unit='GB')
+    '9.31 GB'
+
     """
-    _power = {'KB': 1, 'MB': 2, 'GB': 3, 'TB': 4}[unit]
+    _power = {'KB': 1, 'MB': 2, 'GB': 3, 'TB': 4}[unit.upper()]
 
     return '{} {}'.format(np.round(byte / (1024 ** _power), dec), unit)
 
@@ -132,6 +95,14 @@ def mem_usage(pandas_obj, *args, **kwargs) -> str:
     :param args: passed to size()
     :param kwargs: passed to size()
     :return: memory usage of a pandas object formated as string
+
+    **Examples**
+
+    >>> import seaborn as sns
+    >>> diamonds = sns.load_dataset('diamonds')
+    >>> mem_usage(diamonds)
+    '12.62 MB'
+
     """
     if isinstance(pandas_obj, pd.DataFrame):
         _usage_b = pandas_obj.memory_usage(deep=True).sum()
@@ -154,10 +125,10 @@ def tprint(*args, sep: str = ' ', **kwargs):
     :param kwargs: passed to print
     :return: None
 
-    Examples
+    **Examples**
 
     >>> tprint('Hello World')
-    Hello World
+    'Hello World'
 
     >>> tprint(1)
     >>> tprint(2)
@@ -192,7 +163,7 @@ def tprint(*args, sep: str = ' ', **kwargs):
 
 
 @export
-def fprint(*args, file: str = '_print.txt', sep: str = ' ', mode: str = 'replace', append_sep: str = '\n',
+def fprint(*args, file: str = '_fprint.txt', sep: str = ' ', mode: str = 'replace', append_sep: str = '\n',
            timestamp: bool = True, do_print: bool = False, do_tprint: bool = False):
     """
     Write the output of print to a file instead. Supports also writing to console.
@@ -206,6 +177,18 @@ def fprint(*args, file: str = '_print.txt', sep: str = ' ', mode: str = 'replace
     :param do_print: weather to also print to console
     :param do_tprint: weather to also print to console using tprint
     :return: None
+
+    **Examples**
+
+    The below output gets written to a file called 'fprint.txt'
+
+    >>> fprint('Hello World', file='fprint.txt')
+
+    The below output gets written both to a file and to console
+
+    >>> fprint('Hello World', file='fprint.txt', do_print=True)
+    'Hello World'
+
     """
     if file[-4:] != '.txt':
         file += '.txt'
@@ -244,6 +227,56 @@ def fprint(*args, file: str = '_print.txt', sep: str = ' ', mode: str = 'replace
 
 
 @export
+def elapsed_time_init() -> None:
+    """
+    Resets reference time for elapsed_time()
+
+    :return: None
+
+    **Examples**
+
+    see :func:`elapsed_time`
+    """
+    global global_t
+    global_t = datetime.datetime.now()
+
+
+@export
+def elapsed_time(do_return: bool = True, ref_t: datetime.datetime = None) -> datetime.timedelta:
+    """
+    Get the elapsed time since reference time ref_time.
+
+    :param do_return: Whether to return or print
+    :param ref_t: Reference time. If None is provided the time elapsed_time_init() was last called is used.
+    :return: In case of do_return: Datetime object containing the elapsed time. Else calls tprint and returns None.
+
+    **Examples**
+
+    >>> from time import sleep
+    >>> elapsed_time_init()
+    >>> sleep(1)
+    >>> elapsed_time(do_return=False)
+    '0:00:01.0'
+
+    >>> from time import sleep
+    >>> elapsed_time_init()
+    >>> sleep(1)
+    >>> elapsed_time(do_return=True)
+    datetime.timedelta(0, 1, 1345)
+    """
+    global global_t
+    if ref_t is None:
+        ref_t = global_t
+
+    _delta_t = datetime.datetime.now() - ref_t
+
+    if do_return:
+        return _delta_t
+    else:
+        tprint(str(_delta_t)[:-5])
+
+
+@export
 def total_time(i: int, i_max: int) -> datetime.timedelta:
     """
     Estimates total time of running operation by linear extrapolation using iteration counters.
@@ -274,21 +307,23 @@ def remaining_time(i: int, i_max: int) -> datetime.timedelta:
 
 
 @export
-def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', mid: str = None, mode: str = 'perc',
-                print_prefix: str = '', p_step: int = 1, printf: Callable = tprint, persist: bool = False, **kwargs):
+def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', empty_symbol: str = '_', mid: str = None,
+                mode: str = 'perc', print_prefix: str = '', p_step: int = 1, printf: Callable = tprint,
+                persist: bool = False, **kwargs):
     """
     Prints a progressbar for the currently running process based on iteration counters.
 
     :param i: current iteration
     :param i_max: max iteration
-    :param symbol: symbol that represents progress percentage
+    :param symbol: symbol that represents reached progress blocks
+    :param empty_symbol: symbol that represents not yet reached progress blocks
     :param mid: what to write in the middle of the progressbar, if mid is passed mode is ignored
     :param mode: {'perc', 'total', 'elapsed'}.
         If perc is passed writes percentage. If 'remaining' or 'elapsed' writes remaining or elapsed time respectively.
         [optional]
     :param print_prefix: what to write in front of the progressbar. Useful when calling progressbar multiple times
         from different functions.
-    :param p_step: progressbar prints one symbol per p_step
+    :param p_step: progressbar prints one symbol (progress block) per p_step
     :param printf: Using tprint by default. Use fprint to write to file instead.
     :param persist: Whether to persist the progressbar after reaching 100 percent.
     :param kwargs: Passed to print function
@@ -307,13 +342,13 @@ def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', mid: str = None, 
 
     if _perc <= 50:
 
-        _right = ' ' * (50 // p_step)
-        _left = symbol * int(np.ceil(_perc / p_step)) + ' ' * ((50 - _perc) // p_step)
+        _right = empty_symbol * (50 // p_step)
+        _left = symbol * int(np.ceil(_perc / p_step)) + empty_symbol * ((50 - _perc) // p_step)
 
     else:
 
         _left = symbol * (50 // p_step)
-        _right = symbol * int(np.ceil(((50 - (100 - _perc)) / p_step))) + ' ' * ((100 - _perc) // p_step)
+        _right = symbol * int(np.ceil(((50 - (100 - _perc)) / p_step))) + empty_symbol * ((100 - _perc) // p_step)
 
     if mid is not None:
         _mid = mid
@@ -350,38 +385,6 @@ def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', mid: str = None, 
 
     if persist and i == i_max:
         print('')
-
-
-@export
-def elapsed_time_init():
-    """
-    Resets reference time for elapsed_time()
-
-    :return: None
-    """
-    global global_t
-    global_t = datetime.datetime.now()
-
-
-@export
-def elapsed_time(do_return: bool = False, ref_t: datetime.datetime = None) -> datetime.timedelta:
-    """
-    Get the elapsed time since reference time ref_time.
-
-    :param do_return: Whether to return or print
-    :param ref_t: Reference time. If None is provided the time elapsed_time_init() was last called is used.
-    :return: In case of do_return: Datetime object containing the elapsed time. Else None.
-    """
-    global global_t
-    if ref_t is None:
-        ref_t = global_t
-
-    _delta_t = datetime.datetime.now() - ref_t
-
-    if do_return:
-        return _delta_t
-    else:
-        tprint(str(_delta_t)[:-5])
 
 
 @export
@@ -593,7 +596,7 @@ def list_merge(*args, unique=True, flatten=False) -> list:
 
 
 @export
-def list_intersection(lst: list, *args) -> list:
+def list_intersection(lst: list, *args: list) -> list:
     """
     Returns common elements of n lists
 
@@ -607,6 +610,29 @@ def list_intersection(lst: list, *args) -> list:
     for _arg in args:
         _list = list(_arg)
         _list_out = list(set(_list_out).intersection(_list))
+
+    return _list_out
+
+
+@export
+def list_exclude(lst: list, *args: list) -> list:
+    """
+    Returns a list that includes only those elements from the first list that are not in any subsequent list.
+    Can also be called with non list args, then those elements are removed.
+
+    :param lst: the list to exclude from
+    :param args: the subsequent lists
+    :return: the filtered list
+    """
+    # more performant than list comprehension
+    _list_out = list(lst)
+
+    for _arg in args:
+        if _arg in _list_out:
+            _list_out.remove(_arg)
+        for _el in force_list(_arg):
+            if _el in _list_out:
+                _list_out.remove(_el)
 
     return _list_out
 

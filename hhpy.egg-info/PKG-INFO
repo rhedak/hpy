@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: hhpy
-Version: 0.0.9
+Version: 0.1.0
 Summary: hhpy - convenient data science
 Home-page: https://github.com/rhedak/hhpy
 Author: Henrik Hanssen
@@ -24,12 +24,15 @@ Description: # hhpy - Data Science convenience project
         pip install hhpy
         ```
         
+        Or get the latest dev version from github
+        
+        ```bash
+        pip install git+https://github.com/rhedak/hhpy
+        ```
+        
         ## Documentation
         
-        Documentation is available at [https://hpy.readthedocs.io/](https://hpy.readthedocs.io/)
-        
-        Pending change to [https://hhpy.readthedocs.io/](https://hhpy.readthedocs.io/), because the package had to be
-        renamed from **hpy** to **hhpy** for PyPi
+        Documentation is available at [https://hhpy.readthedocs.io/](https://hhpy.readthedocs.io/)
 Keywords: package development template
 Platform: UNKNOWN
 Classifier: Development Status :: 4 - Beta
