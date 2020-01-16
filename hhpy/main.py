@@ -30,6 +30,10 @@ pd.options.mode.chained_assignment = None
 global_t = datetime.datetime.now()  # for times progress bar
 global_tprint_len = 0  # for temporary printing
 
+rcParams = {
+    'tprint.r_loc': 'front'
+}
+
 
 # --- decorators
 def export(fn):
@@ -114,7 +118,7 @@ def mem_usage(pandas_obj, *args, **kwargs) -> str:
 
 
 @export
-def tprint(*args, sep: str = ' ', **kwargs):
+def tprint(*args, sep: str = ' ', r_loc: str = rcParams['tprint.r_loc'], **kwargs):
     """
     Wrapper for print() but with a carriage return at the end.
     This results in the text being overwritten by the next print call.
@@ -122,6 +126,11 @@ def tprint(*args, sep: str = ' ', **kwargs):
 
     :param args: arguments to print
     :param sep: separator
+    :param r_loc: where to put the carriage return, one of ['front', 'end']. Some interpreters (e.g. PyCharm)
+        don't like end since they automatically clear the print area after each carriage return. When using front
+        a regular print after a tprint will start at the end of the tprint. When using 'end' a regular
+        print will overwrite the tprint output but will not clear the console so if it is . In either case a blank
+        tprint() will clear the console and restore default print behaviour.
     :param kwargs: passed to print
     :return: None
 
@@ -136,6 +145,12 @@ def tprint(*args, sep: str = ' ', **kwargs):
 
     """
     global global_tprint_len
+
+    _allowed_r_locs = ['front', 'end']
+
+    if r_loc not in _allowed_r_locs:
+        warnings.warn(f'r_loc not in {_allowed_r_locs}, defaulting to {rcParams["tprint.r_loc"]}')
+        r_loc = rcParams['tprint.r_loc']
 
     _string = ''
     _arg_len = 0
@@ -156,7 +171,10 @@ def tprint(*args, sep: str = ' ', **kwargs):
         _string += ' ' * _whitespace_len
 
     # print
-    print(_string, end='\r', **kwargs)
+    if r_loc == 'front':
+        print('\r' + _string, end='', **kwargs)
+    else:  # r_loc == 'end'
+        print(_string, end='\r', **kwargs)
 
     # store len for next tprint use
     global_tprint_len = _arg_len
@@ -904,7 +922,7 @@ def get_hdf_keys(file: str) -> List[str]:
     :return: List of keys
     """
 
-    with h5py.File(file) as _file:
+    with h5py.File(file, 'r') as _file:
         _keys = list(_file.keys())
         _file.close()
 
@@ -952,7 +970,8 @@ def read_hdf(file: str, key: Union[str, List[str]] = None, sample: int = None, r
 
         _i += 1
 
-        if do_print: tprint('reading {} - key {} / {} : {}...'.format(file, _i, len(_keys), _key))
+        if do_print:
+            tprint('reading {} - key {} / {} : {}...'.format(file, _i, len(_keys), _key))
         if catch_error:
             try:
                 _df.append(pd.read_hdf(file, key=_key))
@@ -973,3 +992,28 @@ def read_hdf(file: str, key: Union[str, List[str]] = None, sample: int = None, r
 
     return _df
 
+
+@export
+def rounddown(x: Any, digits: int) -> Any:
+    """
+    convenience wrapper for np.floor with digits option
+
+    :param x: any python object that supports np.floor
+    :param digits: amount of digits
+    :return: rounded x
+    """
+
+    return np.floor(x * 10**digits) / 10**digits
+
+
+@export
+def roundup(x: Any, digits: int) -> Any:
+    """
+    convenience wrapper for np.ceil with digits option
+
+    :param x: any python object that supports np.ceil
+    :param digits: amount of digits
+    :return: rounded x
+    """
+
+    return np.ceil(x * 10**digits) / 10**digits

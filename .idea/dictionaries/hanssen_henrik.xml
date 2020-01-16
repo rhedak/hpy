@@ -78,6 +78,7 @@
       <w>lims</w>
       <w>linecolor</w>
       <w>linestyle</w>
+      <w>locs</w>
       <w>lowpass</w>
       <w>mahalanobis</w>
       <w>matplotlib</w>
@@ -120,6 +121,7 @@
       <w>rmsd</w>
       <w>rmsdplot</w>
       <w>rmse</w>
+      <w>rounddown</w>
       <w>scaler</w>
       <w>scatterplot</w>
       <w>scikit</w>

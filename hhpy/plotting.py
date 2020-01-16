@@ -95,7 +95,7 @@ docstr = DocstringProcessor(
         * ``median``, ``mean_ascending``, ``median_descending``: sorted by median value, defaults to descending
         
     ''',
-    color='color used for plotting, must be known to matplotlib.pyplot [optional]',
+    color='Color used for plotting, must be known to matplotlib.pyplot [optional]',
     palette='Collection of colors to be used for plotting. Can be a dictionary for with names for each level or '
             'a list of colors or an individual color name. Must be valid colors known to pyplot [optional]',
     cmap='Color map to use [optional]',
@@ -103,8 +103,8 @@ docstr = DocstringProcessor(
     number_format='The format string used for annotations [optional]',
     float_format='The format string used for displaying floats [optional]',
     int_format='The format string used for displaying floats [optional]',
-    corr_target='target variable name, if specified only correlations with the target are shown [optional]',
-    corr_cutoff='filter all correlation whose absolute value is below the cutoff [optional]',
+    corr_target='Target variable name, if specified only correlations with the target are shown [optional]',
+    corr_cutoff='Filter all correlation whose absolute value is below the cutoff [optional]',
     col_wrap='After how many columns to create a new line of subplots [optional]',
     subplot_width='Width of each individual subplot [optional]',
     subplot_height='Height of each individual subplot [optional]',
@@ -135,11 +135,11 @@ docstr = DocstringProcessor(
     ylim='Y limits for the axis as tuple, passed to ax.set_ylim() [optional]',
     grid='Whether to toggle ax.grid() [optional]',
     vline='A list of x positions to draw vlines at [optional]',
-    to_abs='whether to cast the values to absolute before proceeding [optional]',
-    label='label to use for the data [optional]',
+    to_abs='Whether to cast the values to absolute before proceeding [optional]',
+    label='Label to use for the data [optional]',
     x_tick_rotation='Set x tick label rotation to this value [optional]',
-    std_cutoff='remove data outside of std_cutoff standard deviations, for a good visual experience try 3 [optional]',
-    do_print='whether to print intermediate steps to console [optional]',
+    std_cutoff='Remove data outside of std_cutoff standard deviations, for a good visual experience try 3 [optional]',
+    do_print='Whether to print intermediate steps to console [optional]',
     **validations
 )
 
@@ -247,13 +247,13 @@ def corrplot_bar(data: pd.DataFrame, target: str = None, columns: List[str] = No
                  corr_cutoff: float = rcParams['corr_cutoff'], corr_as_alpha: bool = False,
                  xlim: tuple = (-1, 1), ax: plt.Axes = None):
     """
-    correlation plot as barchart
+    Correlation plot as barchart based on :func: `~hhpy.ds.get_df_corr`
     
     :param data: %(data)s
     :param target: %(corr_target)s
-    :param columns: columns for which to calculate the correlations, defaults to all numeric columns [optional]
+    :param columns: Columns for which to calculate the correlations, defaults to all numeric columns [optional]
     :param corr_cutoff: %(corr_cutoff)s
-    :param corr_as_alpha: whether to set alpha value of bars to scale with correlation [optional]
+    :param corr_as_alpha: Whether to set alpha value of bars to scale with correlation [optional]
     :param xlim: xlim scale for plot, defaults to (-1, 1) to show the absolute scale of the correlations.
         set to None if you want the plot x limits to scale to the highest correlation values [optional]
     :param ax: %(ax_in)s
@@ -2590,7 +2590,7 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
 @export
 def legend_outside(ax: plt.Axes = None, width: float = .85, loc: str = 'right',
                    legend_space: float = rcParams['legend_outside.legend_space'], offset_x: float = 0,
-                   offset_y: float = 0, **kwargs):
+                   offset_y: float = 0, loc_warn: bool = True, **kwargs):
     """
     draws a legend outside of the subplot
     
@@ -2600,12 +2600,14 @@ def legend_outside(ax: plt.Axes = None, width: float = .85, loc: str = 'right',
     :param legend_space: how far below the subplot to put the legend if loc=='bottom'
     :param offset_x: x offset for the legend
     :param offset_y: y offset for the legend
+    :param loc_warn: Whether to trigger a warning if legend loc is not recognized
     :param kwargs: other keyword arguments passed to pyplot.legend
     :return: None
     """
     # -- init
     if loc not in ['bottom', 'right']:
-        warnings.warn('legend_outside: legend loc not recognized')
+        if loc_warn:
+            warnings.warn('legend_outside: legend loc not recognized, defaulting to plt.legend')
         ax.legend(loc=loc, **kwargs)
         return None
 
@@ -3424,8 +3426,8 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
               order: Union[Sequence, str] = None, hue_order: Union[Sequence, str] = None, normalize_x: bool = False,
               normalize_hue: bool = False, palette: Union[Mapping, Sequence, str] = None,
               x_tick_rotation: int = None, count_twinx: bool = False, hide_legend: bool = False, annotate: bool = True,
-              annotate_format: str = rcParams['int_format'], legend_kws: Mapping = None, barplot_kws: Mapping = None,
-              count_twinx_kws: Mapping = None, **kwargs):
+              annotate_format: str = rcParams['int_format'], legend_loc: str = 'upper right',
+              barplot_kws: Mapping = None, count_twinx_kws: Mapping = None, **kwargs):
     """
     Based on seaborn barplot but with a few more options
     
@@ -3435,46 +3437,45 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
     :param ax: %(ax_in)s
     :param order: %(order)s
     :param hue_order: %(order)s
-    :param normalize_x: whether to normalize x, causes the sum of each x group to be 100 percent [optional]
-    :param normalize_hue: whether to normalize hue, causes the sum of each hue group to be 100 percent [optional]
+    :param normalize_x: Whether to normalize x, causes the sum of each x group to be 100 percent [optional]
+    :param normalize_hue: Whether to normalize hue, causes the sum of each hue group to be 100 percent [optional]
     :param palette: %(palette)s
     :param x_tick_rotation: %(x_tick_rotation)s
-    :param count_twinx: whether to plot the count values on the second axis (if using normalize) [optional]
-    :param hide_legend: whether to hide the legend [optional]
-    :param annotate: whether to use annotate_barplot [optional]
+    :param count_twinx: Whether to plot the count values on the second axis (if using normalize) [optional]
+    :param hide_legend: Whether to hide the legend [optional]
+    :param annotate: Whether to use annotate_barplot [optional]
     :param annotate_format: %(number_format)s
-    :param legend_kws: additional keyword arguments passed to pyplot.legend [optional]
-    :param barplot_kws: additional keyword arguments passed to seaborn.barplot [optional]
-    :param count_twinx_kws: additional keyword arguments passed to pyplot.plot [optional]
-    :param kwargs: additional keyword arguments passed to hhpy.ds.df_count [optional]
+    :param legend_loc: %(legend_loc)s
+    :param barplot_kws: Additional keyword arguments passed to seaborn.barplot [optional]
+    :param count_twinx_kws: Additional keyword arguments passed to pyplot.plot [optional]
+    :param kwargs: Additional keyword arguments passed to :func: `~hhpy.ds.df_count` [optional]
     :return: %(ax_out)s
     """
 
     # -- init
-
-    # long or short format
-    if legend_kws is None:
-        legend_kws = {}
+    # defaults
     if barplot_kws is None:
         barplot_kws = {}
     if count_twinx_kws is None:
         count_twinx_kws = {}
+    # long or short format
     if data is not None:
         # avoid inplace operations
-        _df = data.copy()
-
+        data = data.copy()
+        # if x is not specified count each row
         if x is None:
-            _x = '_dummy'
-            _df = _df.assign(_dummy=1)
-        else:
-            _x = x
-
+            x = '_dummy'
+            data = data.assign(_dummy=1)
     else:
-        # create dummy df
-        _df = pd.DataFrame.from_dict({'x': x})
-        _x = 'x'
+        if isinstance(x, pd.DataFrame):
+            # case: only a DataFrame is passed as first argument (count rows)
+            data = x.copy().assign(_dummy=1)
+        else:
+            # assume passed object is a Sequence and create dummy df
+            data = pd.DataFrame({'_dummy': x})
+        x = '_dummy'
 
-    _count_x = 'count_{}'.format(_x)
+    _count_x = 'count_{}'.format(x)
     _count_hue = 'count_{}'.format(hue)
 
     # if an axis has not been passed initialize one
@@ -3482,28 +3483,28 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
         ax = plt.gca()
 
     if normalize_x:
-        _y = 'perc_{}'.format(_x)
+        _y = 'perc_{}'.format(x)
     elif normalize_hue:
         _y = 'perc_{}'.format(hue)
     else:
         _y = 'count'
 
-    _df_count = df_count(x=_x, df=_df, hue=hue, **kwargs)
+    _df_count = df_count(x=x, df=data, hue=hue, **kwargs)
 
     if order is None or order == 'count':
-        _order = _df_count[[_x, _count_x]].drop_duplicates().sort_values(by=[_count_x], ascending=False)[_x].tolist()
+        _order = _df_count[[x, _count_x]].drop_duplicates().sort_values(by=[_count_x], ascending=False)[x].tolist()
     elif order == 'sorted':
-        _order = _df_count[_x].drop_duplicates().sort_values().tolist()
+        _order = _df_count[x].drop_duplicates().sort_values().tolist()
     else:
         _order = order
 
     if hue is not None:
-        _hues = _get_ordered_levels(data=_df, level=hue, order=hue_order, x=_x)
+        _hues = _get_ordered_levels(data=data, level=hue, order=hue_order, x=x)
 
     if palette is None:
         palette = rcParams['palette'] * 5
 
-    sns.barplot(data=_df_count, x=_x, y=_y, hue=hue, order=_order, hue_order=hue_order, palette=palette, ax=ax,
+    sns.barplot(data=_df_count, x=x, y=_y, hue=hue, order=_order, hue_order=hue_order, palette=palette, ax=ax,
                 **barplot_kws)
     ax.set_xlabel('')
 
@@ -3525,10 +3526,11 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
         # noinspection PyTypeChecker
         ax.set_ylim(_ylim)
 
+    # legend
     if hide_legend:
         ax.get_legend().remove()
     elif hue is not None:
-        ax.legend(**legend_kws)
+        legend_outside(ax, loc=legend_loc, loc_warn=False)
 
     # tick rotation
     if x_tick_rotation is not None:
@@ -3536,19 +3538,15 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
 
     # total count on secaxis
     if count_twinx:
-
         _ax = ax.twinx()
-
         _count_twinx_kws_keys = list(count_twinx_kws.keys())
-
         if 'marker' not in _count_twinx_kws_keys:
             count_twinx_kws['marker'] = '_'
         if 'color' not in _count_twinx_kws_keys:
             count_twinx_kws['color'] = 'k'
         if 'alpha' not in _count_twinx_kws_keys:
             count_twinx_kws['alpha'] = .5
-
-        _ax.scatter(_x, _count_x, data=_df_count[[x, _count_x]].drop_duplicates(), **count_twinx_kws)
+        _ax.scatter(x, _count_x, data=_df_count[[x, _count_x]].drop_duplicates(), **count_twinx_kws)
         _ax.set_ylabel('count')
 
     return ax

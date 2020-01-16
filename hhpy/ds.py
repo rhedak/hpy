@@ -21,125 +21,145 @@ from typing import Mapping, Sequence, Callable, Union, List, Optional
 
 # local imports
 from hhpy.main import export, force_list, tprint, progressbar, qformat, list_intersection, round_signif, is_list_like, \
-    dict_list, append_to_dict_list, concat_cols
+    dict_list, append_to_dict_list, concat_cols, DocstringProcessor
+
+# --- constants
+docstr = DocstringProcessor(
+    df='Pandas DataFrame containing the data',
+    x='Main variable, name of a column in the DataFrame or vector data',
+    hue='Name of the column to split by level [optional]',
+    top_nr='Number of unique levels to keep when applying :func: `~top_n_coding`',
+    other_name='Name of the levels grouped inside other [optional]',
+)
 
 
 # --- functions
 @export
-def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_cat: bool = True, cat_frac: bool = .5) \
-        -> pd.DataFrame:
+def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_cat: bool = True, cat_frac: float = .5,
+                float_to_int: bool = True, float_digits: Optional[int] = None) -> pd.DataFrame:
     """
     optimize memory usage of a pandas df, automatically downcast all var types and converts objects to categories
 
     :param df: pandas DataFrame to be optimized. Other objects are implicitly cast to DataFrame
-    :param c_int: whether to downcast integers
-    :param c_float: whether to downcast floats
-    :param c_cat: whether to cast objects to categories. Uses cat_frac as condition
-    :param cat_frac: if c_cat is True and the column has less than cat_frac unique values it will be cast to category
+    :param c_int: Whether to downcast integers
+    :param c_float: Whether to downcast floats
+    :param c_cat: Whether to cast objects to categories. Uses cat_frac as condition
+    :param cat_frac: If c_cat: If the column has less than cat_frac percent unique values it will be cast to category
+    :param float_to_int: Whether to cast float columns that only contain integers to int
+    :param float_digits: If float_to_int: round float columns to this many digits before checking for integers
     :return: the optimized pandas DataFrame
     """
-    _df = pd.DataFrame(df).copy()
-    del df
+    # avoid inplace operations
+    df = pd.DataFrame(df).copy()
 
     # check for duplicate columns
-    _duplicate_columns = get_duplicate_cols(_df)
+    _duplicate_columns = get_duplicate_cols(df)
     if len(_duplicate_columns) > 0:
         warnings.warn('duplicate columns found: {}'.format(_duplicate_columns))
-        _df = drop_duplicate_cols(_df)
+        df = drop_duplicate_cols(df)
+
+    if float_to_int:
+        for _col in df.select_dtypes(np.number).columns:
+            # - cast to integer if possible
+            # integer dtype is different if it can contain NaN
+            _s = df[_col].copy()
+            # check if column contains NaN
+            if _s.isnull().sum() > 0:
+                # nullable dtype
+                _int_dtype = pd.Int64Dtype()
+                # comparison with NaN is always false
+                _s = _s.dropna()
+            else:
+                # non nullable dtype
+                _int_dtype = int
+            # if applicable: round
+            if float_digits:
+                _s = _s.round(float_digits)
+            # compare non null values
+            if np.array_equal(_s, _s.astype(int)):
+                # cast to specified int dtype
+                df[_col] = df[_col].apply(np.floor).astype(_int_dtype)
 
     if c_int:
-
-        _df_int = _df.select_dtypes(include=['int'])
-
-        for d_col in _df_int.columns:
-
-            # you can only use unsigned if all values are positive
-            if ~((_df_int[d_col] > 0).all()):
-                _df_int = _df_int.drop(d_col, axis=1)
-
-        converted_int = _df_int.apply(pd.to_numeric, downcast='unsigned')
-        _df[converted_int.columns] = converted_int
+        _cols_int = df.select_dtypes(include=['int'])
+        # split integer columns in unsigned (all positive) and (unsigned)
+        _cols_signed = []
+        _cols_unsigned = []
+        for _col in _cols_int:
+            if (df[_col] > 0).all():
+                _cols_unsigned.append(_col)
+            else:
+                _cols_signed.append(_col)
+        # downcast
+        df[_cols_unsigned] = df[_cols_unsigned].apply(pd.to_numeric, downcast='unsigned')
+        df[_cols_signed] = df[_cols_signed].apply(pd.to_numeric, downcast='signed')
 
     if c_float:
-        _df_float = _df.select_dtypes(include=['float'])
-        converted_float = _df_float.apply(pd.to_numeric, downcast='float')
-        _df[converted_float.columns] = converted_float
+        _cols_float = df.select_dtypes(include=['float']).columns
+        df[_cols_float] = df[_cols_float].apply(pd.to_numeric, downcast='float')
 
     if c_cat:
+        for _col in df.select_dtypes(include=['object']).columns:
+            # if there are less than 1 - cat_frac unique elements: cast to category
+            if df[_col].drop_duplicates().shape[0] / df[_col].shape[0] < (1 - cat_frac):
+                df[_col] = df[_col].astype('category')
 
-        _df_obj = _df.select_dtypes(include=['object'])
-        converted_obj = pd.DataFrame()
-
-        for col in _df_obj.columns:
-
-            num_unique_values = len(_df_obj[col].unique())
-            num_total_values = len(_df_obj[col])
-
-            if num_unique_values / num_total_values < (1 - cat_frac):
-                converted_obj.loc[:, col] = _df_obj[col].astype('category')
-            else:
-                converted_obj.loc[:, col] = _df_obj[col]
-
-        _df[converted_obj.columns] = converted_obj
-
-    return _df
+    return df
 
 
 @export
-def get_df_corr(df: pd.DataFrame, target: str = None, groupby: Union[str, list] = None) -> pd.DataFrame:
+def get_df_corr(df: pd.DataFrame, columns: List[str] = None, target: str = None,
+                groupby: Union[str, list] = None) -> pd.DataFrame:
     """
-    returns a pandas DataFrame containing all pearson correlations in a melted format
+    Calculate Pearson Correlations for numeric columns, extends on pandas.DataFrame.corr but automatically
+    melts the output. Used by :func: `~hhpy.plotting.corrplot_bar`
 
     :param df: input pandas DataFrame. Other objects are implicitly cast to DataFrame
-    :param target: if target is specified: returns only correlations that involve the target column
-    :param groupby: if groupby is specified: returns correlations for each level of the group
+    :param columns: Column to calculate the correlation for, defaults to all numeric columns [optional]
+    :param target: Returns only correlations that involve the target column [optional]
+    :param groupby: Returns correlations for each level of the group [optional]
     :return: pandas DataFrame containing all pearson correlations in a melted format
     """
     # avoid inplace operations
-    _df = df.copy()
-    del df
-
+    df = df.copy()
     # if there is a column called index it will create problems so rename it to '__index__'
-    _df = _df.rename({'index': '__index__'}, axis=1)
-
-    # add dummy if no group by
+    df = df.rename({'index': '__index__'}, axis=1)
+    # add dummy groupby if groupby is None
     if groupby is None:
         groupby = ['_dummy']
-        _df['_dummy'] = 1
+        df['_dummy'] = 1
 
-    # setting target makes the df_corr only contain correlations that involve the target
+    # use only numeric columns
+    if columns is None:
+        columns = df.select_dtypes(include=np.number).columns
 
-    _cols = _df.select_dtypes(include=np.number).columns
-
+    # init df as list of dfs
     _df_corr = []
-
-    for _index, _df_i in _df.groupby(groupby):
-
+    # loop groups
+    for _index, _df_i in df.groupby(groupby):
         # get corr
         _df_corr_i = _df_i.corr().reset_index().rename({'index': 'col_0'}, axis=1)
-
         # set upper right half to nan
-        for _i in range(len(_cols)):
-            _col = _cols[_i]
-
+        for _i, _col in enumerate(columns):
             _df_corr_i[_col] = np.where(_df_corr_i[_col].index <= _i, np.nan, _df_corr_i[_col])
-
         # gather / melt
         _df_corr_i = pd.melt(_df_corr_i, id_vars=['col_0'], var_name='col_1', value_name='corr').dropna()
         # drop self correlation
         _df_corr_i = _df_corr_i[_df_corr_i['col_0'] != _df_corr_i['col_1']]
-
         # get identifier
         for _groupby in force_list(groupby):
             _df_corr_i[_groupby] = _df_i[_groupby].iloc[0]
-
+        # append to list of dfs
         _df_corr.append(_df_corr_i)
-
+    # merge
     _df_corr = df_merge(_df_corr)
-    _df_corr = col_to_front(_df_corr, groupby)
 
+    # clean dummy groupby
     if '_dummy' in _df_corr.columns:
         _df_corr.drop('_dummy', axis=1, inplace=True)
+    else:
+        # move groupby columns to front
+        _df_corr = col_to_front(_df_corr, groupby)
 
     # reorder and keep only columns involving the target (if applicable)
     if target is not None:
@@ -241,11 +261,10 @@ def outlier_to_nan(df: pd.DataFrame, col: str, groupby: Union[list, str] = None,
     :param do_print: whether to print steps to console
     :return: pandas DataFrame with outliers set to nan
     """
-    _df = df.copy()
-    del df
+    df = pd.DataFrame(df).copy()
 
     if groupby is None:
-        _df['__groupby'] = 1
+        df['__groupby'] = 1
         groupby = '__groupby'
 
     for _rep in range(reps):
@@ -254,33 +273,33 @@ def outlier_to_nan(df: pd.DataFrame, col: str, groupby: Union[list, str] = None,
             tprint('rep = ' + str(_rep + 1) + ' of ' + str(reps))
 
         # grouped by df
-        _df_out_grouped = _df.groupby(groupby)
+        _df_out_grouped = df.groupby(groupby)
 
-        _df['_dummy'] = _df[col]
+        df['_dummy'] = df[col]
         # use interpolation to treat missing values
-        _df['_dummy'] = _df_out_grouped['_dummy'].transform(pd.DataFrame.interpolate)
+        df['_dummy'] = _df_out_grouped['_dummy'].transform(pd.DataFrame.interpolate)
 
         # calculate delta (mean of diff to previous and next value)
-        _df['_dummy_delta'] = .5 * (
-                np.abs(_df['_dummy'] - _df_out_grouped['_dummy'].shift(1).bfill()) +
-                np.abs(_df['_dummy'] - _df_out_grouped['_dummy'].shift(-1).ffill())
+        df['_dummy_delta'] = .5 * (
+                np.abs(df['_dummy'] - _df_out_grouped['_dummy'].shift(1).bfill()) +
+                np.abs(df['_dummy'] - _df_out_grouped['_dummy'].shift(-1).ffill())
         )
 
         _df_mean = _df_out_grouped[['_dummy_delta']].mean().rename({'_dummy_delta': '_dummy_mean'}, axis=1)
         _df_std = _df_out_grouped[['_dummy_delta']].std().rename({'_dummy_delta': '_dummy_std'}, axis=1)
         _df_cutoff = _df_mean.join(_df_std).reset_index()
 
-        _df = pd.merge(_df, _df_cutoff, on=groupby, how='inner')
-        _df[col] = np.where(
-            np.abs(_df['_dummy_delta'] - _df['_dummy_mean']) <= (std_cutoff * _df['_dummy_std']),
-            _df[col], np.nan)
+        df = pd.merge(df, _df_cutoff, on=groupby, how='inner')
+        df[col] = np.where(
+            np.abs(df['_dummy_delta'] - df['_dummy_mean']) <= (std_cutoff * df['_dummy_std']),
+            df[col], np.nan)
 
-        _df = _df.drop(['_dummy', '_dummy_mean', '_dummy_std', '_dummy_delta'], axis=1)
+        df = df.drop(['_dummy', '_dummy_mean', '_dummy_std', '_dummy_delta'], axis=1)
 
-    if '__groupby' in _df.columns:
-        _df = _df.drop('__groupby', axis=1)
+    if '__groupby' in df.columns:
+        df = df.drop('__groupby', axis=1)
 
-    return _df
+    return df
 
 
 @export
@@ -341,18 +360,17 @@ def pass_by_group(df: pd.DataFrame, col: str, groupby: Union[str, list], btype: 
     :param order: order of the filter
     :return: filtered DataFrame
     """
-    _df = df.copy()
-    del df
+    df = pd.DataFrame(df).copy()
 
-    _df_out_grouped = _df.groupby(groupby)
+    _df_out_grouped = df.groupby(groupby)
 
     # apply highpass filter
-    _df[col] = np.concatenate(
+    df[col] = np.concatenate(
         _df_out_grouped[col].apply(butter_pass_filter, cutoff, fs, order, btype, shift).values).flatten()
 
-    _df = _df.reset_index(drop=True)
+    df = df.reset_index(drop=True)
 
-    return _df
+    return df
 
 
 @export
@@ -1917,68 +1935,92 @@ def resample(df, rule=1, on=None, groupby=None, agg='mean', columns=None, adj_co
     return _df
 
 
-def df_count(x, df, hue=None, sort_by_count=True, top_nr=5, x_int=None, x_min=None, x_max=None, other_name='other',
-             na='drop'):
+@docstr
+@export
+def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count: bool = True, top_nr: int = 5,
+             x_base: Optional[float] = None, x_min: Optional[float] = None, x_max: Optional[float] = None,
+             other_name: str = 'other', na: Union[bool, str] = 'drop') -> pd.DataFrame:
+    """
+    Create a DataFrame of value counts. Supports hue levels and is therefore useful for plots, for an application
+    see :func: `~hhpy.plotting.countplot`.
+
+    :param x: %(x)s
+    :param df: %(df)s
+    :param hue: %(hue)s
+    :param sort_by_count: Whether to sort the DataFrame by value counts [optional]
+    :param top_nr: %(top_nr)s
+    :param x_base: if supplied: cast x to integer multiples of x_base, useful when you have float data that would
+        result in many unique counts for close numbers [optional]
+    :param x_min: limit the range of valid numeric x values to be greater than or equal to x_min [optional]
+    :param x_max: limit the range of valid numeric x values to be less than or equal to x_max [optional]
+    :param other_name: %(other_name)s
+    :param na: whether to keep (True, 'keep') na values and implicitly cast to string
+        or drop (False, 'drop') them [optional]
+    :return: pandas DataFrame containing the counts by x (and by hue if it is supplied)
+    """
     # -- init
-    _df = df.copy()
-    del df
+    # avoid inplace operations
+    df = df.copy()
 
-    if na != 'drop':
-        _df[x] = _df[x].astype(str).fillna('NaN')
+    # if applicable: cast na to string
+    if na and na != 'drop':
+        df[x] = df[x].astype(str).fillna('NaN')
         if hue is not None: 
-            _df[hue] = _df[hue].astype(str).fillna('NaN')
+            df[hue] = df[hue].astype(str).fillna('NaN')
 
-    if not top_nr: 
-        top_nr = None
-
+    # in case the original column is already called count it is renamed to count_org
     if x == 'count':
         x = 'count_org'
-        _df = _df.rename({'count': 'count_org'}, axis=1)
+        df = df.rename({'count': 'count_org'}, axis=1)
 
     # -- preprocessing
-    if x_int is not None:
+    if x_base:
 
-        _df[x] = np.round(_df[x] / x_int) * x_int
-        if isinstance(x_int, int): 
-            _df[x] = _df[x].astype(int)
+        # round to multiples of x_int
+        df[x] = np.round(df[x] / x_base) * x_base
+        if isinstance(x_base, int):
+            df[x] = df[x].astype(int)
 
-        if x_min is None: 
-            x_min = _df[x].min()
-        if x_max is None: 
-            x_max = _df[x].max()
-
-        _df_xs = pd.DataFrame({x: range(x_min, x_max, x_int)})
+        # apply x limits
+        if x_min is None:
+            x_min = df[x].min()
+        if x_max is None:
+            x_max = df[x].max()
+        _df_xs = pd.DataFrame({x: range(x_min, x_max, x_base)})
         _xs_on = [x]
 
+        # init hues
         if hue is not None:
-            _df_hues = _df[[hue]].drop_duplicates().reset_index().assign(_dummy=1)
+            _df_hues = df[[hue]].drop_duplicates().reset_index().assign(_dummy=1)
             _df_xs = pd.merge(_df_xs.assign(_dummy=1), _df_hues, on='_dummy').drop(['_dummy'], axis=1)
             _xs_on = _xs_on + [hue]
             
     else:
-        _df_xs = pd.DataFrame()
-        _xs_on = []
+        # apply x limits (ignored if not numeric)
+        if x in df.select_dtypes(np.number):
+            if x_min:
+                df[x] = df[x].where(lambda _: _ >= x_min, x_min)
+            if x_max:
+                df[x] = df[x].where(lambda _: _ <= x_max, x_max)
 
-    # dummy
-    _df['_count'] = 1
-
-    # group values outside of top_n to other_name
-    if top_nr is not None:
-
-        _df[x] = top_n_coding(s=_df[x], n=top_nr, other_name=other_name)
-
+    # if applicable: apply top_n_coding (both x and hue)
+    if top_nr:
+        df[x] = top_n_coding(s=df[x], n=top_nr, other_name=other_name)
         if hue is not None:
-            _df[hue] = top_n_coding(s=_df[hue], n=top_nr, other_name=other_name)
+            df[hue] = top_n_coding(s=df[hue], n=top_nr, other_name=other_name)
 
-    # init df with counts
+    # init groupby
     _groupby = [x]
     if hue is not None: 
         _groupby = _groupby + [hue]
 
-    _df_count = _df.groupby(_groupby).agg({'_count': 'sum'}).reset_index().rename({'_count': 'count'}, axis=1)
+    # we use a dummy column called count and sum over it by group to retain the original x column values
+    _df_count = df.assign(count=1).groupby(_groupby).agg({'count': 'sum'}).reset_index()
 
-    # append 0 entries for numerical x
-    if x_int is not None:
+    # if applicable: append 0 entries for numerical x inside x_range
+    if x_base:
+        # was already called with same if before
+        # noinspection PyUnboundLocalVariable
         _df_count = pd.merge(_df_count, _df_xs, on=_xs_on, how='outer')
         _df_count['count'] = _df_count['count'].fillna(0)
 
@@ -1990,7 +2032,6 @@ def df_count(x, df, hue=None, sort_by_count=True, top_nr=5, x_int=None, x_min=No
         _df_count[_count_hue] = _df_count['count'].sum()
         _df_count[_count_x] = _df_count['count']
     else:
-
         _df_count[_count_x] = _df_count.groupby(x)['count'].transform(pd.Series.sum)
         _df_count[_count_hue] = _df_count.groupby(hue)['count'].transform(pd.Series.sum)
 
@@ -2087,12 +2128,12 @@ def top_n_coding(s: Sequence, n: int, other_name: str = 'other', na_to_other: bo
     """
     returns a modified version of the pandas series where all elements not in top_n become recoded as 'other'
 
-    :param s: pandas Series to adjust
-    :param n: how many elements to keep
-    :param other_name: name of the other element [optional]
-    :param na_to_other: whether to cast missing elements to other [optional]
-    :param w: weights, if given the weights are summed instead of just counting entries in s [optional]
-    :return: adjusted pandas Series
+    :param s: Pandas Series to adjust
+    :param n: How many unique elements to keep
+    :param other_name: Name of the other element [optional]
+    :param na_to_other: Whether to cast missing elements to other [optional]
+    :param w: Weights, if given the weights are summed instead of just counting entries in s [optional]
+    :return: Adjusted pandas Series
     """
 
     # we have to cast to string so we can set the other name
@@ -2139,21 +2180,19 @@ def k_split(df: pd.DataFrame, k: int = 5, groupby: Union[Sequence, str] = None,
         tprint('splitting 1:{} ...'.format(k))
 
     # -- init
-    _df = df.copy()
-    del df
-
-    _index_name = _df.index.name
-    _df['_index'] = _df.index.copy()
-    _df = _df.reset_index(drop=True)
-    _k_split = int(np.ceil(_df.shape[0] / k))
+    df = df.copy()
+    _index_name = df.index.name
+    df['_index'] = df.index.copy()
+    df = df.reset_index(drop=True)
+    _k_split = int(np.ceil(df.shape[0] / k))
 
     if groupby is None:
         groupby = '_dummy'
-        _df['_dummy'] = 1
+        df['_dummy'] = 1
 
     _df_out = []
 
-    for _index, _df_i in _df.groupby(groupby):
+    for _index, _df_i in df.groupby(groupby):
 
         # sort (randomly or by given value)
         if sortby is None:

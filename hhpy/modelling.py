@@ -406,7 +406,7 @@ class Models(_BaseModel):
         self.__name__ = 'hhpy.modelling.Models'
         self.models = _models
         self.fit_type = None
-        self.df = df
+        self.df = df.copy()
         self.X_ref = force_list(X_ref)
         self.y_ref = force_list(y_ref)
         self.scaler_X = scaler_X
@@ -449,11 +449,12 @@ class Models(_BaseModel):
         return _models
 
     @docstr
-    def fit(self, fit_type: str = 'train_test', do_print: bool = True):
+    def fit(self, fit_type: str = 'train_test',  k_test: Optional[int] = None, do_print: bool = True):
         """
         fit all Model objects in collection
         
         :param fit_type: one of %(fit_valid_fit_types)s
+        :param k_test: which k_index to use as test data
         :param do_print: %(do_print)s
         :return: None
         """
@@ -484,7 +485,9 @@ class Models(_BaseModel):
 
         if fit_type == 'train_test':
             _k_tests = [_df_scaled['_k_index'].max()]
-            self.df['_test'] = self.df['_k_index'] == _k_tests[0]
+            if k_test is None:
+                k_test = _k_tests[0]
+            self.df['_test'] = self.df['_k_index'] == k_test
         elif fit_type == 'k_cross':
             _k_tests = sorted(_df_scaled['_k_index'].unique())
         else:
@@ -643,9 +646,9 @@ class Models(_BaseModel):
     @docstr
     def train(self, df: pd.DataFrame = None, k: int = 5, groupby: Union[Sequence, str] = None,
               sortby: Union[Sequence, str] = None, random_state: int = None, fit_type: str = 'train_test',
-              ensemble: bool = False, scores: Union[Sequence, str] = None, scale: float = None,
-              do_predict: bool = True, do_score: bool = True, do_split: bool = True, do_fit: bool = True,
-              do_print: bool = True, display_score: bool = True):
+              k_test: Optional[int] = None, ensemble: bool = False, scores: Union[Sequence, str] = None,
+              scale: float = None, do_predict: bool = True, do_score: bool = True, do_split: bool = True,
+              do_fit: bool = True, do_print: bool = True, display_score: bool = True):
         """
         wrapper method that combined k_split, train, predict and score
 
@@ -655,6 +658,7 @@ class Models(_BaseModel):
         :param sortby: see hhpy.ds.k_split
         :param random_state: see hhpy.ds.k_split
         :param fit_type: see .fit
+        :param k_test: see .fit
         :param ensemble: %(ensemble)s
         :param scores: see .score
         :param scale: see .score
@@ -672,7 +676,7 @@ class Models(_BaseModel):
         if do_split:
             self.k_split(k=k, groupby=groupby, sortby=sortby, random_state=random_state, do_print=do_print)
         if do_fit:
-            self.fit(fit_type=fit_type, do_print=do_print)
+            self.fit(fit_type=fit_type, k_test=k_test, do_print=do_print)
         if do_predict:
             self.predict(ensemble=ensemble, do_print=do_print)
         if do_score:
