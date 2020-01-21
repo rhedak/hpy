@@ -15,12 +15,28 @@ import os
 import sys
 import datetime
 import h5py
+import re
 
 # third party imports
-from typing import Any, Callable, Union, Sequence, Mapping, List
+from typing import Any, Callable, Union, Sequence, Mapping, List, Optional
+from docrep import DocstringProcessor
+from collections import defaultdict
+from copy import deepcopy
+from time import sleep
+from json import JSONDecodeError
 
 # optional imports
-from docrep import DocstringProcessor
+try:
+    # noinspection PyPackageRequirements
+    from googletrans import Translator
+except ImportError:
+    Translator = None
+try:
+    # noinspection PyPackageRequirements
+    import emoji
+except ImportError:
+    emoji = None
+
 
 # --- init
 pd.plotting.register_matplotlib_converters()
@@ -29,10 +45,24 @@ pd.options.mode.chained_assignment = None
 # --- constants
 global_t = datetime.datetime.now()  # for times progress bar
 global_tprint_len = 0  # for temporary printing
+Scalar = Union[int, float, str, bytes]
+ListOfScalars = Union[List[Scalar], Scalar]
+SequenceOrScalar = Union[Sequence, Scalar]
 
 rcParams = {
     'tprint.r_loc': 'front'
 }
+
+# --- constants
+validations = {
+    'reformat_string__case': ['lower', 'upper'],
+}
+
+docstr = DocstringProcessor(
+    df='Pandas DataFrame containing the data',
+    x='Main variable, name of a column in the DataFrame or vector data',
+    **validations
+)
 
 
 # --- decorators
@@ -43,6 +73,173 @@ def export(fn):
     else:
         mod.__all__ = [fn.__name__]
     return fn
+
+
+# --- classes
+@export
+class BaseClass:
+    """
+        Base class for various classes deriving from this. Implements __repr__, converting to dict as well as
+        saving to pickle and restoring from pickle.
+    """
+
+    def __init__(self, name: str = None):
+
+        self.__name__ = 'hhpy.main.Base'
+        self.__attributes__ = ['__name__', 'name']
+        self.name = name
+
+    def __repr__(self):
+        _str = self.__name__ + '('
+
+        _it = -1
+        for _attr in self.__attributes__[1:]:
+            _it += 1
+            if _it > 0:
+                _str += ', '
+            _str += '{}={}'.format(_attr, self.__getattribute__(_attr))
+
+        _str += ')'
+
+        return _str
+
+    def to_dict(self):
+        """
+        Converts self to a dictionary
+
+        :return: None
+        """
+
+        _dict = {}
+        for _attr_name in self.__attributes__:
+            _attr = self.__getattribute__(_attr_name)
+            if 'to_dict' in dir(_attr):
+                _attr = _attr.to_dict()
+            elif is_list_like(_attr):
+                if isinstance(_attr, Mapping):
+                    for _key, _value in _attr.items():
+                        if 'to_dict' in dir(_value):
+                            _attr[_key] = _value.to_dict()
+                else:
+                    for _i in range(len(_attr)):
+                        if 'to_dict' in dir(_attr[_i]):
+                            _attr[_i] = _attr[_i].to_dict()
+            _dict[_attr_name] = _attr
+
+        return _dict
+
+    def from_dict(self, dct: Mapping):
+        """
+        Restores self from a dictionary
+
+        :param dct: Dictionary created from :meth:`~BaseClass.to_dict`
+        :return: None
+        """
+
+        for _attr_name in self.__attributes__:
+            if _attr_name not in dct.keys():
+                continue
+            _attr = dct[_attr_name]
+            if is_list_like(_attr):
+                if isinstance(_attr, Mapping):
+
+                    if '__name__' in _attr.keys():
+
+                        _name = _attr['__name__']
+                        if _name[:3] == 'cf.':
+                            _name = _name[3:]
+                        _attr_eval = eval(_name + '()')
+                        if 'from_dict' in dir(_attr_eval):
+                            _attr_eval.from_dict(_attr)
+                        _attr = _attr_eval
+
+                    else:
+
+                        for _attr_key, _attr_value in _attr.items():
+
+                            if isinstance(_attr_value, Mapping):
+
+                                if '__name__' in _attr_value.keys():
+
+                                    _name = _attr_value['__name__']
+                                    if _name[:3] == 'cf.':
+                                        _name = _name[3:]
+                                    _attr_eval = eval(_name + '()')
+                                    if 'from_dict' in dir(_attr_eval):
+                                        _attr_eval.from_dict(_attr_value)
+                                    _attr[_attr_key] = _attr_eval
+
+                else:
+                    for _i in range(len(_attr)):
+
+                        _attr_value = _attr[_i]
+
+                        if isinstance(_attr_value, Mapping):
+
+                            if '__name__' in _attr_value.keys():
+
+                                _name = _attr_value['__name__']
+                                if _name[:3] == 'cf.':
+                                    _name = _name[3:]
+                                _attr_eval = eval(_name + '()')
+                                if 'from_dict' in dir(_attr_eval):
+                                    _attr_eval.from_dict(_attr_value)
+                                _attr[_i] = _attr_eval
+
+            self.__setattr__(_attr_name, _attr)
+
+    def save(self, filename: str, f: Callable = pd.to_pickle):
+        """
+        Save self to file using an arbitrary function that supports saving dictionaries. Note that the object
+        is implicitly converted to a dictionary before saving.
+
+        :param filename: filename (path) to be used
+        :param f: function to be used [optional]
+        :return: None
+        """
+        _dict = self.copy().to_dict()
+        f(_dict, filename)
+
+    def load(self, filename: str, f: Callable = pd.read_pickle):
+        """
+        Load self from file saved with :meth:`~BaseClass.save` using an arbitrary function that supports loading
+        dictionaries.
+
+        :param filename: filename (path) of the file
+        :param f: function to be used [optional]
+        :return: None
+        """
+        self.from_dict(f(filename))
+
+    def to_pickle(self, *args, **kwargs):
+        """
+        Wrapper for :meth:`~BaseClass.save` using f =
+        `pandas.to_pickle <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_pickle.html>`_
+
+        :param args: passed to save [optional]
+        :param kwargs: passed to save [optional]
+        :return: see save
+        """
+        self.save(*args, f=pd.to_pickle, **kwargs)
+
+    def read_pickle(self, *args, **kwargs):
+        """
+        Wrapper for :meth:`BaseClass.load` using f =
+        `pandas.read_pickle <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_pickle.html>`_
+
+        :param args: passed to load [optional]
+        :param kwargs: passed to load [optional]
+        :return: see load
+        """
+        self.load(*args, f=pd.read_pickle, **kwargs)
+
+    def copy(self):
+        """
+        Uses `copy.deepcopy <https://docs.python.org/3/library/copy.html>`_ to return a copy of the object
+
+        :return: Copy of self
+        """
+        return deepcopy(self)
 
 
 # --- functions
@@ -562,7 +759,7 @@ def concat_cols(df: pd.DataFrame, columns: list, sep: str = '_', to_int: bool = 
 
 
 @export
-def list_unique(lst: list) -> list:
+def list_unique(lst: Any) -> list:
     """
     Returns unique elements from a list
 
@@ -573,7 +770,7 @@ def list_unique(lst: list) -> list:
 
 
 @export
-def list_flatten(lst: list) -> list:
+def list_flatten(lst: Any) -> list:
     """
     Flatten a list of lists
 
@@ -584,7 +781,7 @@ def list_flatten(lst: list) -> list:
 
 
 @export
-def list_merge(*args, unique=True, flatten=False) -> list:
+def list_merge(*args: Any, unique: bool = True, flatten: bool = False) -> list:
     """
     Merges n lists together
 
@@ -614,7 +811,7 @@ def list_merge(*args, unique=True, flatten=False) -> list:
 
 
 @export
-def list_intersection(lst: list, *args: list) -> list:
+def list_intersection(lst: SequenceOrScalar, *args: SequenceOrScalar) -> list:
     """
     Returns common elements of n lists
 
@@ -623,17 +820,17 @@ def list_intersection(lst: list, *args: list) -> list:
     :return: the list of common elements
     """
     # more performant than list comprehension
-    _list_out = list(lst)
+    _list_out = force_list(lst)
 
     for _arg in args:
-        _list = list(_arg)
+        _list = force_list(_arg)
         _list_out = list(set(_list_out).intersection(_list))
 
     return _list_out
 
 
 @export
-def list_exclude(lst: list, *args: list) -> list:
+def list_exclude(lst: SequenceOrScalar, *args: SequenceOrScalar) -> list:
     """
     Returns a list that includes only those elements from the first list that are not in any subsequent list.
     Can also be called with non list args, then those elements are removed.
@@ -643,7 +840,7 @@ def list_exclude(lst: list, *args: list) -> list:
     :return: the filtered list
     """
     # more performant than list comprehension
-    _list_out = list(lst)
+    _list_out = force_list(lst)
 
     for _arg in args:
         if _arg in _list_out:
@@ -695,14 +892,18 @@ def rand(shape: tuple = None, lower: int = None, upper: int = None, step: int = 
 
 
 @export
-def dict_list(*args) -> dict:
+def dict_list(*args, dict_type: str = 'defaultdict') -> dict:
     """
     Creates a dictionary of empty named lists. Useful for iteratively creating a pandas DataFrame
 
     :param args: The names of the lists
+    :param dict_type: Whether to use a 'regular' or 'defaultdict' (default to empty list) type dictionary
     :return: Dictionary of empty named lists
     """
-    _dict = {}
+    if dict_type == 'regular':
+        _dict = {}
+    else:
+        _dict = defaultdict(lambda _: [], {})
 
     for _arg in args:
         for _list in force_list(_arg):
@@ -749,18 +950,33 @@ def append_to_dict_list(dct: dict, append: Union[dict, list], inplace: bool = Tr
 
 
 @export
-def is_list_like(obj: Any) -> bool:
+def is_scalar(obj: Any) -> bool:
     """
-    Checks any python object to see if it is list like
+    Checks if a given python object is scalar, i.e. one of int, float, str, bytyes
 
     :param obj: Any python object
-    :return: Boolean
+    :return: True if scaler, else False
+    """
+
+    for _type in [int, float, str, bytes]:
+        if isinstance(obj, _type):
+            return True
+    return False
+
+
+@export
+def is_list_like(obj: Any) -> bool:
+    """
+    Checks if a given python object is list like. I.e. if it is a Sequence but not a string / bytyes object.
+
+    :param obj: Any python object
+    :return: True if list like, else False
     """
     return isinstance(obj, Sequence) and not isinstance(obj, (str, bytes))
 
 
 @export
-def force_list(*args) -> list:
+def force_list(*args: Any) -> list:
     """
     Takes any python object and turns it into an iterable list.
 
@@ -1017,3 +1233,121 @@ def roundup(x: Any, digits: int) -> Any:
     """
 
     return np.ceil(x * 10**digits) / 10**digits
+
+
+@docstr
+@export
+def reformat_string(string: str, case: Optional[str] = 'lower', replace: Optional[Mapping[str, str]] = None,
+                    lstrip: Optional[str] = ' ', rstrip: Optional[str] = ' ', demojize: bool = True,
+                    trans: bool = False, trans_dest: Optional[str] = 'en', trans_src: Optional[str] = 'auto',
+                    trans_sleep: Union[float, bool] = .4) -> str:
+    """
+    Function to quickly reformat a string to a specific convention. The default convention is only lowercase,
+    numbers and underscores. Also allows translation if optional dependency googletrans is installed.
+
+    :param string: input string to be reformatted
+    :param case: casts string to specified case, one of %(reformat_string__case)s [optional]
+    :param replace: Dictionary containing the replacements to be made passed to
+        `re.sub <https://docs.python.org/3/library/re.html>`_ . Defaults to replacing any non [a-zA-Z0-9]
+        string with '_'. Note that this means that special characters from other languages get replaced. If you don't
+        want that set replace to False or specify your own mapping. Is applied **last** so make sure your
+        conventions match [optional]
+    :param lstrip: The leading characters to be removed, passed to
+        `string.lstrip <https://docs.python.org/3/library/stdtypes.html>`_ [optional]
+    :param rstrip: The training characters to be removed, passed to
+        `string.rstrip <https://docs.python.org/3/library/stdtypes.html>`_ [optional]
+    :param demojize: Whether to remove emojis using `emoji.demojize <https://pypi.org/project/emoji/>`_ [optional]
+    :param trans: Whether to translate the string using
+        `googletrans.Translator.translate <https://py-googletrans.readthedocs.io/en/latest/#googletrans-translator>`_
+        [optional]
+    :param trans_dest: The language to translate from, passed to googletrans as dest=trans_dest [optional]
+    :param trans_src: The language to translate to, passed to googletrans as src=trans_src [optional]
+    :param trans_sleep: Amount of seconds to sleep before translating, should be at least .4 to avoid triggering
+        google's rate limits. Set it to lower values / None / False for a speedup at your own risk [optional]
+    :return: reformatted string
+    """
+    # -- init
+    if replace is None:
+        replace = {'[^A-Za-z0-9]': '_'}
+
+    # implicitly cast to string
+    string = str(string)
+
+    # -- demojize: (needs to come before trans)
+    if demojize:
+        if emoji:
+            string = emoji.demojize(string)
+        else:
+            warnings.warn('Missing optional dependency emoji, skipping demojize')
+
+    # -- trans: (needs to come after demojize but before the rest)
+    if trans:
+        assert Translator, 'Missing optional dependency googletrans'
+        _translator = Translator()
+        try:
+            # avoid rate limits
+            if trans_sleep:
+                sleep(trans_sleep)
+            # translate
+            string = _translator.translate(string, dest=trans_dest, src=trans_src).text
+        except JSONDecodeError:
+            warnings.warn(f'handled JSONDecodeError at {string}, this probably means that you exceeded the googletrans'
+                          f' rate limit and need to wait 24 hours.')
+        except Exception as _exc:
+            warnings.warn(f'handled exception " {type(_exc).__name__,}: {_exc}" when translating {string}, '
+                          f'skipping translation')
+
+    # -- case
+    if case:
+        if case == 'lower':
+            string = string.lower()
+        elif case == 'upper':
+            string = string.upper()
+        else:
+            warnings.warn(f'ignoring unknown case {case}')
+
+    # -- lstrip
+    if lstrip:
+        string = string.lstrip(lstrip)
+
+    # -- rstrip
+    if rstrip:
+        string = string.rstrip(rstrip)
+
+    # -- replace (comes last so that replacement rules but be defined accordingly)
+    for _exp, _replacement in replace.items():
+        string = re.sub(_exp, _replacement, string)
+
+    return string
+
+
+@export
+def dict_inv(dct: Mapping, key_as_str: bool = False) -> dict:
+    """
+    Returns an inverted copy of a given dictionary (if it is invertible)
+
+    :param dct: Dictionary to be inverted
+    :param key_as_str: Whether all keys of the inverted dictionary should be forced to string
+    :return: Inverted dictionary
+    """
+
+    _dct_inv = {}
+
+    for _key, _value in dct.items():
+        # assert scalar
+        if not is_scalar(_value):
+            raise ValueError(f'A non-scalar dictionary value is not invertible, found at key {_key}')
+        # assert non-duplicate value
+        _warn = True
+        while _value in _dct_inv.keys():
+            if _warn:
+                _warn = False
+                warnings.warn(f'duplicate value found at "{_key}: {_value}", appending _')
+            _value = str(_value) + '_'
+        # if applicable: convert value to string
+        if key_as_str:
+            _value = str(_value)
+        # assign
+        _dct_inv[_value] = _dct_inv[_key]
+
+    return _dct_inv

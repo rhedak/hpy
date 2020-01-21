@@ -20,23 +20,310 @@ from sklearn.preprocessing import StandardScaler
 from typing import Mapping, Sequence, Callable, Union, List, Optional
 
 # local imports
-from hhpy.main import export, force_list, tprint, progressbar, qformat, list_intersection, round_signif, is_list_like, \
-    dict_list, append_to_dict_list, concat_cols, DocstringProcessor
+from hhpy.main import export, BaseClass, force_list, tprint, progressbar, qformat, list_intersection, round_signif, \
+    is_list_like, dict_list, append_to_dict_list, concat_cols, DocstringProcessor, reformat_string, dict_inv, \
+    list_exclude
 
 # --- constants
+validations = {
+    'DFMapping__from_df__return_type': ['self', 'tuple']
+}
+
 docstr = DocstringProcessor(
     df='Pandas DataFrame containing the data',
     x='Main variable, name of a column in the DataFrame or vector data',
     hue='Name of the column to split by level [optional]',
-    top_nr='Number of unique levels to keep when applying :func: `~top_n_coding`',
+    top_nr='Number of unique levels to keep when applying :func:`~top_n_coding` [optional]',
     other_name='Name of the levels grouped inside other [optional]',
+    inplace='Whether to modify the DataFrame inplace [optional]',
+    printf='The function used for printing in-function messages. Set to None or False to suppress printing [optional]',
+    DFMapping__col_names='Whether to transform the column names [optional]',
+    DFMapping__values='Whether to transform the column values [optional]',
+    DFMapping__columns='Columns to transform, defaults to all columns [optional]',
 )
+
+
+# --- classes
+@export
+class DFMapping(BaseClass):
+    """
+    Mapping object bound to a pandas DataFrame that standardizes column names and values according to the chosen
+    conventions. Also implements google translation. Can be used like an sklearn scalar object.
+    The mapping can be saved and later used to restore the original shape of the DataFrame.
+    Note that the index is exempt.
+
+    :param name: name of the object [Optional]
+    :param df: a DataFrame to init on or path to a saved DFMapping object [Optional]
+    :param kwargs: other arguments passed to the respective init function
+    """
+
+    def __init__(self, name: str = 'DFMapping', df: Union[pd.DataFrame, str] = None, **kwargs):
+
+        self.col_mapping = {}
+        self.value_mapping = {}
+
+        # -- defaults
+        # if the function is called with only one argument attempt to parse it's type and act accordingly
+        if df is None:
+            # data frame is passed
+            if isinstance(name, pd.DataFrame):
+                df = name
+                name = 'DFMapping'
+            # string is passed: is it a path to an excel file?
+            elif isinstance(name, str) and (('.xls' in name) or ('.pkl' in name) or ('.pickle' in name)):
+                df = name
+                name = name.split('.')[0].split('/')[-1]
+
+        # DataFrame is passed: init from it
+        if isinstance(df, pd.DataFrame):
+            self.from_df(df, **kwargs)
+        # path to excel file is passed: init from it
+        elif isinstance(df, str):
+            if '.xlsx' in df:
+                self.from_excel(df)
+            else:
+                self.from_pickle(df)
+
+        # -- attributes
+        super().__init__(name)
+        self.__name__ = 'hhpy.ds.DFMapping'
+        self.__attributes__ = ['__name__', 'name', 'col_mapping', 'value_mapping']
+
+    @docstr
+    def from_df(self, df: pd.DataFrame, col_names: bool = True, values: bool = True,
+                columns: Optional[List[str]] = None, return_type: str = 'self', printf: Callable = tprint,
+                duplicate_limit: int = 10, **kwargs):
+        """
+        Initialize the DFMapping from a pandas DataFrame.
+
+        :param df: %(df)s
+        :param col_names: %(DFMapping__col_names)s
+        :param values:  %(DFMapping__values)s
+        :param columns: %(DFMapping__columns)s
+        :param return_type: if 'self': writes to self, 'tuple' returns (col_mapping, value_mapping) [optional]
+        :param printf: %(printf)s
+        :param duplicate_limit: allowed number of reformated duplicates per column, each duplicate is suffixed with '_'
+            but if you have too many you likely have a column of non allowed character strings and the mapping
+            would take a very long time. The duplicate handling therefor stops and a warning is triggered
+             since the transformation is no longer invertible. Consider excluding the column or using cat codes
+              [optional]
+        :param kwargs: Other keyword arguments passed to :func:`~hhpy.main.reformat_string` [optional]
+        :return: see return_type
+        """
+
+        # -- init
+        # assert
+        if return_type not in validations['DFMapping__from_df__return_type']:
+            warnings.warn(f'Unknown return_type {return_type}, falling back to self')
+            return_type = 'self'
+
+        # avoid inplace operations
+        df = pd.DataFrame(df).copy()
+
+        # -- main
+        # extract columns
+        if columns:
+            _columns = columns
+        else:
+            _columns = df.columns
+
+        # init mappings
+        _col_mapping = {}
+        _value_mapping = {}
+        _str_columns = df.select_dtypes(['object', 'category']).columns
+
+        # loop columns
+        for _it, _column in enumerate(_columns):
+            # progressbar
+            if printf:
+                progressbar(_it, len(_columns), printf=printf, print_prefix=f'{_column}: ')
+            # map col name
+            if col_names:
+                _reformated_column = reformat_string(_column, **kwargs)
+                # careful: it is possible that the reformated string is a duplicate, in this case we append '_' to the
+                # string until it is no longer a duplicate
+                _it_ = 0
+                while _reformated_column in _col_mapping.values():
+                    _reformated_column += '_'
+                    _it_ += 1
+                    if _it_ == 10:
+                        warnings.warn(f'too many reformated duplicates in column names')
+                        break
+                # assign to dict
+                _col_mapping[_column] = _reformated_column
+            # check if column is string like
+            if _column in _str_columns:
+                # get unique values
+                _uniques = df[_column].drop_duplicates().values
+                # map
+                if values:
+                    _value_mapping[_column] = {}
+                    _it_u_max = len(_uniques)
+                    for _it_u, _unique in enumerate(_uniques):
+                        # progressbar
+                        if printf:
+                            progressbar(_it, len(_columns), printf=printf,
+                                        print_prefix=f'{_column}: {_it_u} / {_it_u_max}')
+                        # reformat
+                        _reformated_unique = reformat_string(_unique, **kwargs)
+                        # careful: it is possible that the reformated string is a duplicate, in this case we
+                        # append '_' to the string until it is no longer a duplicate
+                        _it_ = 0
+                        while _reformated_unique in _value_mapping[_column].values():
+                            _reformated_unique += '_'
+                            _it_ += 1
+                            if _it_ == 10:
+                                warnings.warn(f'too many reformated duplicates in column {_column}')
+                                break
+                        # assign to dict
+                        _value_mapping[_column][_unique] = _reformated_unique
+        # progressbar 100%
+        if printf:
+            progressbar(printf=printf)
+
+        if return_type == 'self':
+            self.col_mapping = _col_mapping
+            self.value_mapping = _value_mapping
+        else:  # return_type == 'tuple'
+            return self.col_mapping, self.value_mapping
+
+    def fit(self, *args, **kwargs):
+        """
+        Alias for :meth:`~DFMapping.from_df` to be inline with sklearn conventions
+
+        :param args: passed to from_df
+        :param kwargs: passed to from_df
+        :return: see from_df
+        """
+
+    @docstr
+    def transform(self, df: pd.DataFrame, col_names: bool = True, values: bool = True,
+                  columns: Optional[List[str]] = None, inverse: bool = False,
+                  inplace: bool = False) -> Optional[pd.DataFrame]:
+        """
+        Apply a mapping created using :func:`~create_df_mapping`. Intended to make a DataFrame standardized and
+        human readable. The same mapping can also be applied with inverse=True to restore the original form
+        of the transformed DataFrame.
+
+        :param df: %(df)s
+        :param col_names: %(DFMapping__col_names)s
+        :param values:  %(DFMapping__values)s
+        :param columns: %(DFMapping__columns)s
+        :param inverse: Whether to apply the mapping in inverse order to restore the original form of the DataFrame
+            [optional]
+        :param inplace: %(inplace)s
+        :return: if inplace: None, else: Transformed DataFrame
+        """
+        # -- init
+        # handle inplace
+        if not inplace:
+            df = pd.DataFrame(df).copy()
+        # get helpers
+        if col_names:
+            _col_mapping = self.col_mapping
+        else:
+            _col_mapping = {}
+        if values:
+            _value_mapping = self.value_mapping
+        else:
+            _value_mapping = {}
+        if columns:
+            _columns = columns
+        else:
+            _columns = df.columns
+
+        # -- main
+        # if inverse: rename columns first
+        if _col_mapping:
+            if inverse:
+                _col_mapping = dict_inv(_col_mapping)
+                df.columns = [_col_mapping.get(_, _) for _ in _columns]
+            else:
+                _columns = [_col_mapping.get(_, _) for _ in _columns]
+
+        # replace values
+        for _key, _mapping in _value_mapping.items():
+
+            # if applicable: inverse mapping
+            if inverse:
+                _mapping = dict_inv(_mapping)
+            # replace column values
+            df[_key] = df[_key].replace(_mapping)
+
+        # if not inverse: rename columns last
+        if not inverse:
+            df.columns = _columns
+
+        # -- return
+        if not inplace:
+            return df
+
+    def inverse_transform(self, *args, **kwargs):
+        """
+        wrapper for :meth:`DFMapping.transform` with inverse=True
+
+        :param args: passed to transform
+        :param kwargs: passed to transform
+        :return: see transform
+        """
+
+        return self.transform(*args, inverse=True, **kwargs)
+
+    @docstr
+    def fit_transform(self, df: pd.DataFrame, col_names: bool = True, values: bool = True,
+                          columns: Optional[List[str]] = None, kwargs_fit: Mapping = {}, **kwargs):
+        """
+        First applies :meth:`DFMapping.from_df` (which has alias fit) and then :meth:`DFMapping.transform`
+
+        :param df: pandas DataFrame to fit against and then transform.
+        :param col_names: %(DFMapping__col_names)s
+        :param values:  %(DFMapping__values)s
+        :param columns: %(DFMapping__columns)s
+        :param kwargs: passed to transform
+        :return: None
+        """
+        self.fit(df=df, col_names=col_names, values=values, columns=columns, **kwargs_fit)
+        self.transform(df=df, col_names=col_names, values=values, columns=columns, **kwargs)
+
+    def to_excel(self, path):
+        """
+        Save the DFMapping object as an excel file. Useful if you want to edit the results of the automatically
+        generated object to fit your specific needs.
+
+        :param path: Path to save the excel file to
+        :return: None
+        """
+        # open ExcelWriter object
+        with pd.ExcelWriter(path) as _writer:
+            # col mapping
+            pd.DataFrame(self.col_mapping, index=[0]).T.to_excel(_writer, sheet_name='__columns__')
+            # value mapping
+            for _key, _mapping in self.value_mapping.items():
+                pd.DataFrame(_mapping, index=[0]).T.to_excel(_writer, sheet_name=_key)
+
+    def from_excel(self, path):
+        """
+        Init the DFMapping object from an excel file. For example you could auto generate a DFMapping using googletrans
+        and then adjust the translations you feel are inappropriate in the excel file. Then regenerate the object
+        from the edited excel file.
+
+        :param path: Path to the excel file
+        :return: None
+        """
+        def _read_excel(xls, sheet_name):
+            return pd.read_excel(xls, sheet_name, index_col=0).T.to_dict(orient='records')[0]
+        # open ExcelFile
+        with pd.ExcelFile(path) as _xls:
+            self.col_mapping = _read_excel(xls=_xls, sheet_name='__columns__')
+            self.value_mapping = {}
+            for _sheet_name in list_exclude(_xls.sheet_names, '__columns__'):
+                self.value_mapping[_sheet_name] = _read_excel(xls=_xls, sheet_name=_sheet_name)
 
 
 # --- functions
 @export
 def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_cat: bool = True, cat_frac: float = .5,
-                float_to_int: bool = True, float_digits: Optional[int] = None) -> pd.DataFrame:
+                float_to_int: bool = False, float_digits: Optional[int] = None) -> pd.DataFrame:
     """
     optimize memory usage of a pandas df, automatically downcast all var types and converts objects to categories
 
@@ -64,7 +351,10 @@ def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_ca
             # integer dtype is different if it can contain NaN
             _s = df[_col].copy()
             # check if column contains NaN
-            if _s.isnull().sum() > 0:
+            # if all values are NaN -> skip column
+            if _s.isnull().all():
+                continue
+            elif _s.isnull().sum() > 0:
                 # nullable dtype
                 _int_dtype = pd.Int64Dtype()
                 # comparison with NaN is always false
@@ -112,7 +402,7 @@ def get_df_corr(df: pd.DataFrame, columns: List[str] = None, target: str = None,
                 groupby: Union[str, list] = None) -> pd.DataFrame:
     """
     Calculate Pearson Correlations for numeric columns, extends on pandas.DataFrame.corr but automatically
-    melts the output. Used by :func: `~hhpy.plotting.corrplot_bar`
+    melts the output. Used by :func:`~hhpy.plotting.corrplot_bar`
 
     :param df: input pandas DataFrame. Other objects are implicitly cast to DataFrame
     :param columns: Column to calculate the correlation for, defaults to all numeric columns [optional]
@@ -1942,7 +2232,7 @@ def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count:
              other_name: str = 'other', na: Union[bool, str] = 'drop') -> pd.DataFrame:
     """
     Create a DataFrame of value counts. Supports hue levels and is therefore useful for plots, for an application
-    see :func: `~hhpy.plotting.countplot`.
+    see :func:`~hhpy.plotting.countplot`
 
     :param x: %(x)s
     :param df: %(df)s
@@ -2106,7 +2396,7 @@ def numeric_to_group(pd_series, step=None, outer_limit=4, suffix=None, use_abs=F
 @export
 def top_n(s: Sequence, n: int, w: Optional[Sequence] = None) -> list:
     """
-    select n elements form a categorical pandas series with the highest counts
+    Select n elements form a categorical pandas series with the highest counts
 
     :param s: pandas Series to select from
     :param n: how many elements to return
@@ -2126,7 +2416,7 @@ def top_n(s: Sequence, n: int, w: Optional[Sequence] = None) -> list:
 def top_n_coding(s: Sequence, n: int, other_name: str = 'other', na_to_other: bool = False,
                  w: Optional[Sequence] = None) -> pd.Series:
     """
-    returns a modified version of the pandas series where all elements not in top_n become recoded as 'other'
+    Returns a modified version of the pandas series where all elements not in top_n become recoded as 'other'
 
     :param s: Pandas Series to adjust
     :param n: How many unique elements to keep
@@ -2160,7 +2450,7 @@ def k_split(df: pd.DataFrame, k: int = 5, groupby: Union[Sequence, str] = None,
             sortby: Union[Sequence, str] = None, random_state: int = None, do_print: bool = True,
             return_type: Union[str, int] = 1) -> Union[pd.Series, tuple]:
     """
-    splits a DataFrame into k (equal sized) parts that can be used for train test splitting or k_cross splitting
+    Splits a DataFrame into k (equal sized) parts that can be used for train test splitting or k_cross splitting
 
     :param df: pandas DataFrame to be split
     :param k: how many (equal sized) parts to split the DataFrame into [optional]

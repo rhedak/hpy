@@ -10,3 +10,4 @@ requests
 IPython
 docrep
 h5py
+openpyxl

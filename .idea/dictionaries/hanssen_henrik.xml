@@ -33,6 +33,11 @@
       <w>customizeable</w>
       <w>datapoint</w>
       <w>dataset</w>
+      <w>defaultdic</w>
+      <w>defaultdict</w>
+      <w>demojize</w>
+      <w>dest</w>
+      <w>dfmapping</w>
       <w>distfit</w>
       <w>distfits</w>
       <w>distkws</w>
@@ -42,6 +47,8 @@
       <w>dropna</w>
       <w>dtype</w>
       <w>edgecolor</w>
+      <w>emoji</w>
+      <w>emojis</w>
       <w>errorbars</w>
       <w>facecolor</w>
       <w>figsize</w>
@@ -52,6 +59,7 @@
       <w>frac</w>
       <w>fwhm</w>
       <w>ggplot</w>
+      <w>googletrans</w>
       <w>gridf</w>
       <w>groupby</w>
       <w>hacky</w>
@@ -65,6 +73,7 @@
       <w>iloc</w>
       <w>importances</w>
       <w>includehidden</w>
+      <w>inversible</w>
       <w>isin</w>
       <w>iterpolate</w>
       <w>iterrows</w>
@@ -80,6 +89,7 @@
       <w>linestyle</w>
       <w>locs</w>
       <w>lowpass</w>
+      <w>lstrip</w>
       <w>mahalanobis</w>
       <w>matplotlib</w>
       <w>maxcount</w>
@@ -87,6 +97,7 @@
       <w>maxperc</w>
       <w>maxs</w>
       <w>medae</w>
+      <w>meth</w>
       <w>mins</w>
       <w>nbviewer</w>
       <w>ncol</w>
@@ -96,6 +107,7 @@
       <w>novec</w>
       <w>nrows</w>
       <w>numpydoc</w>
+      <w>openpyxl</w>
       <w>pcolor</w>
       <w>pcolormesh</w>
       <w>perc</w>
@@ -114,6 +126,7 @@
       <w>quantile</w>
       <w>quantiles</w>
       <w>quickstart</w>
+      <w>reformated</w>
       <w>regressors</w>
       <w>resample</w>
       <w>resampling</w>
@@ -122,6 +135,7 @@
       <w>rmsdplot</w>
       <w>rmse</w>
       <w>rounddown</w>
+      <w>rstrip</w>
       <w>scaler</w>
       <w>scatterplot</w>
       <w>scikit</w>
@@ -143,6 +157,7 @@
       <w>subaxes</w>
       <w>suptitle</w>
       <w>tdelta</w>
+      <w>testdata</w>
       <w>ticklabels</w>
       <w>timepoints</w>
       <w>toctree</w>
@@ -159,6 +174,7 @@
       <w>xlabel</w>
       <w>xlim</w>
       <w>xlims</w>
+      <w>xlsx</w>
       <w>xticklabels</w>
       <w>xylim</w>
       <w>yaxis</w>

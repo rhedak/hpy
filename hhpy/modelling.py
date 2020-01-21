@@ -27,7 +27,7 @@ except ImportError:
     display = print
 
 # local imports
-from hhpy.main import export, is_list_like, force_list, tprint, DocstringProcessor
+from hhpy.main import export, BaseClass, is_list_like, force_list, tprint, DocstringProcessor
 from hhpy.ds import k_split, df_score
 from hhpy.plotting import ax_as_list, legend_outside, rcParams as hpt_rcParams, docstr as docstr_hpt
 
@@ -35,11 +35,11 @@ from hhpy.plotting import ax_as_list, legend_outside, rcParams as hpt_rcParams, 
 __all__ = []
 
 validations = {
-    'Model_predict_valid_return_types': ['y', 'df', 'DataFrame'],
-    'Models_predict_valid_return_types': ['y', 'df', 'DataFrame', 'self'],
-    'Models_score_valid_return_types': ['self', 'df', 'DataFrame'],
-    'Models_score_valid_scores': ['r2', 'rmse', 'mae', 'stdae', 'medae'],
-    'fit_valid_fit_types': ['train_test', 'k_cross', 'final'],
+    'Model__predict__return_type': ['y', 'df', 'DataFrame'],
+    'Models__predict__return_type': ['y', 'df', 'DataFrame', 'self'],
+    'Models__score__return_type': ['self', 'df', 'DataFrame'],
+    'Models__score__scores': ['r2', 'rmse', 'mae', 'stdae', 'medae'],
+    'fit__fit_type': ['train_test', 'k_cross', 'final'],
 }
 
 docstr = DocstringProcessor(
@@ -72,124 +72,9 @@ docstr = DocstringProcessor(
 
 
 # --- classes
-class _BaseModel:
-    """
-        base class for unified model classes defined below
-        the goal is to have a unified meta framework for multiple machine learning frameworks
-        that is convenient to use
-    """
-
-    def __init__(self, name: str):
-
-        self.__name__ = 'hhpy.modelling.Base'
-        self.__attributes__ = ['__name__', 'name']
-        self.name = name
-
-    def __repr__(self):
-        _str = self.__name__ + '('
-
-        _it = -1
-        for _attr in self.__attributes__[1:]:
-            _it += 1
-            if _it > 0:
-                _str += ', '
-            _str += '{}={}'.format(_attr, self.__getattribute__(_attr))
-
-        _str += ')'
-
-        return _str
-
-    def to_dict(self):
-
-        _dict = {}
-        for _attr_name in self.__attributes__:
-            _attr = self.__getattribute__(_attr_name)
-            if 'to_dict' in dir(_attr):
-                _attr = _attr.to_dict()
-            elif is_list_like(_attr):
-                if isinstance(_attr, Mapping):
-                    for _key, _value in _attr.items():
-                        if 'to_dict' in dir(_value):
-                            _attr[_key] = _value.to_dict()
-                else:
-                    for _i in range(len(_attr)):
-                        if 'to_dict' in dir(_attr[_i]):
-                            _attr[_i] = _attr[_i].to_dict()
-            _dict[_attr_name] = _attr
-
-        return _dict
-
-    def from_dict(self, dct: Mapping):
-
-        for _attr_name in self.__attributes__:
-            if _attr_name not in dct.keys():
-                continue
-            _attr = dct[_attr_name]
-            if is_list_like(_attr):
-                if isinstance(_attr, Mapping):
-
-                    if '__name__' in _attr.keys():
-
-                        _name = _attr['__name__']
-                        if _name[:3] == 'cf.':
-                            _name = _name[3:]
-                        _attr_eval = eval(_name + '()')
-                        if 'from_dict' in dir(_attr_eval):
-                            _attr_eval.from_dict(_attr)
-                        _attr = _attr_eval
-
-                    else:
-
-                        for _attr_key, _attr_value in _attr.items():
-
-                            if isinstance(_attr_value, Mapping):
-
-                                if '__name__' in _attr_value.keys():
-
-                                    _name = _attr_value['__name__']
-                                    if _name[:3] == 'cf.':
-                                        _name = _name[3:]
-                                    _attr_eval = eval(_name + '()')
-                                    if 'from_dict' in dir(_attr_eval):
-                                        _attr_eval.from_dict(_attr_value)
-                                    _attr[_attr_key] = _attr_eval
-
-                else:
-                    for _i in range(len(_attr)):
-
-                        _attr_value = _attr[_i]
-
-                        if isinstance(_attr_value, Mapping):
-
-                            if '__name__' in _attr_value.keys():
-
-                                _name = _attr_value['__name__']
-                                if _name[:3] == 'cf.':
-                                    _name = _name[3:]
-                                _attr_eval = eval(_name + '()')
-                                if 'from_dict' in dir(_attr_eval):
-                                    _attr_eval.from_dict(_attr_value)
-                                _attr[_i] = _attr_eval
-
-            self.__setattr__(_attr_name, _attr)
-
-    def save(self, filename: str, f: Callable = pd.to_pickle):
-
-        _dict = self.copy().to_dict()
-        f(_dict, filename)
-
-    def load(self, filename: str, f: Callable = pd.read_pickle):
-
-        self.from_dict(f(filename))
-
-    def copy(self):
-
-        return deepcopy(self)
-
-
 @docstr
 @export
-class Model(_BaseModel):
+class Model(BaseClass):
     """
     A unified modeling class that is extended from sklearn, accepts any model that implements .fit and .predict
     
@@ -312,7 +197,7 @@ class Model(_BaseModel):
         
         :param X: %(X)s
         :param df: %(df)s
-        :param return_type: one of %(Model_predict_valid_return_types)s, if 'y' returns a pandas Series / DataFrame
+        :param return_type: one of %(Model__predict__return_type)s, if 'y' returns a pandas Series / DataFrame
             with only the predictions, if one of 'df','DataFrame' returns the full DataFrame with predictions added
         :return: see return_type
         """
@@ -320,7 +205,7 @@ class Model(_BaseModel):
         if not self.is_fit:
             raise ValueError('Model is not fit yet')
 
-        _valid_return_types = validations['Model_predict_valid_return_types']
+        _valid_return_types = validations['Model__predict__return_type']
         assert(return_type in _valid_return_types), 'return type must be one of {}'.format(_valid_return_types)
 
         # ensure pandas df
@@ -358,7 +243,7 @@ class Model(_BaseModel):
 
 @docstr
 @export
-class Models(_BaseModel):
+class Models(BaseClass):
     """
     Collection of Models that allow for fitting and predicting with multiple Models at once,
     comparing accuracy and creating Ensembles
@@ -406,9 +291,18 @@ class Models(_BaseModel):
         self.__name__ = 'hhpy.modelling.Models'
         self.models = _models
         self.fit_type = None
-        self.df = df.copy()
-        self.X_ref = force_list(X_ref)
+        if df:
+            self.df = df.copy()
+        else:
+            self.df = None
         self.y_ref = force_list(y_ref)
+        if X_ref:
+            self.X_ref = force_list(X_ref)
+        elif df:
+            # default to all columns not in y_ref
+            self.X_ref = [_ for _ in df.columns if _ not in self.y_ref]
+        else:
+            self.X_ref = []
         self.scaler_X = scaler_X
         self.scaler_y = scaler_y
         self.model_names = _model_names
@@ -453,7 +347,7 @@ class Models(_BaseModel):
         """
         fit all Model objects in collection
         
-        :param fit_type: one of %(fit_valid_fit_types)s
+        :param fit_type: one of %(fit__fit_type)s
         :param k_test: which k_index to use as test data
         :param do_print: %(do_print)s
         :return: None
@@ -461,7 +355,7 @@ class Models(_BaseModel):
 
         # TODO - CROSS VALIDATION
 
-        _valid_fit_types = validations['fit_valid_fit_types']
+        _valid_fit_types = validations['fit__fit_type']
         assert fit_type in _valid_fit_types, 'fit type must be one of {}'.format(_valid_fit_types)
         assert not ((fit_type != 'final') and ('_k_index' not in self.df.columns)), 'DataFrame is not k_split yet'
         assert fit_type != 'cross', 'cross validation not implemented yet'
@@ -515,7 +409,7 @@ class Models(_BaseModel):
         
         :param X: %(X_predict)s
         :param df: %(df_predict)s
-        :param return_type: one of %(Models_predict_valid_return_types)s
+        :param return_type: one of %(Models__predict__return_type)s
         :param ensemble: %(ensemble)s
         :param do_print: %(do_print)s
         :return: if return_type is self: None, else see Model.predict
@@ -607,7 +501,7 @@ class Models(_BaseModel):
         """
         calculate score of the Model predictions
 
-        :param return_type: one of %(Models_score_valid_return_types)s
+        :param return_type: one of %(Models__score__return_type)s
         :param pivot: whether to pivot the DataFrame for easier readability [optional]
         :param do_print: %(do_print)s
         :param display_score: %(display_score)s

@@ -1,4 +1,10 @@
-__pycache__
+**.DS_Store
+**.pyo
+**.pyc
+**~
+**/__pycache__
 sphinx/_build
 sphinx/_templates
 dist
+.pytest_cache
+tests/tmp
