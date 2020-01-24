@@ -291,14 +291,14 @@ class Models(BaseClass):
         self.__name__ = 'hhpy.modelling.Models'
         self.models = _models
         self.fit_type = None
-        if df:
+        if df is not None:
             self.df = df.copy()
         else:
             self.df = None
         self.y_ref = force_list(y_ref)
         if X_ref:
             self.X_ref = force_list(X_ref)
-        elif df:
+        elif df is not None:
             # default to all columns not in y_ref
             self.X_ref = [_ for _ in df.columns if _ not in self.y_ref]
         else:
@@ -720,26 +720,24 @@ def get_feature_importance(model: object, predictors: Union[Sequence, str],
     :return: pandas DataFrame containing the feature importances
     """
 
-    def _get_feature_importance_rf(_f_model, _f_predictors, _f_features_to_sum=None):
+    def _get_feature_importance_rf(__model, __predictors, __features_to_sum: Mapping = None):
 
-        _feature_importances = _f_model.feature_importances_
+        # init df for feature importances
+        ___df = pd.DataFrame({
+            'feature': __predictors,
+            'importance': __model.feature_importances_
+        })
 
-        __df = pd.DataFrame()
+        # if applicable: sum features
+        if __features_to_sum is not None:
+            for _key in list(__features_to_sum.keys()):
+                ___df['feature'] = np.where(___df['feature'].isin(__features_to_sum[_key]), _key, ___df['feature'])
+                ___df = ___df.groupby('feature').sum().reset_index()
 
-        __df['feature'] = _f_predictors
-        __df['importance'] = _feature_importances
+        ___df = ___df.sort_values(['importance'], ascending=False).reset_index(drop=True)
+        ___df['importance'] = np.round(___df['importance'], 5)
 
-        if _f_features_to_sum is not None:
-
-            for _key in list(_f_features_to_sum.keys()):
-                __df['feature'] = np.where(__df['feature'].isin(_f_features_to_sum[_key]), _key, __df['feature'])
-                __df = __df.groupby('feature').sum().reset_index()
-
-        __df = __df.sort_values(['importance'], ascending=False).reset_index(drop=True)
-
-        __df['importance'] = np.round(__df['importance'], 5)
-
-        return __df
+        return ___df
 
     # get feature importance of a decision tree like model in a sorted data frame
     def _get_feature_importance_xgb(_f_model, _f_predictors, _f_features_to_sum=None):
@@ -775,6 +773,7 @@ def get_feature_importance(model: object, predictors: Union[Sequence, str],
 
         return __df
 
+    # -- main
     try:
         # noinspection PyTypeChecker
         _df = _get_feature_importance_rf(model, predictors, features_to_sum)

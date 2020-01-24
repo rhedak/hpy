@@ -17,12 +17,12 @@ from scipy import stats, signal
 from scipy.spatial import distance
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, median_absolute_error
 from sklearn.preprocessing import StandardScaler
-from typing import Mapping, Sequence, Callable, Union, List, Optional
+from typing import Mapping, Sequence, Callable, Union, List, Optional, Tuple
 
 # local imports
 from hhpy.main import export, BaseClass, force_list, tprint, progressbar, qformat, list_intersection, round_signif, \
     is_list_like, dict_list, append_to_dict_list, concat_cols, DocstringProcessor, reformat_string, dict_inv, \
-    list_exclude
+    list_exclude, docstr as docstr_main, SequenceOfScalars
 
 # --- constants
 validations = {
@@ -40,6 +40,7 @@ docstr = DocstringProcessor(
     DFMapping__col_names='Whether to transform the column names [optional]',
     DFMapping__values='Whether to transform the column values [optional]',
     DFMapping__columns='Columns to transform, defaults to all columns [optional]',
+    warn=docstr_main.params['warn'],
 )
 
 
@@ -57,7 +58,7 @@ class DFMapping(BaseClass):
     :param kwargs: other arguments passed to the respective init function
     """
 
-    def __init__(self, name: str = 'DFMapping', df: Union[pd.DataFrame, str] = None, **kwargs):
+    def __init__(self, name: str = 'DFMapping', df: Union[pd.DataFrame, str] = None, **kwargs) -> None:
 
         self.col_mapping = {}
         self.value_mapping = {}
@@ -92,7 +93,7 @@ class DFMapping(BaseClass):
     @docstr
     def from_df(self, df: pd.DataFrame, col_names: bool = True, values: bool = True,
                 columns: Optional[List[str]] = None, return_type: str = 'self', printf: Callable = tprint,
-                duplicate_limit: int = 10, **kwargs):
+                duplicate_limit: int = 10, warn: bool = True, **kwargs) -> Optional[Tuple[dict, dict]]:
         """
         Initialize the DFMapping from a pandas DataFrame.
 
@@ -105,8 +106,9 @@ class DFMapping(BaseClass):
         :param duplicate_limit: allowed number of reformated duplicates per column, each duplicate is suffixed with '_'
             but if you have too many you likely have a column of non allowed character strings and the mapping
             would take a very long time. The duplicate handling therefor stops and a warning is triggered
-             since the transformation is no longer invertible. Consider excluding the column or using cat codes
-              [optional]
+            since the transformation is no longer invertible. Consider excluding the column or using cat codes
+            [optional]
+        :param warn: %(warn)s
         :param kwargs: Other keyword arguments passed to :func:`~hhpy.main.reformat_string` [optional]
         :return: see return_type
         """
@@ -114,7 +116,8 @@ class DFMapping(BaseClass):
         # -- init
         # assert
         if return_type not in validations['DFMapping__from_df__return_type']:
-            warnings.warn(f'Unknown return_type {return_type}, falling back to self')
+            if warn:
+                warnings.warn(f'Unknown return_type {return_type}, falling back to self')
             return_type = 'self'
 
         # avoid inplace operations
@@ -146,8 +149,9 @@ class DFMapping(BaseClass):
                 while _reformated_column in _col_mapping.values():
                     _reformated_column += '_'
                     _it_ += 1
-                    if _it_ == 10:
-                        warnings.warn(f'too many reformated duplicates in column names')
+                    if _it_ == duplicate_limit:
+                        if warn:
+                            warnings.warn(f'too many reformated duplicates in column names')
                         break
                 # assign to dict
                 _col_mapping[_column] = _reformated_column
@@ -172,8 +176,9 @@ class DFMapping(BaseClass):
                         while _reformated_unique in _value_mapping[_column].values():
                             _reformated_unique += '_'
                             _it_ += 1
-                            if _it_ == 10:
-                                warnings.warn(f'too many reformated duplicates in column {_column}')
+                            if _it_ == duplicate_limit:
+                                if warn:
+                                    warnings.warn(f'too many reformated duplicates in column {_column}')
                                 break
                         # assign to dict
                         _value_mapping[_column][_unique] = _reformated_unique
@@ -187,7 +192,7 @@ class DFMapping(BaseClass):
         else:  # return_type == 'tuple'
             return self.col_mapping, self.value_mapping
 
-    def fit(self, *args, **kwargs):
+    def fit(self, *args, **kwargs) -> Optional[Tuple[dict, dict]]:
         """
         Alias for :meth:`~DFMapping.from_df` to be inline with sklearn conventions
 
@@ -255,10 +260,13 @@ class DFMapping(BaseClass):
             df.columns = _columns
 
         # -- return
-        if not inplace:
+        if inplace:
+            # noinspection PyProtectedMember
+            df._update_inplace(df)
+        else:
             return df
 
-    def inverse_transform(self, *args, **kwargs):
+    def inverse_transform(self, *args, **kwargs) -> Optional[pd.DataFrame]:
         """
         wrapper for :meth:`DFMapping.transform` with inverse=True
 
@@ -271,7 +279,8 @@ class DFMapping(BaseClass):
 
     @docstr
     def fit_transform(self, df: pd.DataFrame, col_names: bool = True, values: bool = True,
-                          columns: Optional[List[str]] = None, kwargs_fit: Mapping = {}, **kwargs):
+                      columns: Optional[List[str]] = None, kwargs_fit: Mapping = None,
+                      **kwargs) -> Optional[pd.DataFrame]:
         """
         First applies :meth:`DFMapping.from_df` (which has alias fit) and then :meth:`DFMapping.transform`
 
@@ -280,12 +289,15 @@ class DFMapping(BaseClass):
         :param values:  %(DFMapping__values)s
         :param columns: %(DFMapping__columns)s
         :param kwargs: passed to transform
-        :return: None
+        :param kwargs_fit: passed to fit
+        :return: see transform
         """
+        if kwargs_fit is None:
+            kwargs_fit = {}
         self.fit(df=df, col_names=col_names, values=values, columns=columns, **kwargs_fit)
-        self.transform(df=df, col_names=col_names, values=values, columns=columns, **kwargs)
+        return self.transform(df=df, col_names=col_names, values=values, columns=columns, **kwargs)
 
-    def to_excel(self, path):
+    def to_excel(self, path: str) -> None:
         """
         Save the DFMapping object as an excel file. Useful if you want to edit the results of the automatically
         generated object to fit your specific needs.
@@ -301,7 +313,7 @@ class DFMapping(BaseClass):
             for _key, _mapping in self.value_mapping.items():
                 pd.DataFrame(_mapping, index=[0]).T.to_excel(_writer, sheet_name=_key)
 
-    def from_excel(self, path):
+    def from_excel(self, path: str) -> None:
         """
         Init the DFMapping object from an excel file. For example you could auto generate a DFMapping using googletrans
         and then adjust the translations you feel are inappropriate in the excel file. Then regenerate the object
@@ -310,8 +322,10 @@ class DFMapping(BaseClass):
         :param path: Path to the excel file
         :return: None
         """
+
         def _read_excel(xls, sheet_name):
             return pd.read_excel(xls, sheet_name, index_col=0).T.to_dict(orient='records')[0]
+
         # open ExcelFile
         with pd.ExcelFile(path) as _xls:
             self.col_mapping = _read_excel(xls=_xls, sheet_name='__columns__')
@@ -323,7 +337,8 @@ class DFMapping(BaseClass):
 # --- functions
 @export
 def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_cat: bool = True, cat_frac: float = .5,
-                float_to_int: bool = False, float_digits: Optional[int] = None) -> pd.DataFrame:
+                float_to_int: bool = False, float_digits: Optional[int] = None,
+                drop_all_na_cols: bool = False) -> pd.DataFrame:
     """
     optimize memory usage of a pandas df, automatically downcast all var types and converts objects to categories
 
@@ -334,6 +349,7 @@ def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_ca
     :param cat_frac: If c_cat: If the column has less than cat_frac percent unique values it will be cast to category
     :param float_to_int: Whether to cast float columns that only contain integers to int
     :param float_digits: If float_to_int: round float columns to this many digits before checking for integers
+    :param drop_all_na_cols: Whether to drop columns that contain only missing values
     :return: the optimized pandas DataFrame
     """
     # avoid inplace operations
@@ -345,6 +361,11 @@ def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_ca
         warnings.warn('duplicate columns found: {}'.format(_duplicate_columns))
         df = drop_duplicate_cols(df)
 
+    # if applicable: drop columns containing only na
+    if drop_all_na_cols:
+        df = df.drop(df.columns[df.isnull().all()], axis=1)
+
+    # if applicable: convert float columns containing integer values to dtype int
     if float_to_int:
         for _col in df.select_dtypes(np.number).columns:
             # - cast to integer if possible
@@ -370,6 +391,7 @@ def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_ca
                 # cast to specified int dtype
                 df[_col] = df[_col].apply(np.floor).astype(_int_dtype)
 
+    # casting
     if c_int:
         _cols_int = df.select_dtypes(include=['int'])
         # split integer columns in unsigned (all positive) and (unsigned)
@@ -822,7 +844,6 @@ def qf(df: pd.DataFrame, fltr: Union[pd.DataFrame, pd.Series, Mapping], remove_u
 
     # logical and filter for all columns in filter df
     for _col in _filter_df.columns:
-
         _filter_condition = _filter_condition & (_df[_col] == _filter_iloc[_col])
 
     # create filtered df
@@ -1216,6 +1237,7 @@ def rmse(*args, **kwargs) -> Union[pd.DataFrame, float]:
     :param kwargs: passed to f_score
     :return: if groupby is supplied: pandas DataFrame, else: scalar value
     """
+
     def _f_rmse(x, y):
         return np.sqrt(mean_squared_error(x, y))
 
@@ -1243,6 +1265,7 @@ def stdae(*args, **kwargs) -> Union[pd.DataFrame, float]:
     :param kwargs: passed to f_score
     :return: if groupby is supplied: pandas DataFrame, else: scalar value
     """
+
     def _f_stdae(x, y):
         return np.std(np.abs(x - y))
 
@@ -1270,6 +1293,7 @@ def corr(*args, **kwargs) -> Union[pd.DataFrame, float]:
     :param kwargs: passed to f_score
     :return: if groupby is supplied: pandas DataFrame, else: scalar value
     """
+
     def _f_corr(x, y): return pd.Series(x).corr(other=pd.Series(y))
 
     return f_score(*args, f=_f_corr, **kwargs)
@@ -1541,7 +1565,7 @@ def df_p(x: str, group: str, df: pd.DataFrame, hue: str = None, agg_func: str = 
     """
     # numeric to quantile
     _df, _groupby, _groupby_names, _vars, _df_levels, _levels = df_group_hue(df, group=group, hue=hue, x=x,
-                                                                               n_quantiles=n_quantiles)
+                                                                             n_quantiles=n_quantiles)
 
     _df_p = pd.DataFrame()
 
@@ -1600,8 +1624,8 @@ def df_agg(x, group, df, hue=None, agg=None, n_quantiles=10, na_to_med=False, p=
 
     # numeric to quantile
     _df, _groupby, _groupby_names, _vars, _df_levels, _levels = df_group_hue(df, group=group, hue=hue, x=x,
-                                                                               n_quantiles=n_quantiles,
-                                                                               na_to_med=na_to_med)
+                                                                             n_quantiles=n_quantiles,
+                                                                             na_to_med=na_to_med)
 
     if hue is not None:
         _hue = '_hue'
@@ -1831,10 +1855,25 @@ def time_reg(df, t='t', y='y', t_unit='D', window=10, slope_diff_cutoff=.1, int_
         return _df_phases
 
 
-def col_to_front(df, cols):
-    _cols = force_list(cols)
+@docstr
+@export
+def col_to_front(df: pd.DataFrame, cols: SequenceOfScalars, inplace: bool = False) -> pd.DataFrame:
+    """
+    Brings one or more columns to the front (first n positions) of a DataFrame
 
-    return df[_cols + [_ for _ in df.columns if _ not in _cols]]
+    :param df: %(df)s
+    :param cols: One or more column names to be brought to the front
+    :param inplace: %(inplace)s
+    :return: Modified copy of the DataFrame
+    """
+    _cols = force_list(cols)
+    _df = df[_cols + [_ for _ in df.columns if _ not in _cols]]
+
+    if inplace:
+        # noinspection PyProtectedMember
+        df._update_inplace(_df)
+    else:
+        return _df
 
 
 def lr(df, x, y, groupby=None, t_unit='D', do_print=True):
@@ -2024,7 +2063,7 @@ def kde(x, df=None, x_range=None, perc_cutoff=.1, range_cutoff=None, x_steps=100
         else:
             _x_name = 'x'
 
-    assert(len(_x) > 0), 'Series {} has zero length'.format(_x_name)
+    assert (len(_x) > 0), 'Series {} has zero length'.format(_x_name)
     _x = pd.Series(_x).reset_index(drop=True)
 
     _x_name_max = _x_name + '_max'
@@ -2250,13 +2289,13 @@ def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count:
     """
     # -- init
     # avoid inplace operations
-    df = df.copy()
+    df = pd.DataFrame(df).copy()
 
     # if applicable: cast na to string
-    if na and na != 'drop':
-        df[x] = df[x].astype(str).fillna('NaN')
-        if hue is not None: 
-            df[hue] = df[hue].astype(str).fillna('NaN')
+    if (not na) or (na == 'drop'):
+        df = df.dropna(subset=[x])
+        if hue is not None:
+            df = df.dropna(subset=[hue])
 
     # in case the original column is already called count it is renamed to count_org
     if x == 'count':
@@ -2284,7 +2323,7 @@ def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count:
             _df_hues = df[[hue]].drop_duplicates().reset_index().assign(_dummy=1)
             _df_xs = pd.merge(_df_xs.assign(_dummy=1), _df_hues, on='_dummy').drop(['_dummy'], axis=1)
             _xs_on = _xs_on + [hue]
-            
+
     else:
         # apply x limits (ignored if not numeric)
         if x in df.select_dtypes(np.number):
@@ -2292,6 +2331,11 @@ def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count:
                 df[x] = df[x].where(lambda _: _ >= x_min, x_min)
             if x_max:
                 df[x] = df[x].where(lambda _: _ <= x_max, x_max)
+
+    # to string
+    df[x] = df[x].astype(str)
+    if hue is not None:
+        df[hue] = df[hue].astype(str)
 
     # if applicable: apply top_n_coding (both x and hue)
     if top_nr:
@@ -2301,7 +2345,7 @@ def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count:
 
     # init groupby
     _groupby = [x]
-    if hue is not None: 
+    if hue is not None:
         _groupby = _groupby + [hue]
 
     # we use a dummy column called count and sum over it by group to retain the original x column values
@@ -2326,7 +2370,7 @@ def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count:
         _df_count[_count_hue] = _df_count.groupby(hue)['count'].transform(pd.Series.sum)
 
     # sort
-    if sort_by_count: 
+    if sort_by_count:
         _df_count = _df_count.sort_values([_count_x], ascending=False).reset_index(drop=True)
 
     _df_count['perc_{}'.format(x)] = np.round(_df_count['count'] / _df_count[_count_x] * 100, 2)
@@ -2349,11 +2393,11 @@ def numeric_to_group(pd_series, step=None, outer_limit=4, suffix=None, use_abs=F
     _series = pd.Series(deepcopy(pd_series))
 
     # use standard scaler to center around mean with std +- 1
-    if use_standard_scaler: 
+    if use_standard_scaler:
         _series = StandardScaler().fit(_series.values.reshape(-1, 1)).transform(_series.values.reshape(-1, 1)).flatten()
 
     # if step is none: use 1 as step
-    if step is None: 
+    if step is None:
         step = 1
     if suffix is None:
         if use_standard_scaler:
@@ -2361,7 +2405,7 @@ def numeric_to_group(pd_series, step=None, outer_limit=4, suffix=None, use_abs=F
         else:
             suffix = 'step'
 
-    if suffix != '': 
+    if suffix != '':
         suffix = '_' + suffix
 
     # to absolute
@@ -2408,7 +2452,7 @@ def top_n(s: Sequence, n: int, w: Optional[Sequence] = None) -> list:
     if w is None:
         return list(pd.Series(s).value_counts().reset_index()['index'][:n])
     else:
-        return pd.DataFrame({'s': s, 'w': w}).groupby('s').agg({'w': 'sum'})\
+        return pd.DataFrame({'s': s, 'w': w}).groupby('s').agg({'w': 'sum'}) \
                    .sort_values(by='w', ascending=False).index.tolist()[:n]
 
 
@@ -2430,7 +2474,7 @@ def top_n_coding(s: Sequence, n: int, other_name: str = 'other', na_to_other: bo
     _s = pd.Series(s).astype('str')
     _top_n = top_n(_s, n, w=w)
     _s = pd.Series(np.where(_s.isin(_top_n), _s, other_name))
-    if na_to_other: 
+    if na_to_other:
         _s = np.where(~_s.isin(['nan', 'nat']), _s, other_name)
     _s = pd.Series(_s)
 

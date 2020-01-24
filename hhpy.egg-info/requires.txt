@@ -11,3 +11,4 @@ IPython
 docrep
 h5py
 openpyxl
+xlrd

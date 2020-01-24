@@ -18,7 +18,7 @@ import h5py
 import re
 
 # third party imports
-from typing import Any, Callable, Union, Sequence, Mapping, List, Optional
+from typing import Any, Callable, Union, Sequence, Mapping, List, Optional, Iterable
 from docrep import DocstringProcessor
 from collections import defaultdict
 from copy import deepcopy
@@ -48,6 +48,7 @@ global_tprint_len = 0  # for temporary printing
 Scalar = Union[int, float, str, bytes]
 ListOfScalars = Union[List[Scalar], Scalar]
 SequenceOrScalar = Union[Sequence, Scalar]
+SequenceOfScalars = Union[Sequence[Scalar], Scalar]
 
 rcParams = {
     'tprint.r_loc': 'front'
@@ -61,6 +62,8 @@ validations = {
 docstr = DocstringProcessor(
     df='Pandas DataFrame containing the data',
     x='Main variable, name of a column in the DataFrame or vector data',
+    warn='Whether to show UserWarnings triggered by this function. Set to False to suppress, other warnings will still '
+         'be triggered [optional]',
     **validations
 )
 
@@ -370,6 +373,9 @@ def tprint(*args, sep: str = ' ', r_loc: str = rcParams['tprint.r_loc'], **kwarg
     # print
     if r_loc == 'front':
         print('\r' + _string, end='', **kwargs)
+        # reset tprint
+        if len(args) == 0 or (len(args) == 1 and args[0] == ''):
+            print('', end='\r', **kwargs)
     else:  # r_loc == 'end'
         print(_string, end='\r', **kwargs)
 
@@ -967,12 +973,36 @@ def is_scalar(obj: Any) -> bool:
 @export
 def is_list_like(obj: Any) -> bool:
     """
-    Checks if a given python object is list like. I.e. if it is a Sequence but not a string / bytyes object.
+    Checks if a given python object is list like. The conditions must be satisfied:
+
+        * not a string or bytes object
+
+        * one of (Sequence, 1d-array like Iterable)
+
 
     :param obj: Any python object
     :return: True if list like, else False
     """
-    return isinstance(obj, Sequence) and not isinstance(obj, (str, bytes))
+    # str, bytes
+    if isinstance(obj, (str, bytes)):
+        return False
+    # Sequence
+    if isinstance(obj, Sequence):
+        return True
+    # Iterable
+    if isinstance(obj, Iterable):
+        _shape = np.array(obj).shape
+        if len(_shape) == 1:
+            return True
+        elif len(_shape) == 2:
+            if _shape[1] == 1:
+                return True
+            else:
+                return False
+        else:
+            return False
+    # Other
+    return False
 
 
 @export
@@ -985,22 +1015,26 @@ def force_list(*args: Any) -> list:
     """
     args = list(args)
 
+    # Empty case
+    if len(args) == 0:
+        return []
+
     # None case
     if len(args) == 1:
         if args[0] is None:
             return []
 
-    _i = -1
-    for _arg in args:
-
-        _i += 1
-
+    # Regular case
+    for _it, _arg in enumerate(args):
         if is_list_like(_arg):
-            _arg = list(_arg)
+            # not all iterables implement list() in the same way -> cast to np.array and flatten
+            if isinstance(_arg, Iterable):
+                _arg = list(np.array(_arg).flatten())
+            else:  # Sequences can be cast to list directly
+                _arg = list(_arg)
         else:
             _arg = [_arg]
-
-        args[_i] = _arg
+        args[_it] = _arg
 
     # depending on whether just one argument was passed or list of arguments we need to return differently
     if len(args) == 1:
@@ -1240,7 +1274,7 @@ def roundup(x: Any, digits: int) -> Any:
 def reformat_string(string: str, case: Optional[str] = 'lower', replace: Optional[Mapping[str, str]] = None,
                     lstrip: Optional[str] = ' ', rstrip: Optional[str] = ' ', demojize: bool = True,
                     trans: bool = False, trans_dest: Optional[str] = 'en', trans_src: Optional[str] = 'auto',
-                    trans_sleep: Union[float, bool] = .4) -> str:
+                    trans_sleep: Union[float, bool] = .4, warn: bool = True) -> str:
     """
     Function to quickly reformat a string to a specific convention. The default convention is only lowercase,
     numbers and underscores. Also allows translation if optional dependency googletrans is installed.
@@ -1264,6 +1298,7 @@ def reformat_string(string: str, case: Optional[str] = 'lower', replace: Optiona
     :param trans_src: The language to translate to, passed to googletrans as src=trans_src [optional]
     :param trans_sleep: Amount of seconds to sleep before translating, should be at least .4 to avoid triggering
         google's rate limits. Set it to lower values / None / False for a speedup at your own risk [optional]
+    :param warn: %(warn)s
     :return: reformatted string
     """
     # -- init
@@ -1291,11 +1326,13 @@ def reformat_string(string: str, case: Optional[str] = 'lower', replace: Optiona
             # translate
             string = _translator.translate(string, dest=trans_dest, src=trans_src).text
         except JSONDecodeError:
-            warnings.warn(f'handled JSONDecodeError at {string}, this probably means that you exceeded the googletrans'
-                          f' rate limit and need to wait 24 hours.')
+            if warn:
+                warnings.warn(f'handled JSONDecodeError at {string}, this probably means that you exceeded the '
+                              f'googletrans rate limit and need to wait 24 hours.')
         except Exception as _exc:
-            warnings.warn(f'handled exception " {type(_exc).__name__,}: {_exc}" when translating {string}, '
-                          f'skipping translation')
+            if warn:
+                warnings.warn(f'handled exception " {type(_exc).__name__,}: {_exc}" when translating {string}, '
+                              f'skipping translation')
 
     # -- case
     if case:
@@ -1304,7 +1341,8 @@ def reformat_string(string: str, case: Optional[str] = 'lower', replace: Optiona
         elif case == 'upper':
             string = string.upper()
         else:
-            warnings.warn(f'ignoring unknown case {case}')
+            if warn:
+                warnings.warn(f'ignoring unknown case {case}')
 
     # -- lstrip
     if lstrip:
@@ -1314,7 +1352,7 @@ def reformat_string(string: str, case: Optional[str] = 'lower', replace: Optiona
     if rstrip:
         string = string.rstrip(rstrip)
 
-    # -- replace (comes last so that replacement rules but be defined accordingly)
+    # -- replace (comes last therefore replacement rules must be defined accordingly)
     for _exp, _replacement in replace.items():
         string = re.sub(_exp, _replacement, string)
 
@@ -1348,6 +1386,6 @@ def dict_inv(dct: Mapping, key_as_str: bool = False) -> dict:
         if key_as_str:
             _value = str(_value)
         # assign
-        _dct_inv[_value] = _dct_inv[_key]
+        _dct_inv[_value] = _key
 
     return _dct_inv
