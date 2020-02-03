@@ -10,6 +10,7 @@ Contains DataScience functions extending on pandas and sklearn
 import numpy as np
 import pandas as pd
 import warnings
+import os
 
 # third party imports
 from copy import deepcopy
@@ -22,11 +23,12 @@ from typing import Mapping, Sequence, Callable, Union, List, Optional, Tuple
 # local imports
 from hhpy.main import export, BaseClass, force_list, tprint, progressbar, qformat, list_intersection, round_signif, \
     is_list_like, dict_list, append_to_dict_list, concat_cols, DocstringProcessor, reformat_string, dict_inv, \
-    list_exclude, docstr as docstr_main, SequenceOfScalars
+    list_exclude, docstr as docstr_main, SequenceOfScalars, string_nan
 
 # --- constants
 validations = {
-    'DFMapping__from_df__return_type': ['self', 'tuple']
+    'DFMapping__from_df__return_type': ['self', 'tuple'],
+    'DFMapping__to_excel__if_exists': ['error', 'replace', 'append']
 }
 
 docstr = DocstringProcessor(
@@ -35,12 +37,14 @@ docstr = DocstringProcessor(
     hue='Name of the column to split by level [optional]',
     top_nr='Number of unique levels to keep when applying :func:`~top_n_coding` [optional]',
     other_name='Name of the levels grouped inside other [optional]',
+    other_to_na='Whether to cast all other elements to NaN [optional]',
     inplace='Whether to modify the DataFrame inplace [optional]',
     printf='The function used for printing in-function messages. Set to None or False to suppress printing [optional]',
     DFMapping__col_names='Whether to transform the column names [optional]',
     DFMapping__values='Whether to transform the column values [optional]',
     DFMapping__columns='Columns to transform, defaults to all columns [optional]',
     warn=docstr_main.params['warn'],
+    **validations
 )
 
 
@@ -48,33 +52,28 @@ docstr = DocstringProcessor(
 @export
 class DFMapping(BaseClass):
     """
-    Mapping object bound to a pandas DataFrame that standardizes column names and values according to the chosen
-    conventions. Also implements google translation. Can be used like an sklearn scalar object.
-    The mapping can be saved and later used to restore the original shape of the DataFrame.
-    Note that the index is exempt.
+        Mapping object bound to a pandas DataFrame that standardizes column names and values according to the chosen
+        conventions. Also implements google translation. Can be used like an sklearn scalar object.
+        The mapping can be saved and later used to restore the original shape of the DataFrame.
+        Note that the index is exempt.
 
-    :param name: name of the object [Optional]
-    :param df: a DataFrame to init on or path to a saved DFMapping object [Optional]
-    :param kwargs: other arguments passed to the respective init function
+        :param name: name of the object [Optional]
+        :param df: a DataFrame to init on or path to a saved DFMapping object [Optional]
+        :param kwargs: other arguments passed to the respective init function
     """
 
-    def __init__(self, name: str = 'DFMapping', df: Union[pd.DataFrame, str] = None, **kwargs) -> None:
+    # --- globals
+    __name__ = 'hhpy.ds.DFMapping'
+    __attributes__ = ['col_mapping', 'value_mapping']
+
+    # ---- functions
+    def __init__(self, df: Union[pd.DataFrame, str] = None, **kwargs) -> None:
 
         self.col_mapping = {}
         self.value_mapping = {}
 
         # -- defaults
-        # if the function is called with only one argument attempt to parse it's type and act accordingly
-        if df is None:
-            # data frame is passed
-            if isinstance(name, pd.DataFrame):
-                df = name
-                name = 'DFMapping'
-            # string is passed: is it a path to an excel file?
-            elif isinstance(name, str) and (('.xls' in name) or ('.pkl' in name) or ('.pickle' in name)):
-                df = name
-                name = name.split('.')[0].split('/')[-1]
-
+        # - if the function is called with only one argument attempt to parse it's type and act accordingly
         # DataFrame is passed: init from it
         if isinstance(df, pd.DataFrame):
             self.from_df(df, **kwargs)
@@ -84,11 +83,6 @@ class DFMapping(BaseClass):
                 self.from_excel(df)
             else:
                 self.from_pickle(df)
-
-        # -- attributes
-        super().__init__(name)
-        self.__name__ = 'hhpy.ds.DFMapping'
-        self.__attributes__ = ['__name__', 'name', 'col_mapping', 'value_mapping']
 
     @docstr
     def from_df(self, df: pd.DataFrame, col_names: bool = True, values: bool = True,
@@ -241,7 +235,7 @@ class DFMapping(BaseClass):
         # if inverse: rename columns first
         if _col_mapping:
             if inverse:
-                _col_mapping = dict_inv(_col_mapping)
+                _col_mapping = dict_inv(_col_mapping, duplicates='drop')
                 df.columns = [_col_mapping.get(_, _) for _ in _columns]
             else:
                 _columns = [_col_mapping.get(_, _) for _ in _columns]
@@ -251,7 +245,7 @@ class DFMapping(BaseClass):
 
             # if applicable: inverse mapping
             if inverse:
-                _mapping = dict_inv(_mapping)
+                _mapping = dict_inv(_mapping, duplicates='drop')
             # replace column values
             df[_key] = df[_key].replace(_mapping)
 
@@ -297,21 +291,46 @@ class DFMapping(BaseClass):
         self.fit(df=df, col_names=col_names, values=values, columns=columns, **kwargs_fit)
         return self.transform(df=df, col_names=col_names, values=values, columns=columns, **kwargs)
 
-    def to_excel(self, path: str) -> None:
+    def to_excel(self, path: str, if_exists: str = 'error') -> None:
         """
         Save the DFMapping object as an excel file. Useful if you want to edit the results of the automatically
         generated object to fit your specific needs.
 
         :param path: Path to save the excel file to
+        :param if_exists: One of %(DFMapping__to_excel__if_exists)s, if 'error' raises exception, if 'replace' replaces
+            existing files and if 'append' appends to file (while checking for duplicates)
         :return: None
         """
-        # open ExcelWriter object
+        # -- functions
+        def _write_excel_sheet(writer, mapping, sheet_name):
+            # create DataFrame and transpose
+            _df_mapping = pd.DataFrame(mapping, index=[0]).T
+            # handle append
+            if (if_exists == 'append') and (sheet_name in _sheet_names):
+                # new mapping data comes below existing ones, duplicates are dropped (keep old)
+                _df_mapping = pd.read_excel(path, sheet_name, index_col=0).append(_df_mapping)\
+                    .pipe(drop_duplicate_indices)
+            # write excel
+            _df_mapping.to_excel(writer, sheet_name=sheet_name)
+        # -- init
+        # - assert
+        if if_exists not in validations['DFMapping__to_excel__if_exists']:
+            raise ValueError(f"if_exists must be one of {validations['DFMapping__to_excel__if_exists']}")
+        # - handle if_exists
+        _sheet_names = []
+        if os.path.exists(path):
+            if if_exists == 'error':
+                raise FileExistsError(f"file already exists, please specify if_exists as one of ")
+            elif if_exists == 'append':
+                _sheet_names = pd.ExcelFile(path).sheet_names
+        # -- main
+        # pandas ExcelWriter object (saves on close)
         with pd.ExcelWriter(path) as _writer:
             # col mapping
-            pd.DataFrame(self.col_mapping, index=[0]).T.to_excel(_writer, sheet_name='__columns__')
-            # value mapping
+            _write_excel_sheet(writer=_writer, mapping=self.col_mapping, sheet_name='__columns__')
+            # value mappings
             for _key, _mapping in self.value_mapping.items():
-                pd.DataFrame(_mapping, index=[0]).T.to_excel(_writer, sheet_name=_key)
+                _write_excel_sheet(writer=_writer, mapping=_mapping, sheet_name=_key)
 
     def from_excel(self, path: str) -> None:
         """
@@ -532,7 +551,7 @@ def drop_duplicate_indices(df: pd.DataFrame) -> pd.DataFrame:
     :param df: pandas DataFrame
     :return: pandas DataFrame without the duplicates indices
     """
-    return df.loc[~df.indices.duplicated(), :]
+    return df.loc[~df.index.duplicated(), :]
 
 
 @export
@@ -807,7 +826,7 @@ def lfit(x: Union[pd.Series, str], y: Union[pd.Series, str] = None, w: Union[pd.
 
 
 @export
-def qf(df: pd.DataFrame, fltr: Union[pd.DataFrame, pd.Series, Mapping], remove_unused_categories: bool = True,
+def qf(df: pd.DataFrame, fltr: Union[pd.DataFrame, pd.Series, Mapping], rem_unused_categories: bool = True,
        reset_index: bool = False):
     """
     quickly filter a DataFrame based on equal criteria. All columns of fltr present in df are filtered
@@ -815,7 +834,7 @@ def qf(df: pd.DataFrame, fltr: Union[pd.DataFrame, pd.Series, Mapping], remove_u
 
     :param df: pandas DataFrame to be filtered
     :param fltr: filter condition as DataFrame or Mapping or Series
-    :param remove_unused_categories: whether to remove unused categories from categorical dtype after filtering
+    :param rem_unused_categories: whether to remove unused categories from categorical dtype after filtering
     :param reset_index: whether to reset index after filtering
     :return: filtered pandas DataFrame
     """
@@ -850,10 +869,8 @@ def qf(df: pd.DataFrame, fltr: Union[pd.DataFrame, pd.Series, Mapping], remove_u
     _df = _df[_filter_condition]
 
     # remove_unused_categories
-    if remove_unused_categories:
-
-        for _cat in _df.select_dtypes(include='category').columns:
-            _df[_cat] = _df[_cat].cat.remove_unused_categories()
+    if rem_unused_categories:
+        _df = remove_unused_categories(_df)
 
     if reset_index:
         _df = _df.reset_index(drop=True)
@@ -1325,11 +1342,11 @@ def df_score(df: pd.DataFrame, y_true: Union[List[str], str], pred_suffix: list 
     _df = df.copy()
     del df
 
-    if groupby is None:
+    if groupby:
+        _groupby = force_list(groupby)
+    else:
         _groupby = ['_dummy']
         _df['_dummy'] = 1
-    else:
-        _groupby = force_list(groupby)
 
     _target = force_list(y_true)
     _model_names = force_list(pred_suffix)
@@ -1382,10 +1399,10 @@ def df_score(df: pd.DataFrame, y_true: Union[List[str], str], pred_suffix: list 
 
     _pivot_index = ['y_ref', 'model']
 
-    if groupby is None:
-        _df_score = _df_score.drop(['_dummy'], axis=1)
-    else:
+    if groupby:
         _pivot_index += _groupby
+    else:
+        _df_score = _df_score.drop(['_dummy'], axis=1)
 
     if pivot:
         _df_score = _df_score.pivot_table(index=_pivot_index, columns='score', values='value')
@@ -1884,19 +1901,18 @@ def lr(df, x, y, groupby=None, t_unit='D', do_print=True):
     _y_fit = '{}_fit'.format(y)
     _y_error = '{}_error'.format(y)
 
-    # init
+    # -- init
     if do_print:
         tprint('init')
 
     _df = df[np.isfinite(df[x]) & np.isfinite(df[y])]
 
-    if groupby is None:
-
+    # defaults
+    if groupby:
+        groupby = force_list(groupby)
+    else:
         _df['_dummy'] = 1
         groupby = ['_dummy']
-
-    elif not is_list_like(groupby):
-        groupby = [groupby]
 
     _df_out = dict_list(
         groupby + [_y_slope, _y_int, 'r2', 'rmse', 'error_mean', 'error_std', 'error_abs_mean', 'error_abs_std'])
@@ -2003,30 +2019,38 @@ def df_merge(*args, ignore_index=True, sort=False, **kwargs):
     return pd.concat(*args, ignore_index=ignore_index, sort=sort, **kwargs)
 
 
-def rank(df, rank_by, groupby=None, score_ascending=True, sort_by=None, sort_by_ascending=None):
-    if sort_by is None:
-        sort_by = []
-    _df = df.copy()
-    del df
+def rank(df, rankby, groupby=None, score_ascending=True, sortby=None, sortby_ascending=None):
 
-    if groupby is None:
+    # -- init
+    # no inplace
+    df = pd.DataFrame(df).copy()
+
+    # defaults
+    rankby = force_list(rankby)
+    sortby = force_list(sortby)
+    if groupby:
+        groupby = force_list(groupby)
+    else:
         groupby = ['_dummy']
-        _df['_dummy'] = 1
+        df['_dummy'] = 1
 
-    _sort_by = force_list(rank_by) + force_list(groupby) + force_list(sort_by)
-
-    _df['_row'] = _df.assign(_row=1)['_row'].cumsum()
-
-    if sort_by_ascending is None:
+    # -- main
+    # save row
+    df['_row'] = df.assign(_row=1)['_row'].cumsum()
+    # handle ascending
+    if sortby_ascending is None:
         _ascending = score_ascending
     else:
-        _ascending = force_list(score_ascending) + [True for _ in groupby] + force_list(sort_by_ascending)
+        _ascending = force_list(score_ascending) + [True for _ in groupby] + force_list(sortby_ascending)
+    # sort
+    df = df.sort_values(by=rankby + groupby + sortby, ascending=_ascending).assign(rank=1)
+    # rank
+    df['_rank'] = df.groupby(groupby)['rank'].cumsum()
+    # sort back to original row order
+    df = df.sort_values(by='_row')
 
-    _df = _df.sort_values(by=_sort_by, ascending=_ascending).assign(rank=1)
-    _df['_rank'] = _df.groupby(groupby)['rank'].cumsum()
-    _df = _df.sort_values(by='_row')
-
-    return _df['_rank']
+    # -- return
+    return df['_rank']
 
 
 def kde(x, df=None, x_range=None, perc_cutoff=.1, range_cutoff=None, x_steps=1000):
@@ -2268,7 +2292,7 @@ def resample(df, rule=1, on=None, groupby=None, agg='mean', columns=None, adj_co
 @export
 def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count: bool = True, top_nr: int = 5,
              x_base: Optional[float] = None, x_min: Optional[float] = None, x_max: Optional[float] = None,
-             other_name: str = 'other', na: Union[bool, str] = 'drop') -> pd.DataFrame:
+             other_name: str = 'other', other_to_na: bool = False, na: Union[bool, str] = 'drop') -> pd.DataFrame:
     """
     Create a DataFrame of value counts. Supports hue levels and is therefore useful for plots, for an application
     see :func:`~hhpy.plotting.countplot`
@@ -2283,6 +2307,7 @@ def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count:
     :param x_min: limit the range of valid numeric x values to be greater than or equal to x_min [optional]
     :param x_max: limit the range of valid numeric x values to be less than or equal to x_max [optional]
     :param other_name: %(other_name)s
+    :param other_to_na: %(other_to_na)s
     :param na: whether to keep (True, 'keep') na values and implicitly cast to string
         or drop (False, 'drop') them [optional]
     :return: pandas DataFrame containing the counts by x (and by hue if it is supplied)
@@ -2291,11 +2316,17 @@ def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count:
     # avoid inplace operations
     df = pd.DataFrame(df).copy()
 
-    # if applicable: cast na to string
+    # if applicable: drop NaN
     if (not na) or (na == 'drop'):
+        # true NaN
         df = df.dropna(subset=[x])
+        # string NaN
+        df = df[~df[x].isin(string_nan)]
         if hue is not None:
+            # true NaN
             df = df.dropna(subset=[hue])
+            # string NaN
+            df = df[~df[hue].isin(string_nan)]
 
     # in case the original column is already called count it is renamed to count_org
     if x == 'count':
@@ -2339,9 +2370,9 @@ def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count:
 
     # if applicable: apply top_n_coding (both x and hue)
     if top_nr:
-        df[x] = top_n_coding(s=df[x], n=top_nr, other_name=other_name)
+        df[x] = top_n_coding(s=df[x], n=top_nr, other_name=other_name, other_to_na=other_to_na)
         if hue is not None:
-            df[hue] = top_n_coding(s=df[hue], n=top_nr, other_name=other_name)
+            df[hue] = top_n_coding(s=df[hue], n=top_nr, other_name=other_name, other_to_na=other_to_na)
 
     # init groupby
     _groupby = [x]
@@ -2373,8 +2404,9 @@ def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count:
     if sort_by_count:
         _df_count = _df_count.sort_values([_count_x], ascending=False).reset_index(drop=True)
 
-    _df_count['perc_{}'.format(x)] = np.round(_df_count['count'] / _df_count[_count_x] * 100, 2)
-    _df_count['perc_{}'.format(hue)] = np.round(_df_count['count'] / _df_count[_count_hue] * 100, 2)
+    # add perc columns
+    _df_count[f"perc_{x}"] = np.round(_df_count['count'] / _df_count[_count_x] * 100, 2)
+    _df_count[f"perc_{hue}"] = np.round(_df_count['count'] / _df_count[_count_hue] * 100, 2)
 
     return _df_count
 
@@ -2456,9 +2488,10 @@ def top_n(s: Sequence, n: int, w: Optional[Sequence] = None) -> list:
                    .sort_values(by='w', ascending=False).index.tolist()[:n]
 
 
+@docstr
 @export
 def top_n_coding(s: Sequence, n: int, other_name: str = 'other', na_to_other: bool = False,
-                 w: Optional[Sequence] = None) -> pd.Series:
+                 other_to_na: bool = False, w: Optional[Sequence] = None) -> pd.Series:
     """
     Returns a modified version of the pandas series where all elements not in top_n become recoded as 'other'
 
@@ -2466,6 +2499,7 @@ def top_n_coding(s: Sequence, n: int, other_name: str = 'other', na_to_other: bo
     :param n: How many unique elements to keep
     :param other_name: Name of the other element [optional]
     :param na_to_other: Whether to cast missing elements to other [optional]
+    :param other_to_na: %(other_to_na)s
     :param w: Weights, if given the weights are summed instead of just counting entries in s [optional]
     :return: Adjusted pandas Series
     """
@@ -2473,9 +2507,12 @@ def top_n_coding(s: Sequence, n: int, other_name: str = 'other', na_to_other: bo
     # we have to cast to string so we can set the other name
     _s = pd.Series(s).astype('str')
     _top_n = top_n(_s, n, w=w)
-    _s = pd.Series(np.where(_s.isin(_top_n), _s, other_name))
+    if other_to_na:
+        _s = pd.Series(np.where(_s.isin(_top_n), _s, 'nan'))
+    else:
+        _s = pd.Series(np.where(_s.isin(_top_n), _s, other_name))
     if na_to_other:
-        _s = np.where(~_s.isin(['nan', 'nat']), _s, other_name)
+        _s = np.where(~_s.isin(string_nan), _s, other_name)
     _s = pd.Series(_s)
 
     # get back the old properties of the series (or you'll screw the index)
@@ -2554,3 +2591,24 @@ def k_split(df: pd.DataFrame, k: int = 5, groupby: Union[Sequence, str] = None,
         return _df_train, _df_test
     else:
         return _df_out['_k_index']
+
+
+@docstr
+@export
+def remove_unused_categories(df: pd.DataFrame, inplace: bool = False) -> Optional[pd.DataFrame]:
+    """
+    Remove unused categories from all categorical columns in the DataFrame
+
+    :param df: %(df)s
+    :param inplace: %(inplace)s
+    :return: pandas DataFrame with the unused categories removed
+    """
+
+    if not inplace:
+        df = pd.DataFrame(df).copy()
+
+    for _col in df.select_dtypes('category'):
+        df[_col] = df[_col].cat.remove_unused_categories()
+
+    if not inplace:
+        return df

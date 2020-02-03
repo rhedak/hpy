@@ -91,6 +91,9 @@
       <w>lowpass</w>
       <w>lstrip</w>
       <w>mahalanobis</w>
+      <w>markeredgecolor</w>
+      <w>markeredgewidth</w>
+      <w>markerfacecolor</w>
       <w>matplotlib</w>
       <w>maxcount</w>
       <w>maxlevel</w>
@@ -102,6 +105,7 @@
       <w>nbviewer</w>
       <w>ncol</w>
       <w>ncols</w>
+      <w>ndarray</w>
       <w>nolabel</w>
       <w>nolegend</w>
       <w>novec</w>
@@ -126,6 +130,7 @@
       <w>quantile</w>
       <w>quantiles</w>
       <w>quickstart</w>
+      <w>rankby</w>
       <w>reformated</w>
       <w>regressors</w>
       <w>resample</w>

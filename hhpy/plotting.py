@@ -146,6 +146,15 @@ docstr = DocstringProcessor(
 
 # --- functions
 def _get_ordered_levels(data: pd.DataFrame, level: str, order: Union[list, str, None], x: str = None) -> list:
+    """
+    internal function for getting the ordered levels of a categorical like column in a pandas DataFrame
+
+    :param data: pandas DataFrame
+    :param level: name of the column
+    :param order: how to order it, details see below
+    :param x: secondary column name, used to aggregate before sorting
+    :return: list of ordered levels
+    """
     if order is None or order == 'sorted':
         _hues = data[level].drop_duplicates().sort_values().tolist()
     elif order == 'inv':
@@ -772,7 +781,13 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
             _x_min = _df[_x].min()
             _x_max = _df[_x].max()
 
-        # hadle bins
+        # edge case
+        if _x_min == _x_max:
+            warnings.warn('Distribution min and max are equal')
+            _x_min -= 1
+            _x_max += 1
+
+        # handle bins
         if not is_list_like(bins):
             _x_step = (_x_max - _x_min) / bins
             _bins = np.arange(_x_min, _x_max + _x_step, _x_step)
@@ -1069,14 +1084,11 @@ def q_plim(s: pd.Series, q_min: float = .1, q_max: float = .9, offset_perc: floa
 
 @docstr
 @export
-def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str = None,
-                    order: Union[list, str] = None, hue_order: Union[list, str] = None,
-                    func: Callable = distplot,
-                    summary_title: bool = True, level_title: bool = True, do_print: bool = False,
-                    width: int = rcParams['fig_width'], height: int = rcParams['fig_height'],
-                    return_fig_ax: bool = rcParams['return_fig_ax'],
-                    kwargs_subplots_adjust: Mapping = None, kwargs_summary: Mapping = None,
-                    **kwargs) -> Union[None, tuple]:
+def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str = None, order: Union[list, str] = None,
+              hue_order: Union[list, str] = None, func: Callable = distplot, summary_title: bool = True,
+              level_title: bool = True, do_print: bool = False, width: int = None, height: int = None,
+              return_fig_ax: bool = None, kwargs_subplots_adjust: Mapping = None, kwargs_summary: Mapping = None,
+              **kwargs) -> Union[None, tuple]:
     """
     Plots a plot for each specified column for each level of a certain column plus a summary plot
     
@@ -1098,19 +1110,27 @@ def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str =
     :param kwargs: other keyword arguments passed to func [optional]
     :return: see return_fig_ax
     """
+    # -- init
+    # - defaults
     if kwargs_summary is None:
         kwargs_summary = kwargs
+    if width is None:
+        width = rcParams['fig_width']
+    if height is None:
+        height = rcParams['fig_height']
+    if return_fig_ax is None:
+        return_fig_ax = rcParams['return_fig_ax']
 
-    _df = data.copy()
-    del data
+    # handle no inplace
+    data = pd.DataFrame(data).copy()
 
     if cols is None:
-        cols = _df.select_dtypes(include=np.number)
+        cols = data.select_dtypes(include=np.number)
 
-    _levels = _get_ordered_levels(data=_df, level=level, order=order)
+    _levels = _get_ordered_levels(data=data, level=level, order=order)
 
     if hue is not None:
-        _hues = _get_ordered_levels(data=_df, level=hue, order=hue_order)
+        _hues = _get_ordered_levels(data=data, level=hue, order=hue_order)
         _hue_str = ' by {}'.format(hue)
     else:
         _hue_str = ''
@@ -1128,7 +1148,7 @@ def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str =
 
         _ax_summary = get_subax(ax, _col_i, 0, rows_prio=False)  # always plot to col 0 of current row
         # summary plot
-        func(_col, data=_df, hue=level, ax=_ax_summary, **kwargs_summary)
+        func(_col, data=data, hue=level, ax=_ax_summary, **kwargs_summary)
         if summary_title:
             _ax_summary.set_title('{} by {}'.format(_col, level))
 
@@ -1139,7 +1159,7 @@ def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str =
             if do_print:
                 progressbar(_it, _it_max, print_prefix='{}_{}'.format(_col, _level))
 
-            _df_level = _df[_df[level] == _level]
+            _df_level = data[data[level] == _level]
 
             _ax = get_subax(ax, _col_i, _level_i + 1)
 
@@ -1176,12 +1196,13 @@ def get_legends(ax: plt.Axes = None) -> list:
 
 
 # a plot to compare four components of a DataFrame
-def four_comp_plot(data, x_1, y_1, x_2, y_2, hue_1=None, hue_2=None, lim=None, return_fig_ax=rcParams['return_fig_ax'],
-                   **kwargs):
+def four_comp_plot(data, x_1, y_1, x_2, y_2, hue_1=None, hue_2=None, lim=None, return_fig_ax=None, **kwargs):
     # you can pass the hues to use or if none are given the default ones (std,plus/minus) are used
     # you can pass xlim and ylim or assume default (4 std)
 
     # four components, ie 2 x 2
+    if return_fig_ax is None:
+        return_fig_ax = rcParams['return_fig_ax']
     if lim is None:
         lim = {'x_1': 'default', 'x_2': 'default', 'y_1': 'default', 'y_2': 'default'}
     _nrows = 2
@@ -1290,8 +1311,8 @@ def four_comp_plot(data, x_1, y_1, x_2, y_2, hue_1=None, hue_2=None, lim=None, r
 @docstr
 @export
 def facet_wrap(func: Callable, data: pd.DataFrame, facet: Union[list, str], *args, facet_type: str = None,
-               col_wrap: int = 4, width: int = rcParams['fig_width'], height: int = rcParams['fig_height'],
-               catch_error: bool = True, return_fig_ax: bool = rcParams['return_fig_ax'], sharex: bool = False,
+               col_wrap: int = 4, width: int = None, height: int = None,
+               catch_error: bool = True, return_fig_ax: bool = None, sharex: bool = False,
                sharey: bool = False, show_xlabel: bool = True, x_tick_rotation: int = None, y_tick_rotation: int = None,
                ax_title: str = 'set', order: Union[list, str] = None, subplots_kws: Mapping = None, **kwargs):
     """
@@ -1327,9 +1348,18 @@ def facet_wrap(func: Callable, data: pd.DataFrame, facet: Union[list, str], *arg
 
     Check out the `example notebook <https://colab.research.google.com/drive/1bAEFRoWJgwPzkEqOoPBHVX849qQjxLYC>`_
     """
-
+    # -- init
+    # - defaults
+    if width is None:
+        width = rcParams['fig_width']
+    if height is None:
+        height = rcParams['fig_height']
+    if return_fig_ax is None:
+        return_fig_ax = rcParams['return_fig_ax']
     if subplots_kws is None:
         subplots_kws = {}
+
+    # - handle no inplace
     _df = data.copy()
     del data
     _facet = None
@@ -1859,9 +1889,10 @@ def rmsdplot(x: str, data: pd.DataFrame, groups: Union[Sequence, str] = None, hu
 
 # plot agg
 def aggplot(x, data, group, hue=None, hue_order=None, width=16, height=9 / 2,
-            p_1_0=True, palette=None, sort_by_hue=False, return_fig_ax=rcParams['return_fig_ax'], agg=None, p=False,
+            p_1_0=True, palette=None, sort_by_hue=False, return_fig_ax=None, agg=None, p=False,
             legend_loc='upper right', aggkws=None, subplots_kws=None, subplots_adjust_kws=None, **kwargs):
-    # avoid inplace operations
+    if return_fig_ax is None:
+        return_fig_ax = rcParams['return_fig_ax']
     if palette is None:
         palette = rcParams['palette']
     if agg is None:
@@ -1872,7 +1903,9 @@ def aggplot(x, data, group, hue=None, hue_order=None, width=16, height=9 / 2,
         subplots_kws = {}
     if subplots_adjust_kws is None:
         subplots_adjust_kws = {'top': .95, 'hspace': .25, 'wspace': .35}
-    _df = data.copy()
+
+    # avoid inplace operations
+    data = pd.DataFrame(data).copy()
     _len = len(agg) + 1 + p
 
     _x = x
@@ -1921,7 +1954,7 @@ def aggplot(x, data, group, hue=None, hue_order=None, width=16, height=9 / 2,
         if _group_is_list:
             _group = group[_col]
 
-        _df_agg = df_agg(x=_x, group=_group, hue=hue, df=_df, agg=agg, p=p, **aggkws)
+        _df_agg = df_agg(x=_x, group=_group, hue=hue, df=data, agg=agg, p=p, **aggkws)
 
         if hue is not None:
             if sort_by_hue:
@@ -1931,7 +1964,7 @@ def aggplot(x, data, group, hue=None, hue_order=None, width=16, height=9 / 2,
             _df_agg = _df_agg.sort_values(by=_sort_by).reset_index(drop=True)
             _label = '_label'
             _df_agg[_label] = concat_cols(_df_agg, [_group, hue], sep='_').astype('category')
-            _hues = _get_ordered_levels(data=_df, level=hue, order=hue_order, x=x)
+            _hues = _get_ordered_levels(data=data, level=hue, order=hue_order, x=x)
 
             if isinstance(palette, Mapping):
                 _df_agg['_color'] = _df_agg[hue].apply(lambda _: palette[_])
@@ -2035,7 +2068,9 @@ def aggplot(x, data, group, hue=None, hue_order=None, width=16, height=9 / 2,
 
 
 def aggplot2d(x, y, data, aggfunc='mean', ax=None, x_int=None, time_int=None,
-              color=rcParams['palette'][0], as_abs=False):
+              color=None, as_abs=False):
+    if color is None:
+        color = rcParams['palette'][0]
     # time int should be something like '<M8[D]'
     # D can be any datetime unit from numpy https://docs.scipy.org/doc/numpy-1.13.0/reference/arrays.datetime.html
 
@@ -2043,25 +2078,24 @@ def aggplot2d(x, y, data, aggfunc='mean', ax=None, x_int=None, time_int=None,
     _y_std = '{}_std'.format(y)
 
     # preprocessing
-
-    _df = data.copy()
+    data = pd.DataFrame(data).copy()
 
     if as_abs:
-        _df[y] = np.abs(_df[y])
+        data[y] = np.abs(data[y])
     if x_int is not None:
-        _df[x] = np.round(_df[x] / x_int) * x_int
+        data[x] = np.round(data[x] / x_int) * x_int
     if time_int is not None:
-        _df[x] = _df[x].astype('<M8[{}]'.format(time_int))
+        data[x] = data[x].astype('<M8[{}]'.format(time_int))
 
     # agg
 
-    _df = _df.groupby([x]).agg({y: [aggfunc, 'std']}).set_axis([_y_agg, _y_std], axis=1, inplace=False).reset_index()
+    data = data.groupby([x]).agg({y: [aggfunc, 'std']}).set_axis([_y_agg, _y_std], axis=1, inplace=False).reset_index()
 
     if ax is None:
         ax = plt.gca()
 
-    ax.plot(_df[x], _df[_y_agg], color=color, label=_y_agg)
-    ax.fill_between(_df[x], _df[_y_agg] + _df[_y_std], _df[_y_agg] - _df[_y_std], color='xkcd:cyan', label=_y_std)
+    ax.plot(data[x], data[_y_agg], color=color, label=_y_agg)
+    ax.fill_between(data[x], data[_y_agg] + data[_y_std], data[_y_agg] - data[_y_std], color='xkcd:cyan', label=_y_std)
     ax.set_xlabel(x)
     ax.set_ylabel(y)
     ax.legend()
@@ -2137,8 +2171,8 @@ def ax_tick_linebreaks(ax: plt.Axes = None, x: bool = True, y: bool = True, **kw
 @docstr
 @export
 def annotate_barplot(ax: plt.Axes = None, x: Sequence = None, y: Sequence = None, ci: bool = True, 
-                     ci_newline: bool = True, adj_ylim: float = .05, nr_format: str = rcParams['float_format'], 
-                     ha: str = 'center', va: str = 'center', offset: int = plt.rcParams['font.size'],
+                     ci_newline: bool = True, adj_ylim: float = .05, nr_format: str = None,
+                     ha: str = 'center', va: str = 'center', offset: int = None,
                      **kwargs) -> plt.Axes:
     """
     automatically annotates a barplot with bar values and error bars (if present). Currently does not work with ticks!
@@ -2152,15 +2186,20 @@ def annotate_barplot(ax: plt.Axes = None, x: Sequence = None, y: Sequence = None
     :param nr_format: %(number_format)s
     :param ha: horizontal alignment [optional]
     :param va: vertical alignment [optional]
-    :param offset: offset between bar top and annotation center [optional]
+    :param offset: offset between bar top and annotation center, defaults to rcParams[font.size] [optional]
     :param kwargs: other keyword arguments passed to pyplot.annotate
     :return: %(ax_out)s
     """
-    # catch font warnings
-    logging.getLogger().setLevel(logging.CRITICAL)
-
+    # -- init
+    # - defaults
+    if nr_format is None:
+        nr_format = rcParams['float_format']
+    if offset is None:
+        offset = plt.rcParams['font.size']
     if ax is None:
         ax = plt.gca()
+    # catch font warnings
+    logging.getLogger().setLevel(logging.CRITICAL)
 
     _adj_plus = False
     _adj_minus = False
@@ -2241,7 +2280,7 @@ def annotate_barplot(ax: plt.Axes = None, x: Sequence = None, y: Sequence = None
 @docstr
 @export
 def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't', lines: Mapping = None,
-             max_interval: int = None, time_per_frame: int = 200, mode: str = rcParams['animplot.mode'],
+             max_interval: int = None, time_per_frame: int = 200, mode: str = None,
              title: bool = True, title_prefix: str = '', t_format: str = None, fig: plt.Figure = None,
              ax: plt.Axes = None, color: str = None, label: str = None, legend: bool = False, legend_out: bool = False,
              legend_kws: Mapping = None, xlim: tuple = None, ylim: tuple = None,
@@ -2295,15 +2334,24 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
     # example for lines (a list of dicts)
     # lines = [{'line':line,'data':data,'x':'x','y':'y','t':'t'}]
 
-    if legend_kws is None:
-        legend_kws = {}
-    _args = {'data': data, 'x': x, 'y': y, 't': t}
-
-    # init fig,ax
+    # -- init
+    # - defaults
+    if mode is None:
+        mode = rcParams['animplot.mode']
     if fig is None:
         fig = plt.gcf()
     if ax is None:
         ax = plt.gca()
+    if legend_kws is None:
+        legend_kws = {}
+    # - handle no inplace
+    data = pd.DataFrame(data).copy()
+    # - preprocessing
+    # if t is the index: save to regular column
+    if (t == 'index') and (t not in data.columns):
+        data[t] = data.index
+
+    _args = {'data': data, 'x': x, 'y': y, 't': t}
 
     _ax_list = ax_as_list(ax)
 
@@ -2562,22 +2610,20 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
 
         return ()
 
+    # - get correct ax for each line
     for _line in lines:
-
-        _line_keys = list(_line.keys())
-
-        if 'ax' in _line_keys:
+        if 'ax' in list(_line.keys()):
             _ax = _line['ax']
         else:
             _ax = plt.gca()
 
-        # _ax.set_xlim(_line['data'][_line['x']].min(), _line['data'][_line['x']].max())
-        # _ax.set_ylim(_line['data'][_line['y']].min(), _line['data'][_line['y']].max())
-
+    # - create main FuncAnimation object
     _anim = FuncAnimation(fig, animate, init_func=init, frames=_max_interval, interval=time_per_frame, blit=True)
-
+    # - close plots
     plt.close('all')
 
+    # -- return
+    # -handle return mode
     if mode == 'html':
         return HTML(_anim.to_html5_video())
     elif mode == 'jshtml':
@@ -2589,7 +2635,7 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
 @docstr
 @export
 def legend_outside(ax: plt.Axes = None, width: float = .85, loc: str = 'right',
-                   legend_space: float = rcParams['legend_outside.legend_space'], offset_x: float = 0,
+                   legend_space: float = None, offset_x: float = 0,
                    offset_y: float = 0, loc_warn: bool = True, **kwargs):
     """
     draws a legend outside of the subplot
@@ -2605,18 +2651,23 @@ def legend_outside(ax: plt.Axes = None, width: float = .85, loc: str = 'right',
     :return: None
     """
     # -- init
+    # - defaults
+    if legend_space is None:
+        legend_space = rcParams['legend_outside.legend_space']
+    if ax is None:
+        ax = plt.gca()
+    # - check if loc is legend_outside specific, if not treat as inside loc and call regular ax.legend
     if loc not in ['bottom', 'right']:
         if loc_warn:
             warnings.warn('legend_outside: legend loc not recognized, defaulting to plt.legend')
         ax.legend(loc=loc, **kwargs)
         return None
 
+    # -- main
+    # - get loc and bbox
     _loc = {'bottom': 'upper center', 'right': 'center left'}[loc]
     _bbox_to_anchor = {'bottom': (0.5 + offset_x, - .15 + offset_y), 'right': (1, 0.5)}[loc]
-
-    if ax is None:
-        ax = plt.gca()
-
+    # - loop axes
     for _ax in ax_as_list(ax):
 
         # -- shrink box

@@ -43,13 +43,19 @@ pd.plotting.register_matplotlib_converters()
 pd.options.mode.chained_assignment = None
 
 # --- constants
+# for functions
 global_t = datetime.datetime.now()  # for times progress bar
 global_tprint_len = 0  # for temporary printing
+# typing
 Scalar = Union[int, float, str, bytes]
 ListOfScalars = Union[List[Scalar], Scalar]
 SequenceOrScalar = Union[Sequence, Scalar]
 SequenceOfScalars = Union[Sequence[Scalar], Scalar]
 
+# true constants
+string_nan = ['nan', 'nat', 'NaN', 'NaT']
+
+# rcParams
 rcParams = {
     'tprint.r_loc': 'front'
 }
@@ -57,6 +63,7 @@ rcParams = {
 # --- constants
 validations = {
     'reformat_string__case': ['lower', 'upper'],
+    'dict_inv__duplicates': ['adjust', 'drop']
 }
 
 docstr = DocstringProcessor(
@@ -84,26 +91,60 @@ class BaseClass:
     """
         Base class for various classes deriving from this. Implements __repr__, converting to dict as well as
         saving to pickle and restoring from pickle.
+        Does NOT provide __init__ since it cannot be used by itself
     """
 
-    def __init__(self, name: str = None):
+    # --- globals
+    __name__ = 'hhpy.main.Base'
+    __attributes__ = []
 
-        self.__name__ = 'hhpy.main.Base'
-        self.__attributes__ = ['__name__', 'name']
-        self.name = name
-
+    # --- functions
     def __repr__(self):
+
+        # check if self.__name__ is still the same as Base (i.e. unset)
+        if self.__name__ == 'hhpy.main.Base' and self.__class__ != BaseClass:
+            warnings.warn('Printing does not work properly if parameter self.__name__ is not declared')
+        # check if class has attributes
+        if len(self.__attributes__) == 0:
+            warnings.warn('self.__attributes__ has length zero, did you declare it?')
+
+        # -- init
         _str = self.__name__ + '('
-
         _it = -1
-        for _attr in self.__attributes__[1:]:
-            _it += 1
-            if _it > 0:
-                _str += ', '
-            _str += '{}={}'.format(_attr, self.__getattribute__(_attr))
-
+        # -- main
+        for _attr in self.__attributes__:
+            # don't print __name__
+            if _attr == '__name__':
+                continue
+            # check if _attr exists
+            if hasattr(self, _attr):
+                # get value
+                _value = self.__getattribute__(_attr)
+                # case by case selector
+                if _value is None:
+                    continue
+                elif isinstance(_value, np.ndarray):
+                    _value = f"numpy.ndarray{_value.shape})"
+                elif isinstance(_value, pd.DataFrame):
+                    _value = f"pandas.DataFrame{_value.shape}"
+                elif isinstance(_value, pd.Series):
+                    _value = f"pandas.Series{_value.shape}"
+                elif isinstance(_value, Callable):
+                    # noinspection PyUnresolvedReferences
+                    _value = f"Callable{_value.__code__.co_varnames}"
+                # only iterate if you print
+                _it += 1
+                # add separator
+                if _it > 0:
+                    _str += ', '
+                # add to string
+                _str += f"{_attr}={_value}"
+            else:
+                warnings.warn(f"{_attr} is specified in self.__attributes__ but does not exist. Skipping...")
+                continue
+        # close brace
         _str += ')'
-
+        # -- return
         return _str
 
     def to_dict(self):
@@ -112,9 +153,11 @@ class BaseClass:
 
         :return: None
         """
+        if len(self.__attributes__) == 0:
+            warnings.warn('self.__attributes__ has length zero, did you declare it?')
 
         _dict = {}
-        for _attr_name in self.__attributes__:
+        for _attr_name in list_merge('__name__', self.__attributes__):
             _attr = self.__getattribute__(_attr_name)
             if 'to_dict' in dir(_attr):
                 _attr = _attr.to_dict()
@@ -122,6 +165,7 @@ class BaseClass:
                 if isinstance(_attr, Mapping):
                     for _key, _value in _attr.items():
                         if 'to_dict' in dir(_value):
+                            # noinspection PyUnresolvedReferences
                             _attr[_key] = _value.to_dict()
                 else:
                     for _i in range(len(_attr)):
@@ -138,8 +182,10 @@ class BaseClass:
         :param dct: Dictionary created from :meth:`~BaseClass.to_dict`
         :return: None
         """
+        if len(self.__attributes__) == 0:
+            warnings.warn('self.__attributes__ has length zero, did you declare it?')
 
-        for _attr_name in self.__attributes__:
+        for _attr_name in list_merge('__name__', self.__attributes__):
             if _attr_name not in dct.keys():
                 continue
             _attr = dct[_attr_name]
@@ -170,6 +216,7 @@ class BaseClass:
                                     _attr_eval = eval(_name + '()')
                                     if 'from_dict' in dir(_attr_eval):
                                         _attr_eval.from_dict(_attr_value)
+                                    # noinspection PyUnresolvedReferences
                                     _attr[_attr_key] = _attr_eval
 
                 else:
@@ -909,7 +956,7 @@ def dict_list(*args, dict_type: str = 'defaultdict') -> dict:
     if dict_type == 'regular':
         _dict = {}
     else:
-        _dict = defaultdict(lambda _: [], {})
+        _dict = defaultdict(list)
 
     for _arg in args:
         for _list in force_list(_arg):
@@ -919,7 +966,8 @@ def dict_list(*args, dict_type: str = 'defaultdict') -> dict:
 
 
 @export
-def append_to_dict_list(dct: dict, append: Union[dict, list], inplace: bool = True) -> Union[dict, None]:
+def append_to_dict_list(dct: Union[dict, defaultdict], append: Union[dict, list],
+                        inplace: bool = True) -> Optional[dict]:
     """
     Appends to a dictionary of named lists. Useful for iteratively creating a pandas DataFrame.
 
@@ -928,10 +976,8 @@ def append_to_dict_list(dct: dict, append: Union[dict, list], inplace: bool = Tr
     :param inplace: Modify inplace or return modified copy
     :return: None if inplace, else modified dictionary
     """
-    if inplace:
-        _dic = dct
-    else:
-        _dic = dct.copy()
+    if not inplace:
+        dct = dct.copy()
 
     # allows lists and dicts
     if not isinstance(append, Mapping):
@@ -949,10 +995,10 @@ def append_to_dict_list(dct: dict, append: Union[dict, list], inplace: bool = Tr
         _append = append
 
     for _key in _append.keys():
-        _dic[_key].append(_append[_key])
+        dct[_key].append(_append[_key])
 
     if not inplace:
-        return _dic
+        return dct
 
 
 @export
@@ -1008,7 +1054,7 @@ def is_list_like(obj: Any) -> bool:
 @export
 def force_list(*args: Any) -> list:
     """
-    Takes any python object and turns it into an iterable list.
+    Takes any python objects and turns them into an iterable list.
 
     :param args: Any python object
     :return: List
@@ -1043,6 +1089,23 @@ def force_list(*args: Any) -> list:
         args = tuple(args)
 
     return args
+
+
+@export
+def force_scalar(obj: Any, warn: bool = True) -> Scalar:
+    """
+    Takes any python object and turns it into a scalar object.
+
+    :param obj: Any python object
+    :param warn: Whether to trigger a warning when objects are being truncated
+    :return: List
+    """
+    _lst = force_list(obj)
+    _len = len(_lst)
+    if warn and _len > 1:
+        warnings.warn(f"force scalar: object {obj} has length {_len}, retaining only first entry")
+
+    return _lst[0]
 
 
 @export
@@ -1360,28 +1423,36 @@ def reformat_string(string: str, case: Optional[str] = 'lower', replace: Optiona
 
 
 @export
-def dict_inv(dct: Mapping, key_as_str: bool = False) -> dict:
+def dict_inv(dct: Mapping, key_as_str: bool = False, duplicates: str = 'keep') -> dict:
     """
     Returns an inverted copy of a given dictionary (if it is invertible)
 
     :param dct: Dictionary to be inverted
     :param key_as_str: Whether all keys of the inverted dictionary should be forced to string
+    :param duplicates: Whether to 'adjust' or 'drop' duplicates. In case of 'adjust' duplicates are suffixed with '_'
     :return: Inverted dictionary
     """
 
+    # -- assert
+    if duplicates not in validations['dict_inv__duplicates']:
+        raise ValueError(f"duplicates must be one of {validations['dict_inv__duplicates']}")
+    # -- init
     _dct_inv = {}
-
+    # -- main
     for _key, _value in dct.items():
         # assert scalar
         if not is_scalar(_value):
             raise ValueError(f'A non-scalar dictionary value is not invertible, found at key {_key}')
         # assert non-duplicate value
-        _warn = True
-        while _value in _dct_inv.keys():
-            if _warn:
-                _warn = False
-                warnings.warn(f'duplicate value found at "{_key}: {_value}", appending _')
-            _value = str(_value) + '_'
+        if duplicates == 'adjust':
+            _warn = True
+            while _value in _dct_inv.keys():
+                if _warn:
+                    _warn = False
+                    warnings.warn(f'duplicate value found at "{_key}: {_value}", appending _')
+                _value = str(_value) + '_'
+        elif (duplicates == 'drop') and (_value in _dct_inv.keys()):
+            continue
         # if applicable: convert value to string
         if key_as_str:
             _value = str(_value)

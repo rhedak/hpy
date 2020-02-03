@@ -17,7 +17,7 @@ import seaborn as sns
 
 # third party imports
 from copy import deepcopy
-from typing import Sequence, Mapping, Union, Callable, Optional
+from typing import Sequence, Mapping, Union, Callable, Optional, Any
 
 from sklearn.exceptions import DataConversionWarning
 
@@ -27,7 +27,7 @@ except ImportError:
     display = print
 
 # local imports
-from hhpy.main import export, BaseClass, is_list_like, force_list, tprint, DocstringProcessor
+from hhpy.main import export, BaseClass, is_list_like, force_list, tprint, DocstringProcessor, SequenceOrScalar
 from hhpy.ds import k_split, df_score
 from hhpy.plotting import ax_as_list, legend_outside, rcParams as hpt_rcParams, docstr as docstr_hpt
 
@@ -72,32 +72,26 @@ docstr = DocstringProcessor(
 
 
 # --- classes
+# noinspection PyPep8Naming
 @docstr
 @export
 class Model(BaseClass):
     """
     A unified modeling class that is extended from sklearn, accepts any model that implements .fit and .predict
-    
+
     :param model: %(model_in)s
     :param name: %(name)s
     :param X_ref: %(X_ref)s
     :param y_ref: %(y_ref)s
     """
 
-    @docstr
-    def __init__(self, model: object = None, name: str = 'pred',
-                 X_ref: Union[Sequence, str] = None, y_ref: Union[Sequence, str] = None):
-        """
-        init method
+    # --- globals
+    __name__ = 'cf.Model'
+    __attributes__ = ['name', 'model', 'X_ref', 'y_ref', 'is_fit']
 
-        :param model: %(model_in)s
-        :param name: %(name)s
-        :param X_ref: %(X_ref)s
-        :param y_ref: %(y_ref)s
-        """
-
-        # -- check
-        super().__init__(name)
+    # --- functions
+    def __init__(self, model: Any = None, name: str = 'pred', X_ref: SequenceOrScalar = None,
+                 y_ref: SequenceOrScalar = None) -> None:
 
         # -- init
         if X_ref is not None:
@@ -106,8 +100,7 @@ class Model(BaseClass):
             y_ref = force_list(y_ref)
 
         # -- assign
-        self.__attributes__ = ['__name__', 'name', 'model', 'X_ref', 'y_ref', 'is_fit']
-        self.__name__ = 'cf.Model'
+        self.name = name
         if isinstance(model, str):
             model = eval(model)
         self.model = model
@@ -241,6 +234,7 @@ class Model(BaseClass):
             raise ValueError('{} is not a valid return_type'.format(return_type))
 
 
+# noinspection PyPep8Naming
 @docstr
 @export
 class Models(BaseClass):
@@ -258,11 +252,15 @@ class Models(BaseClass):
     :param printf: %(printf)s
     """
 
-    def __init__(self, *args: Union[object, Sequence], name: str = None, df: pd.DataFrame = None,
-                 X_ref: Union[Sequence, str] = None, y_ref: Union[Sequence, str] = None, scaler_X: object = None,
-                 scaler_y: object = None, printf: Callable = tprint):
+    # --- globals
+    __name__ = 'hhpy.modelling.Models'
+    __attributes__ = ['models', 'fit_type', 'df', 'X_ref', 'y_ref', 'scaler_X', 'scaler_y', 'model_names', 'df_score']
 
-        super().__init__(name)
+    # --- functions
+    def __init__(self, *args: Any, df: pd.DataFrame = None, X_ref: SequenceOrScalar = None,
+                 y_ref: SequenceOrScalar = None, scaler_X: Any = None, scaler_y: Any = None,
+                 printf: Callable = tprint) -> None:
+
         _models = []
         _model_names = []
 
@@ -286,9 +284,6 @@ class Models(BaseClass):
                     _model_names.append(_model.name)
 
         # -- assign
-        self.__attributes__ = ['__name__', 'name', 'models', 'fit_type', 'df', 'X_ref', 'y_ref', 'scaler_X', 'scaler_y',
-                               'model_names', 'df_score']
-        self.__name__ = 'hhpy.modelling.Models'
         self.models = _models
         self.fit_type = None
         if df is not None:
@@ -403,7 +398,9 @@ class Models(BaseClass):
         self.fit_type = fit_type
 
     @docstr
-    def predict(self, X=None, df=None, return_type='self', ensemble=False, do_print=True):
+    def predict(
+            self, X=None, df=None, return_type='self', ensemble=False, do_print=True
+    ) -> Optional[Union[pd.Series, pd.DataFrame]]:
         """
         predict with all models in collection
         
@@ -417,8 +414,7 @@ class Models(BaseClass):
 
         _valid_return_types = ['self', 'df', 'DataFrame']
 
-        assert(return_type in _valid_return_types),\
-                'return_type must be one of {}'.format(_valid_return_types)
+        assert(return_type in _valid_return_types), 'return_type must be one of {}'.format(_valid_return_types)
 
         if not self.fit_type:
             raise ValueError('Model is not fit yet')
@@ -496,8 +492,10 @@ class Models(BaseClass):
             return _df
 
     @docstr
-    def score(self, return_type: str = 'self', pivot: bool = False, do_print: bool = True,  display_score: bool = True,
-              **kwargs) -> Optional[pd.DataFrame]:
+    def score(
+            self, return_type: str = 'self', pivot: bool = False, do_print: bool = True,  display_score: bool = True,
+            **kwargs
+    ) -> Optional[pd.DataFrame]:
         """
         calculate score of the Model predictions
 
@@ -538,11 +536,13 @@ class Models(BaseClass):
             return _df_score
 
     @docstr
-    def train(self, df: pd.DataFrame = None, k: int = 5, groupby: Union[Sequence, str] = None,
-              sortby: Union[Sequence, str] = None, random_state: int = None, fit_type: str = 'train_test',
-              k_test: Optional[int] = None, ensemble: bool = False, scores: Union[Sequence, str] = None,
-              scale: float = None, do_predict: bool = True, do_score: bool = True, do_split: bool = True,
-              do_fit: bool = True, do_print: bool = True, display_score: bool = True):
+    def train(
+            self, df: pd.DataFrame = None, k: int = 5, groupby: Union[Sequence, str] = None,
+            sortby: Union[Sequence, str] = None, random_state: int = None, fit_type: str = 'train_test',
+            k_test: Optional[int] = None, ensemble: bool = False, scores: Union[Sequence, str] = None,
+            scale: float = None, do_predict: bool = True, do_score: bool = True, do_split: bool = True,
+            do_fit: bool = True, do_print: bool = True, display_score: bool = True
+    ) -> None:
         """
         wrapper method that combined k_split, train, predict and score
 
@@ -579,9 +579,11 @@ class Models(BaseClass):
             self.printf('training done')
 
     @docstr_hpt
-    def scoreplot(self, x='y_ref', y='value', hue='model', hue_order=None, row='score',
-                  row_order=None, palette=hpt_rcParams['palette'], width=16, height=9 / 2, scale=None,
-                  query=None, return_fig_ax=False, **kwargs) -> Optional[tuple]:
+    def scoreplot(
+            self, x='y_ref', y='value', hue='model', hue_order=None, row='score', row_order=None,
+            palette=hpt_rcParams['palette'], width=16, height=9 / 2, scale=None, query=None, return_fig_ax=False,
+            **kwargs
+    ) -> Optional[tuple]:
         """
         plot the score(s) using sns.barplot
 
@@ -656,7 +658,7 @@ def dict_to_model(dic: Mapping) -> Model:
 
 
 @export
-def force_model(model: Union[object, Mapping]) -> Model:
+def force_model(model: Any) -> Model:
     """
     takes any Model, model object or dictionary and converts to Model
 
@@ -681,7 +683,7 @@ def force_model(model: Union[object, Mapping]) -> Model:
 
 
 @export
-def get_coefs(model: object, y: Union[Sequence, str]):
+def get_coefs(model: Any, y: SequenceOrScalar):
     """
     get coefficients of a linear regression in a sorted data frame
 
@@ -709,8 +711,9 @@ def get_coefs(model: object, y: Union[Sequence, str]):
 
 
 @export
-def get_feature_importance(model: object, predictors: Union[Sequence, str],
-                           features_to_sum: Mapping = None) -> pd.DataFrame:
+def get_feature_importance(
+        model: object, predictors: Union[Sequence, str], features_to_sum: Mapping = None
+) -> pd.DataFrame:
     """
     get feature importance of a decision tree like model in a sorted data frame
 
