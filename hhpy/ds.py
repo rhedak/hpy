@@ -5,34 +5,37 @@ hhpy.ds.py
 Contains DataScience functions extending on pandas and sklearn
 
 """
-
-# standard imports
+# ---- imports
+# --- standard imports
 import numpy as np
 import pandas as pd
 import warnings
 import os
 
-# third party imports
+# --- third party imports
 from copy import deepcopy
 from scipy import stats, signal
 from scipy.spatial import distance
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, median_absolute_error
 from sklearn.preprocessing import StandardScaler
 from typing import Mapping, Sequence, Callable, Union, List, Optional, Tuple
+from io import StringIO
 
-# local imports
+# --- local imports
 from hhpy.main import export, BaseClass, force_list, tprint, progressbar, qformat, list_intersection, round_signif, \
     is_list_like, dict_list, append_to_dict_list, concat_cols, DocstringProcessor, reformat_string, dict_inv, \
-    list_exclude, docstr as docstr_main, SequenceOfScalars, string_nan
+    list_exclude, docstr as docstr_main, SequenceOfScalars, SequenceOrScalar, STRING_NAN, is_scalar, GROUPBY_DUMMY
 
-# --- constants
+# ---- variables
+# --- validations
 validations = {
     'DFMapping__from_df__return_type': ['self', 'tuple'],
     'DFMapping__to_excel__if_exists': ['error', 'replace', 'append']
 }
-
+# --- docstr
 docstr = DocstringProcessor(
-    df='Pandas DataFrame containing the data',
+    # - general
+    df='Pandas DataFrame containing the data, other objects are implicitly cast to DataFrame',
     x='Main variable, name of a column in the DataFrame or vector data',
     hue='Name of the column to split by level [optional]',
     top_nr='Number of unique levels to keep when applying :func:`~top_n_coding` [optional]',
@@ -40,15 +43,38 @@ docstr = DocstringProcessor(
     other_to_na='Whether to cast all other elements to NaN [optional]',
     inplace='Whether to modify the DataFrame inplace [optional]',
     printf='The function used for printing in-function messages. Set to None or False to suppress printing [optional]',
+    groupby='The columns used for grouping, passed to pandas.DataFrame.groupby [optional]',
+    window='Size of the rolling window, see pandas.Series.rolling [optional]',
+    # - specific
     DFMapping__col_names='Whether to transform the column names [optional]',
     DFMapping__values='Whether to transform the column values [optional]',
     DFMapping__columns='Columns to transform, defaults to all columns [optional]',
+    # - imported
     warn=docstr_main.params['warn'],
+    # - validations
     **validations
 )
+# --- dtypes
+dtypes = {
+    'Int': ['Int8', 'Int16', 'Int32', 'Int64', 'UInt8', 'UInt16', 'UInt32', 'UInt64'],
+    'UInt': ['UInt8', 'UInt16', 'UInt32', 'UInt64'],
+    'int': ['int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64'],
+    'uint': ['uint8', 'uint16', 'uint32', 'uint64'],
+    'float': ['float8', 'float16', 'float32', 'float64'],
+    'string': ['string'],
+    'object': ['object'],
+    'boolean': ['boolean'],
+    'category': ['category'],
+    'datetime': ['datetime64[ns]'],
+    'datetimez': ['datetime64[ns, <tz>]'],
+    'period': ['period[<freq>]']
+}
+dtypes['Iint'] = dtypes['Int'] + dtypes['int']
+dtypes['number'] = dtypes['Iint'] + dtypes['float']
+dtypes['datetime64'] = dtypes['datetime']
 
 
-# --- classes
+# ---- classes
 @export
 class DFMapping(BaseClass):
     """
@@ -66,7 +92,7 @@ class DFMapping(BaseClass):
     __name__ = 'hhpy.ds.DFMapping'
     __attributes__ = ['col_mapping', 'value_mapping']
 
-    # ---- functions
+    # --- functions
     def __init__(self, df: Union[pd.DataFrame, str] = None, **kwargs) -> None:
 
         self.col_mapping = {}
@@ -115,7 +141,7 @@ class DFMapping(BaseClass):
             return_type = 'self'
 
         # avoid inplace operations
-        df = pd.DataFrame(df).copy()
+        df = _assert_df(df)
 
         # -- main
         # extract columns
@@ -216,7 +242,7 @@ class DFMapping(BaseClass):
         # -- init
         # handle inplace
         if not inplace:
-            df = pd.DataFrame(df).copy()
+            df = _assert_df(df)
         # get helpers
         if col_names:
             _col_mapping = self.col_mapping
@@ -353,26 +379,62 @@ class DFMapping(BaseClass):
                 self.value_mapping[_sheet_name] = _read_excel(xls=_xls, sheet_name=_sheet_name)
 
 
-# --- functions
+# ---- functions
+# --- internal
+def _assert_df(df: pd.DataFrame, inplace: bool = False, name: str = 'df') -> pd.DataFrame:
+    if inplace:
+        if isinstance(df, pd.DataFrame):
+            return df
+        else:
+            raise ValueError(f"{name} must be a DataFrame when using inplace=True")
+    else:
+        try:
+            df = pd.DataFrame(df).copy()
+            return df
+        except Exception as _e:
+            print(f"{_e.__class__.__name__}: {_e}")
+            raise ValueError(f"{name} must be a DataFrame or castable to DataFrame")
+
+
+# --- export
 @export
 def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_cat: bool = True, cat_frac: float = .5,
-                float_to_int: bool = False, float_digits: Optional[int] = None,
-                drop_all_na_cols: bool = False) -> pd.DataFrame:
+                convert_dtypes: bool = True, drop_all_na_cols: bool = False) -> pd.DataFrame:
     """
     optimize memory usage of a pandas df, automatically downcast all var types and converts objects to categories
 
     :param df: pandas DataFrame to be optimized. Other objects are implicitly cast to DataFrame
-    :param c_int: Whether to downcast integers
-    :param c_float: Whether to downcast floats
-    :param c_cat: Whether to cast objects to categories. Uses cat_frac as condition
+    :param c_int: Whether to downcast integers [optional]
+    :param c_float: Whether to downcast floats [optional]
+    :param c_cat: Whether to cast objects to categories. Uses cat_frac as condition [optional]
     :param cat_frac: If c_cat: If the column has less than cat_frac percent unique values it will be cast to category
-    :param float_to_int: Whether to cast float columns that only contain integers to int
-    :param float_digits: If float_to_int: round float columns to this many digits before checking for integers
-    :param drop_all_na_cols: Whether to drop columns that contain only missing values
+        [optional]
+    :param convert_dtypes: Whether to call convert dtypes (pandas 1.0.0+) [optional]
+    :param drop_all_na_cols: Whether to drop columns that contain only missing values [optional]
     :return: the optimized pandas DataFrame
     """
+    # -- func
+    # noinspection PyShadowingNames
+    def _do_downcast(df, cols, downcast):
+        if downcast is None:
+            return df
+        for _col in force_list(cols):
+            # downcast
+            try:
+                df[_col] = pd.to_numeric(df[_col], downcast=downcast)
+            except Exception as _e:
+                print(f"Downcast Error in {_col} - {_e.__class__}: {_e}")
+        return df
+
+    # -- init
     # avoid inplace operations
-    df = pd.DataFrame(df).copy()
+    df = _assert_df(df)
+
+    # pandas version flag
+    _pandas_version_1_plus = int(pd.__version__.split('.')[0]) > 0
+    # not convert_dtypes not support before pandas 1.0.0
+    if not _pandas_version_1_plus:
+        convert_dtypes = False
 
     # check for duplicate columns
     _duplicate_columns = get_duplicate_cols(df)
@@ -384,56 +446,53 @@ def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_ca
     if drop_all_na_cols:
         df = df.drop(df.columns[df.isnull().all()], axis=1)
 
+    # -- main
     # if applicable: convert float columns containing integer values to dtype int
-    if float_to_int:
-        for _col in df.select_dtypes(np.number).columns:
-            # - cast to integer if possible
-            # integer dtype is different if it can contain NaN
-            _s = df[_col].copy()
-            # check if column contains NaN
-            # if all values are NaN -> skip column
-            if _s.isnull().all():
-                continue
-            elif _s.isnull().sum() > 0:
-                # nullable dtype
-                _int_dtype = pd.Int64Dtype()
-                # comparison with NaN is always false
-                _s = _s.dropna()
-            else:
-                # non nullable dtype
-                _int_dtype = int
-            # if applicable: round
-            if float_digits:
-                _s = _s.round(float_digits)
-            # compare non null values
-            if np.array_equal(_s, _s.astype(int)):
-                # cast to specified int dtype
-                df[_col] = df[_col].apply(np.floor).astype(_int_dtype)
+    if convert_dtypes:
+        # scalar object to str (doesn't seem to work automatically as of 1.0.0)
+        for _col in df.select_dtypes('object').columns:
+            df[_col] = df[_col].apply(lambda _: str(_) if is_scalar(_) else _)
+        # df.convert_dtypes will be called after downcasting since it is not supported for some dtypes
 
     # casting
     if c_int:
-        _cols_int = df.select_dtypes(include=['int'])
-        # split integer columns in unsigned (all positive) and (unsigned)
-        _cols_signed = []
-        _cols_unsigned = []
+        _include = dtypes['int']
+        # Int does not support downcasting as of pandas 1.0.0 -> check again later
+        # if _pandas_version_1_plus:
+        #     _include += dtypes_Int
+        _cols_int = df.select_dtypes(include=_include)
+        # loop int columns
         for _col in _cols_int:
-            if (df[_col] > 0).all():
-                _cols_unsigned.append(_col)
+            # split integer columns in unsigned (all positive) and (unsigned)
+            if df[_col].isna().sum() > 0:
+                _downcast = None
+            elif (df[_col] > 0).all():
+                _downcast = 'unsigned'
             else:
-                _cols_signed.append(_col)
-        # downcast
-        df[_cols_unsigned] = df[_cols_unsigned].apply(pd.to_numeric, downcast='unsigned')
-        df[_cols_signed] = df[_cols_signed].apply(pd.to_numeric, downcast='signed')
+                _downcast = 'signed'
+            df = _do_downcast(df=df, cols=_col, downcast=_downcast)
 
     if c_float:
-        _cols_float = df.select_dtypes(include=['float']).columns
-        df[_cols_float] = df[_cols_float].apply(pd.to_numeric, downcast='float')
+        df = _do_downcast(df=df, cols=df.select_dtypes(include=['float']).columns, downcast='float')
 
     if c_cat:
-        for _col in df.select_dtypes(include=['object']).columns:
+        _include = ['object']
+        if _pandas_version_1_plus:
+            _include += ['string']
+        for _col in df.select_dtypes(include=_include).columns:
             # if there are less than 1 - cat_frac unique elements: cast to category
-            if df[_col].drop_duplicates().shape[0] / df[_col].shape[0] < (1 - cat_frac):
+            _count_unique = df[_col].dropna().drop_duplicates().shape[0]
+            _count_no_na = df[_col].dropna().shape[0]
+            if _count_no_na > 0 and (_count_unique / _count_no_na < (1 - cat_frac)):
                 df[_col] = df[_col].astype('category')
+
+    # call convert dtypes to handle downcasted dtypes
+    if convert_dtypes:
+        # try except is needed due to some compatibility issues
+        try:
+            df = df.convert_dtypes()
+        except Exception as _e:
+            print(f"skipped convert_dtypes due to: f{_e.__class__}: {_e}")
 
     return df
 
@@ -451,19 +510,21 @@ def get_df_corr(df: pd.DataFrame, columns: List[str] = None, target: str = None,
     :param groupby: Returns correlations for each level of the group [optional]
     :return: pandas DataFrame containing all pearson correlations in a melted format
     """
-    # avoid inplace operations
-    df = df.copy()
+    # -- init
+    # no inplace
+    df = _assert_df(df)
     # if there is a column called index it will create problems so rename it to '__index__'
     df = df.rename({'index': '__index__'}, axis=1)
     # add dummy groupby if groupby is None
     if groupby is None:
-        groupby = ['_dummy']
-        df['_dummy'] = 1
-
-    # use only numeric columns
+        groupby = GROUPBY_DUMMY
+        df[groupby] = 1
+    groupby = force_list(groupby)
+    # columns defaults to numeric columns
     if columns is None:
         columns = df.select_dtypes(include=np.number).columns
 
+    # -- main
     # init df as list of dfs
     _df_corr = []
     # loop groups
@@ -478,7 +539,7 @@ def get_df_corr(df: pd.DataFrame, columns: List[str] = None, target: str = None,
         # drop self correlation
         _df_corr_i = _df_corr_i[_df_corr_i['col_0'] != _df_corr_i['col_1']]
         # get identifier
-        for _groupby in force_list(groupby):
+        for _groupby in groupby:
             _df_corr_i[_groupby] = _df_i[_groupby].iloc[0]
         # append to list of dfs
         _df_corr.append(_df_corr_i)
@@ -486,8 +547,8 @@ def get_df_corr(df: pd.DataFrame, columns: List[str] = None, target: str = None,
     _df_corr = df_merge(_df_corr)
 
     # clean dummy groupby
-    if '_dummy' in _df_corr.columns:
-        _df_corr.drop('_dummy', axis=1, inplace=True)
+    if GROUPBY_DUMMY in _df_corr.columns:
+        _df_corr.drop(GROUPBY_DUMMY, axis=1, inplace=True)
     else:
         # move groupby columns to front
         _df_corr = col_to_front(_df_corr, groupby)
@@ -590,13 +651,14 @@ def outlier_to_nan(df: pd.DataFrame, col: str, groupby: Union[list, str] = None,
     :param std_cutoff: the number of standard deviations outside of which to set values to None
     :param reps: how many times to repeat the algorithm
     :param do_print: whether to print steps to console
-    :return: pandas DataFrame with outliers set to nan
+    :return: pandas Series with outliers set to nan
     """
-    df = pd.DataFrame(df).copy()
+    df = _assert_df(df)
 
     if groupby is None:
-        df['__groupby'] = 1
-        groupby = '__groupby'
+        groupby = GROUPBY_DUMMY
+        df[groupby] = 1
+    groupby = force_list(groupby)
 
     for _rep in range(reps):
 
@@ -604,33 +666,23 @@ def outlier_to_nan(df: pd.DataFrame, col: str, groupby: Union[list, str] = None,
             tprint('rep = ' + str(_rep + 1) + ' of ' + str(reps))
 
         # grouped by df
-        _df_out_grouped = df.groupby(groupby)
+        _df_grouped = df.groupby(groupby)
 
-        df['_dummy'] = df[col]
         # use interpolation to treat missing values
-        df['_dummy'] = _df_out_grouped['_dummy'].transform(pd.DataFrame.interpolate)
+        df[col] = _df_grouped[col].transform(pd.DataFrame.interpolate)
 
         # calculate delta (mean of diff to previous and next value)
-        df['_dummy_delta'] = .5 * (
-                np.abs(df['_dummy'] - _df_out_grouped['_dummy'].shift(1).bfill()) +
-                np.abs(df['_dummy'] - _df_out_grouped['_dummy'].shift(-1).ffill())
+        _delta = .5 * (
+                (df[col] - _df_grouped[col].shift(1).bfill()).abs() +
+                (df[col] - _df_grouped[col].shift(-1).ffill()).abs()
         )
 
-        _df_mean = _df_out_grouped[['_dummy_delta']].mean().rename({'_dummy_delta': '_dummy_mean'}, axis=1)
-        _df_std = _df_out_grouped[['_dummy_delta']].std().rename({'_dummy_delta': '_dummy_std'}, axis=1)
-        _df_cutoff = _df_mean.join(_df_std).reset_index()
+        df[col] = df[col].where((_delta - _df_grouped[col].mean()).abs() <= (std_cutoff * _df_grouped[col].std()))
 
-        df = pd.merge(df, _df_cutoff, on=groupby, how='inner')
-        df[col] = np.where(
-            np.abs(df['_dummy_delta'] - df['_dummy_mean']) <= (std_cutoff * df['_dummy_std']),
-            df[col], np.nan)
+    if GROUPBY_DUMMY in df.columns:
+        df = df.drop(GROUPBY_DUMMY, axis=1)
 
-        df = df.drop(['_dummy', '_dummy_mean', '_dummy_std', '_dummy_delta'], axis=1)
-
-    if '__groupby' in df.columns:
-        df = df.drop('__groupby', axis=1)
-
-    return df
+    return df[col]
 
 
 @export
@@ -691,7 +743,7 @@ def pass_by_group(df: pd.DataFrame, col: str, groupby: Union[str, list], btype: 
     :param order: order of the filter
     :return: filtered DataFrame
     """
-    df = pd.DataFrame(df).copy()
+    df = _assert_df(df)
 
     _df_out_grouped = df.groupby(groupby)
 
@@ -705,9 +757,9 @@ def pass_by_group(df: pd.DataFrame, col: str, groupby: Union[str, list], btype: 
 
 
 @export
-def lfit(x: Union[pd.Series, str], y: Union[pd.Series, str] = None, w: Union[pd.Series, str] = None,
-         df: pd.DataFrame = None, groupby: Union[list, str] = None, do_print: bool = True,
-         catch_error: bool = False, return_df: bool = False, extrapolate: bool = None):
+def lfit(x: SequenceOrScalar, y: SequenceOrScalar = None, w: SequenceOrScalar = None, df: pd.DataFrame = None,
+         groupby: SequenceOrScalar = None, do_print: bool = True, catch_error: bool = False, return_df: bool = False,
+         extrapolate: int = None) -> Union[pd.Series, pd.DataFrame]:
     """
     quick linear fit with numpy
 
@@ -723,34 +775,34 @@ def lfit(x: Union[pd.Series, str], y: Union[pd.Series, str] = None, w: Union[pd.
     :return: if return_df is True: pandas DataFrame, else: pandas Series
     """
     if df is None:
-        if 'name' in dir(x):
+        if hasattr(x, 'name'):
             _x_name = x.name
         else:
             _x_name = 'x'
-        if 'name' in dir(y):
+        if hasattr(y, 'name'):
             _y_name = y.name
         else:
-            _y_name = 'x'
-        if 'name' in dir(w):
+            _y_name = 'y'
+        if hasattr(w, 'name'):
             _w_name = w.name
         else:
-            _w_name = 'x'
-        _df = pd.DataFrame({
-            _x_name: x,
-            _y_name: y,
-            _w_name: w
-        })
+            _w_name = 'w'
+        _df = pd.DataFrame()
+        _df[_x_name] = x
+        _df[_y_name] = y
+        _df[_w_name] = w
     else:
         _df = df.copy()
         del df
         _x_name = x
         _y_name = y
         _w_name = w
-    _y_name_fit = '{}_fit'.format(_y_name)
+    _y_name_fit = f"{_y_name}_fit"
 
     if groupby is None:
-        groupby = '__groupby'
-        _df[groupby] = 1
+        groupby = [GROUPBY_DUMMY]
+        _df[GROUPBY_DUMMY] = 1
+    groupby = force_list(groupby)
 
     _it_max = _df[groupby].drop_duplicates().shape[0]
 
@@ -762,7 +814,7 @@ def lfit(x: Union[pd.Series, str], y: Union[pd.Series, str] = None, w: Union[pd.
             progressbar(_it, _it_max, print_prefix=qformat(_index))
 
         if y is None:
-            _x = _df_i.index
+            _x = _df_i.index.to_series()
             _y = _df_i[_x_name]
         else:
             _x = _df_i[_x_name]
@@ -808,11 +860,14 @@ def lfit(x: Union[pd.Series, str], y: Union[pd.Series, str] = None, w: Union[pd.
 
             _y_fit = _fit(_x)
 
-        _df_i[_x_name] = _x
-        _df_i[_y_name] = _y
-        _df_i[_y_name_fit] = _y_fit
+        # create df fit for iteration
+        _df_fit_i = pd.DataFrame({
+            _x_name: _x,
+            _y_name: _y,
+            _y_name_fit: _y_fit
+        })
 
-        _df_fit.append(_df_i)
+        _df_fit.append(_df_fit_i)
 
     _df_fit = df_merge(_df_fit)
 
@@ -823,6 +878,63 @@ def lfit(x: Union[pd.Series, str], y: Union[pd.Series, str] = None, w: Union[pd.
         return _df_fit
     else:
         return _df_fit[_y_name_fit]
+
+
+@docstr
+@export
+def rolling_lfit(x: SequenceOrScalar, window: int, df: pd.DataFrame = None, groupby: SequenceOrScalar = None):
+    """
+    Rolling version of lfit: for each row of the DataFrame / Series look at the previous window rows, then perform an
+    lfit and use this value as a prediction for this row. Useful as naive predictor for time series Data.
+
+    :param x: %(x)s
+    :param window: %(window)s
+    :param df: %(df)s
+    :param groupby:%(groupby)s
+    :return: pandas Series containing the fitted values
+    """
+
+    # -- assert
+    if df is None:
+        if hasattr(x, 'name'):
+            _x_name = x
+        else:
+            _x_name = 'x'
+        df = pd.DataFrame({_x_name: x})
+    else:
+        _x_name = x
+
+    # -- init
+    if groupby is None:
+        groupby = [GROUPBY_DUMMY]
+        df[GROUPBY_DUMMY] = 1
+    else:
+        groupby = force_list(groupby)
+
+    # -- main
+    # init output as dict
+    _x_lfit = {}
+    # - loop groups
+    for _, _df_i in df.groupby(groupby):
+        # get _x_i
+        _x_i = _df_i[x]
+        for _row, (_x_index, __) in enumerate(_x_i.iteritems()):
+            # need at least 2 entries to lfit -> first two entries become na
+            if _row < 2:
+                _x_lfit[_x_index] = np.nan
+                continue
+            # if row < window start at 0
+            _min_row = max([_row - window, 0])
+            # subset series
+            _x_row = _x_i.iloc[_min_row:_row]
+            # fit
+            _x_row_lfit = lfit(_x_row, extrapolate=1)
+            # get extrapolated value and append to dict
+            _x_lfit[_x_index] = (_x_row_lfit.iloc[-1])
+    # dict to series
+    _x_lfit = pd.Series(_x_lfit).sort_index()
+    # -- return
+    return _x_lfit
 
 
 @export
@@ -1414,7 +1526,8 @@ def df_score(df: pd.DataFrame, y_true: Union[List[str], str], pred_suffix: list 
 def rmsd(x: str, df: pd.DataFrame, group: str, return_df_paired: bool = False, agg_func: str = 'median',
          standardize: bool = False, to_abs: bool = False) -> Union[float, pd.DataFrame]:
     """
-    calculated the weighted root mean squared difference for a reference columns x by a specific group
+    calculated the weighted root mean squared difference for a reference columns x by a specific group. For a
+    multi group DataFrame see :func:`df_rmsd`. For a plot see :func:`hhpy.plotting.rmsdplot`
 
     :param x: name of the column to calculate the rmsd for
     :param df: pandas DataFrame
@@ -1424,6 +1537,10 @@ def rmsd(x: str, df: pd.DataFrame, group: str, return_df_paired: bool = False, a
     :param standardize: whether to apply Standardization before calculating the rmsd
     :param to_abs: whether to cast x to abs before calculating the rmsd
     :return: if return_df_paired pandas DataFrame, else rmsd as float
+
+    **Examples**
+
+    Check out the `example notebook <https://colab.research.google.com/drive/1wvkYK80if0okXJGf1j2Kl-SxXZdl-97k>`_
     """
 
     _agg_by_group = '{}_by_group'.format(agg_func)
@@ -1452,11 +1569,14 @@ def rmsd(x: str, df: pd.DataFrame, group: str, return_df_paired: bool = False, a
 
 
 # get a data frame showing the root mean squared difference by group type
+# noinspection PyShadowingNames
 @export
 def df_rmsd(x: str, df: pd.DataFrame, groups: Union[list, str] = None, hue: str = None, hue_order: list = None,
-            sort_by_hue: bool = True, n_quantiles: int = 10, include_rmsd: bool = True, **kwargs):
+            sort_by_hue: bool = True, n_quantiles: int = 10, signif: int = 2, include_rmsd: bool = True,
+            **kwargs) -> pd.DataFrame:
     """
-    calculate rmsd for reference column x with multiple other columns and return as DataFrame
+    calculate :func:`rmsd` for reference column x with multiple other columns and return as DataFrame. For a
+    plot see :func:`~hhpy.plotting.rmsdplot`
 
     :param x: name of the column to calculate the rmsd for
     :param df: pandas DataFrame containing the data
@@ -1465,10 +1585,15 @@ def df_rmsd(x: str, df: pd.DataFrame, groups: Union[list, str] = None, hue: str 
     :param hue_order: sort the hue levels in this order [optional]
     :param sort_by_hue: sort the values by hue rather than by group [optional]
     :param n_quantiles: numeric columns will be automatically split into this many quantiles [optional]
+    :param signif: how many significant digits to use in quantile splitting [optional]
     :param include_rmsd: if False provide only a grouped DataFrame but don't actually calculate the rmsd,
         you can use include_rmsd=False to save computation time if you only need the maxperc (used in plotting)
-    :param kwargs: passed to rmsd
+    :param kwargs: passed to :func:`rmsd`
     :return: None
+
+    **Examples**
+
+    Check out the `example notebook <https://colab.research.google.com/drive/1wvkYK80if0okXJGf1j2Kl-SxXZdl-97k>`_
     """
     # avoid inplace operations
     _df = df.copy()
@@ -1491,7 +1616,7 @@ def df_rmsd(x: str, df: pd.DataFrame, groups: Union[list, str] = None, hue: str 
 
     if hue is not None:
         if hue in list(_df.select_dtypes(include=np.number)):
-            _df[hue] = quantile_split(_df[hue], n_quantiles)
+            _df[hue] = quantile_split(_df[hue], n=n_quantiles, signif=signif)
         _df[hue] = _df[hue].astype('category').cat.remove_unused_categories()
         _hues = _df[hue].cat.categories
     else:
@@ -2015,15 +2140,20 @@ def df_split(df: pd.DataFrame, split_by: Union[List[str], str], return_type: str
 
 
 # merges a df, wrapper for pd.concat
-def df_merge(*args, ignore_index=True, sort=False, **kwargs):
-    return pd.concat(*args, ignore_index=ignore_index, sort=sort, **kwargs)
+def df_merge(obj, ignore_index=True, sort=False, **kwargs):
+    if isinstance(obj, pd.DataFrame):
+        return obj
+    elif len(obj) > 1:
+        return pd.concat(obj, ignore_index=ignore_index, sort=sort, **kwargs)
+    else:
+        return obj[0]
 
 
 def rank(df, rankby, groupby=None, score_ascending=True, sortby=None, sortby_ascending=None):
 
     # -- init
     # no inplace
-    df = pd.DataFrame(df).copy()
+    df = _assert_df(df)
 
     # defaults
     rankby = force_list(rankby)
@@ -2314,19 +2444,19 @@ def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count:
     """
     # -- init
     # avoid inplace operations
-    df = pd.DataFrame(df).copy()
+    df = _assert_df(df)
 
     # if applicable: drop NaN
     if (not na) or (na == 'drop'):
         # true NaN
         df = df.dropna(subset=[x])
         # string NaN
-        df = df[~df[x].isin(string_nan)]
+        df = df[~df[x].isin(STRING_NAN)]
         if hue is not None:
             # true NaN
             df = df.dropna(subset=[hue])
             # string NaN
-            df = df[~df[hue].isin(string_nan)]
+            df = df[~df[hue].isin(STRING_NAN)]
 
     # in case the original column is already called count it is renamed to count_org
     if x == 'count':
@@ -2512,7 +2642,7 @@ def top_n_coding(s: Sequence, n: int, other_name: str = 'other', na_to_other: bo
     else:
         _s = pd.Series(np.where(_s.isin(_top_n), _s, other_name))
     if na_to_other:
-        _s = np.where(~_s.isin(string_nan), _s, other_name)
+        _s = np.where(~_s.isin(STRING_NAN), _s, other_name)
     _s = pd.Series(_s)
 
     # get back the old properties of the series (or you'll screw the index)
@@ -2551,40 +2681,42 @@ def k_split(df: pd.DataFrame, k: int = 5, groupby: Union[Sequence, str] = None,
         tprint('splitting 1:{} ...'.format(k))
 
     # -- init
-    df = df.copy()
-    _index_name = df.index.name
-    df['_index'] = df.index.copy()
-    df = df.reset_index(drop=True)
-    _k_split = int(np.ceil(df.shape[0] / k))
-
+    # - no inplace
+    df = _assert_df(df)
+    # - row where to split
+    # - groupby
     if groupby is None:
-        groupby = '_dummy'
-        df['_dummy'] = 1
+        groupby = GROUPBY_DUMMY
+        df[GROUPBY_DUMMY] = 1
 
+    # -- main
     _df_out = []
-
+    # - split each group
     for _index, _df_i in df.groupby(groupby):
 
         # sort (randomly or by given value)
         if sortby is None:
-            _df_i = _df_i.sample(frac=1, random_state=random_state).reset_index(drop=True)
+            _df_i = _df_i.sample(frac=1, random_state=random_state)
         else:
             if sortby == 'index':
                 _df_i = _df_i.sort_index()
             else:
-                _df_i = _df_i.sort_values(by=sortby).reset_index(drop=True)
-
-        # assign k index
-        _df_i['_k_index'] = _df_i.index // _k_split
-
+                _df_i = _df_i.sort_values(by=sortby)
+        # get row numbers
+        _df_i['__row__'] = range(_df_i.shape[0])
+        # assign k index based on row number
+        _row_split = int(np.ceil(_df_i.shape[0] / k))
+        _df_i['_k_index'] = _df_i['__row__'] // _row_split
+        # append to list
         _df_out.append(_df_i)
-
-    _df_out = df_merge(_df_out).set_index(['_index']).sort_index()
-    _df_out.index = _df_out.index.rename(None)
-
-    if '_dummy' in _df_out.columns:
-        _df_out = _df_out.drop(['_dummy'], axis=1)
-
+    # - merge
+    _df_out = pd.concat(_df_out).sort_index()
+    # drop __row__ dummy
+    _df_out = _df_out.drop('__row__', axis=1)
+    # drop groupby dummy
+    if GROUPBY_DUMMY in _df_out.columns:
+        _df_out = _df_out.drop(GROUPBY_DUMMY, axis=1)
+    # -- return
     if return_type in range(k):
         _df_train = _df_out[_df_out['_k_index'] != return_type].drop('_k_index', axis=1)
         _df_test = _df_out[_df_out['_k_index'] == return_type].drop('_k_index', axis=1)
@@ -2605,10 +2737,94 @@ def remove_unused_categories(df: pd.DataFrame, inplace: bool = False) -> Optiona
     """
 
     if not inplace:
-        df = pd.DataFrame(df).copy()
+        df = _assert_df(df)
 
     for _col in df.select_dtypes('category'):
         df[_col] = df[_col].cat.remove_unused_categories()
 
     if not inplace:
         return df
+
+
+@export
+def read_csv(path: str, nrows: int = None, encoding: str = None, errors: str = 'replace', kws_open: Mapping = None,
+             **kwargs):
+    """
+    wrapper for pandas.read_csv that reads the file into an IOString first. This enables one to use the error handling
+    params of open which is very useful when opening a file with an uncertain encoding or illegal characters
+    that would trigger an encoding error in pandas.read_csv
+
+    :param path: path to file
+    :param nrows: how many rows to read, defaults to all [optional]
+    :param encoding: encoding to pass to open [optional]
+    :param errors: how to handle errors, see open [optional]
+    :param kws_open: other keyword arguments passed to open [optional]
+    :param kwargs: other keyword arguments passed to pandas.read_csv [optional]
+    :return:
+    """
+    # -- init
+    # - defaults
+    if kws_open is None:
+        kws_open = {}
+
+    # -- main
+    with open(path.encode('utf-8'), 'r', encoding=encoding, errors=errors, **kws_open) as _f:
+        if nrows:
+            _csv = StringIO('\n'.join([next(_f) for _ in range(nrows + 1)]))
+        else:
+            _csv = StringIO(_f.read())
+
+    # -- return
+    return pd.read_csv(deepcopy(_csv), nrows=nrows, **kwargs)
+
+
+@docstr
+@export
+def get_columns(df: pd.DataFrame, dtype: Union[SequenceOrScalar, np.number] = None,
+                to_list: bool = False) -> Union[list, pd.Index]:
+    """
+    A quick way to get the columns of a certain dtype. I added this because in pandas 1.0.0
+    pandas.DataFrame.select_dtypes('string') sometimes throws an error when the column does not contain correctly
+    formated data.
+
+    :param df: %(df)s
+    :param dtype: dtype to filter for, mimics behaviour of pandas.DataFrame.select_dtypes
+    :param to_list: Whether to return a list instead of a pandas.Index
+    :return: object containing the column names - if to_list: list, else pandas.Index
+    """
+
+    # -- init
+    _columns = []
+    # -- main
+    # - dtype filter
+    for _index, _value in df.dtypes.iteritems():
+        for _dtype in force_list(dtype):
+            # map int, float, boolean, np.number to their string representation
+            if _dtype in [int, float, bool]:
+                _dtype = 'int'
+            elif _dtype == float:
+                _dtype = 'float'
+            elif _dtype == bool:
+                _dtype = 'bool'
+            elif _dtype == np.number:
+                _dtype = 'number'
+            # main comparison: check if given dtype string or type
+            if isinstance(_dtype, str):
+                # look for str representation -> enforce lower case
+                _dtype = _dtype.lower()
+                _value = str(_value).lower()
+                if _dtype in ['number', 'numeric']:
+                    # generic number
+                    if ('float' in _value) or ('int' in _value):
+                        _columns.append(_index)
+                elif _dtype.lower() in _value:
+                    # user specified type
+                    _columns.append(_index)
+            elif isinstance(_value, _dtype):
+                # use an isinstance comparison
+                _columns.append(_index)
+    # - index to list
+    if not to_list:
+        _columns = pd.Index(_columns)
+    # -- return
+    return _columns

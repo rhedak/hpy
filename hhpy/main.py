@@ -6,8 +6,8 @@ Contains basic calculation functions that are used in the more specialized versi
 on their own
 
 """
-
-# standard library imports
+# ---- imports
+# --- standard imports
 import numpy as np
 import pandas as pd
 import warnings
@@ -16,16 +16,14 @@ import sys
 import datetime
 import h5py
 import re
-
-# third party imports
+# --- third party imports
 from typing import Any, Callable, Union, Sequence, Mapping, List, Optional, Iterable
 from docrep import DocstringProcessor
 from collections import defaultdict
 from copy import deepcopy
 from time import sleep
 from json import JSONDecodeError
-
-# optional imports
+# --- optional imports
 try:
     # noinspection PyPackageRequirements
     from googletrans import Translator
@@ -37,35 +35,34 @@ try:
 except ImportError:
     emoji = None
 
-
-# --- init
+# ---- init
 pd.plotting.register_matplotlib_converters()
 pd.options.mode.chained_assignment = None
 
-# --- constants
-# for functions
+# ---- variables
+# --- globals for functions
 global_t = datetime.datetime.now()  # for times progress bar
 global_tprint_len = 0  # for temporary printing
-# typing
+# --- typing classes
 Scalar = Union[int, float, str, bytes]
 ListOfScalars = Union[List[Scalar], Scalar]
 SequenceOrScalar = Union[Sequence, Scalar]
 SequenceOfScalars = Union[Sequence[Scalar], Scalar]
-
-# true constants
-string_nan = ['nan', 'nat', 'NaN', 'NaT']
-
-# rcParams
+# --- rcParams
 rcParams = {
-    'tprint.r_loc': 'front'
+    'tprint.r_loc': 'front',
 }
 
-# --- constants
+# ---- constants
+# --- true constants
+STRING_NAN = ['nan', 'nat', 'NaN', 'NaT']
+GROUPBY_DUMMY = '__groupby__'
+# --- validations
 validations = {
     'reformat_string__case': ['lower', 'upper'],
     'dict_inv__duplicates': ['adjust', 'drop']
 }
-
+# --- docstr
 docstr = DocstringProcessor(
     df='Pandas DataFrame containing the data',
     x='Main variable, name of a column in the DataFrame or vector data',
@@ -75,8 +72,9 @@ docstr = DocstringProcessor(
 )
 
 
-# --- decorators
+# ---- decorators
 def export(fn):
+    # based on https://stackoverflow.com/questions/41895077/export-decorator-that-manages-all
     mod = sys.modules[fn.__module__]
     if hasattr(mod, '__all__'):
         mod.__all__.append(fn.__name__)
@@ -85,7 +83,7 @@ def export(fn):
     return fn
 
 
-# --- classes
+# ---- classes
 @export
 class BaseClass:
     """
@@ -95,63 +93,18 @@ class BaseClass:
     """
 
     # --- globals
-    __name__ = 'hhpy.main.Base'
+    __name__ = 'BaseClass'
     __attributes__ = []
 
     # --- functions
     def __repr__(self):
+        return _get_repr(self)
 
-        # check if self.__name__ is still the same as Base (i.e. unset)
-        if self.__name__ == 'hhpy.main.Base' and self.__class__ != BaseClass:
-            warnings.warn('Printing does not work properly if parameter self.__name__ is not declared')
-        # check if class has attributes
-        if len(self.__attributes__) == 0:
-            warnings.warn('self.__attributes__ has length zero, did you declare it?')
-
-        # -- init
-        _str = self.__name__ + '('
-        _it = -1
-        # -- main
-        for _attr in self.__attributes__:
-            # don't print __name__
-            if _attr == '__name__':
-                continue
-            # check if _attr exists
-            if hasattr(self, _attr):
-                # get value
-                _value = self.__getattribute__(_attr)
-                # case by case selector
-                if _value is None:
-                    continue
-                elif isinstance(_value, np.ndarray):
-                    _value = f"numpy.ndarray{_value.shape})"
-                elif isinstance(_value, pd.DataFrame):
-                    _value = f"pandas.DataFrame{_value.shape}"
-                elif isinstance(_value, pd.Series):
-                    _value = f"pandas.Series{_value.shape}"
-                elif isinstance(_value, Callable):
-                    # noinspection PyUnresolvedReferences
-                    _value = f"Callable{_value.__code__.co_varnames}"
-                # only iterate if you print
-                _it += 1
-                # add separator
-                if _it > 0:
-                    _str += ', '
-                # add to string
-                _str += f"{_attr}={_value}"
-            else:
-                warnings.warn(f"{_attr} is specified in self.__attributes__ but does not exist. Skipping...")
-                continue
-        # close brace
-        _str += ')'
-        # -- return
-        return _str
-
-    def to_dict(self):
+    def to_dict(self) -> dict:
         """
         Converts self to a dictionary
 
-        :return: None
+        :return: Dictionary
         """
         if len(self.__attributes__) == 0:
             warnings.warn('self.__attributes__ has length zero, did you declare it?')
@@ -292,7 +245,105 @@ class BaseClass:
         return deepcopy(self)
 
 
-# --- functions
+# ---- functions
+# --- internal functions
+def _get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = True, map_dict: bool = True) -> str:
+    """
+    basic reuseable repr method for custom classes
+
+    :param obj: Any instance of a custom class implementing .__name__ (str) and .__attributes__ (List[str])
+    :param rules: Rules as dictionary of types and callables. Callable argument will be attribute value
+    :param map_list: Whether to map the rules to list elements
+    :return: str
+    """
+    def _get_repr_i(value: Any) -> str:
+
+        __repr_i = repr(value)
+        # case by case selector
+        if isinstance(value, np.ndarray):
+            __repr_i = f"numpy.ndarray{value.shape})"
+        elif isinstance(value, pd.DataFrame):
+            __repr_i = f"pandas.DataFrame{value.shape}"
+        elif isinstance(value, pd.Series):
+            __repr_i = f"pandas.Series{value.shape}"
+        elif hasattr(value, '__code__'):
+            if hasattr(value, '__name__'):
+                __name = value.__name__
+            else:
+                __name = 'Callable'
+            __repr_i = f"{__name}{value.__code__.co_varnames}"
+        # eval custom rules
+        for _type, _callable in rules.items():
+            if isinstance(value, _type):  # or (value == _type)
+                try:
+                    __repr_i = _callable(value)
+                except Exception as _e:
+                    print(f"{_e.__class__.__name__}: {_e} handled for {value}")
+
+        return __repr_i
+
+    # -- assert
+
+    # check if self.__name__ is still the same as Base (i.e. unset)
+    # - name
+    if hasattr(obj, '__name__'):
+        _name = obj.__name__
+    else:
+        warnings.warn('Object has no __name__ attribute, did you declare it?')
+        _name = '{Unnamed}'
+    if obj.__name__ == 'BaseClass' and obj.__class__ != BaseClass:
+        warnings.warn('__name__ is equal to BaseClass, did you declare it?')
+    # - attributes
+    if hasattr(obj, '__attributes__'):
+        _attributes = obj.__attributes__
+    else:
+        warnings.warn('Object has no __attributes__ attribute, did you declare it?')
+        _attributes = []
+    if len(obj.__attributes__) == 0:
+        warnings.warn('self.__attributes__ has length zero, did you declare it?')
+    # - rules
+    if rules is not None and not isinstance(rules, Mapping):
+        raise ValueError('rules should be a dictionary of types and callables')
+
+    # -- init
+    _repr = f"{_name}("
+    # iterator for separator handling
+    _it = -1
+    # -- main
+    for _attribute in _attributes:
+        # don't print __name__
+        if _attribute == '__name__':
+            continue
+        # check if _attr exists
+        if hasattr(obj, _attribute):
+            # get value
+            _value = obj.__getattribute__(_attribute)
+            if _value is None:
+                continue
+            if map_list and isinstance(_value, list):
+                _value = [_get_repr_i(_) for _ in _value]
+            if map_dict and isinstance(_value, dict):
+                for __key, __value in _value.items():
+                    _value[__key] = _get_repr_i(__value)
+            # get repr_i from value
+            _repr_i = _get_repr_i(value=_value)
+            # only iterate if you print
+            _it += 1
+            # add separator
+            if _it > 0:
+                _repr += ', '
+            # add to repr string
+            _repr += f"{_attribute}={_repr_i}"
+        else:
+            warnings.warn(f"{_attribute} is specified in self.__attributes__ but does not exist. Skipping...")
+            continue
+    # close brace
+    _repr += ')'
+    # -- return
+    return _repr
+
+
+# --- exported functions
 @export
 def today(date_format: str = '%Y_%m_%d') -> str:
     """
@@ -597,17 +648,14 @@ def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', empty_symbol: str
     :param kwargs: Passed to print function
     :return:
     """
-    # uses tprint by default, pass fprint to write to file
-
-    # if mid is passed mode is ignored
-
-    # mode can be 'perc', 'remaining' or 'elapsed'
-    # anything else, e.g. '', leads to an empty middle
-
+    # -- init
     _perc_f = i / i_max * 100
     _perc = int(np.floor(_perc_f))
     _rem = 100 - _perc
+    if len(print_prefix) > 0 and (print_prefix[-2:] != ': ') and (print_prefix[-1:] not in [':', '\n']):
+        print_prefix += ": "
 
+    # -- main
     if _perc <= 50:
 
         _right = empty_symbol * (50 // p_step)
@@ -647,7 +695,7 @@ def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', empty_symbol: str
     else:
         _mid = ''
 
-    _bar = '|{}{}{}{}|'.format(_left, print_prefix, _mid, _right)
+    _bar = f"{print_prefix}|{_left}{_mid}{_right}|"
 
     printf(_bar, **kwargs)
 
@@ -668,18 +716,18 @@ def time_to_str(t: datetime.datetime, time_format: str = '%Y-%m-%d') -> str:
 
 
 @export
-def cf_vec(x: Any, func: Callable, *args, **kwargs) -> Any:
+def cf_vec(x: Any, func: Callable, to_list: bool = True, *args, **kwargs) -> Any:
     """
     Pandas compatible vectorize function. In case a DataFrame is passed the function is applied to all columns.
 
     :param x: Any vector like object
     :param func: Any function that should be vectorized
+    :param to_list: Whether to cast the output to a list
     :param args: passed to func
     :param kwargs: passed to func
     :return: Vector like object
     """
-    # df
-
+    # - case: pandas DataFrame
     if isinstance(x, pd.DataFrame):
 
         _df = x.copy()
@@ -689,30 +737,26 @@ def cf_vec(x: Any, func: Callable, *args, **kwargs) -> Any:
 
         return _df
 
-    # generic
-
+    # - case: numpy array
     _x = np.array(x)
-
     if _x.shape == ():
-        _out = func(_x, *args, **kwargs)
-    elif len(_x.shape) == 1:
+        _out = func(x, *args, **kwargs)
+    elif (len(_x.shape) == 1) and to_list:
         _out = [func(_x_i, *args, **kwargs) for _x_i in _x]
     else:
         with np.nditer(_x, op_flags=['readwrite']) as _it:
             for _x_i in _it:
                 _x_i[...] = func(_x_i, *args, **kwargs)
-
         _out = _x
-
-    _out = force_list(_out)
-
+    if to_list:
+        _out = force_list(_out)
     return _out
 
 
 @export
 def round_signif_i(x: np.number, digits: int = 1) -> float:
     """
-    Round to significant number of digits
+    Round to significant number of digits for a Scalar number
 
     :param x: any number
     :param digits: integer amount of significant digits
@@ -814,12 +858,25 @@ def concat_cols(df: pd.DataFrame, columns: list, sep: str = '_', to_int: bool = 
 @export
 def list_unique(lst: Any) -> list:
     """
-    Returns unique elements from a list
+    Returns unique elements from a list (dropping duplicates)
 
     :param lst: any list like object
-    :return: a list
+    :return: list containing each element only once
     """
     return list(dict.fromkeys(force_list(lst)))
+
+
+@export
+def list_duplicate(lst: Any) -> list:
+    """
+    Returns only duplicate elements from a list
+
+    :param lst: any list like object
+    :return: list of duplicates values
+    """
+
+    _ind = pd.Index(lst)
+    return list_unique(_ind[_ind.duplicated()].tolist())
 
 
 @export
@@ -896,8 +953,12 @@ def list_exclude(lst: SequenceOrScalar, *args: SequenceOrScalar) -> list:
     _list_out = force_list(lst)
 
     for _arg in args:
-        if _arg in _list_out:
-            _list_out.remove(_arg)
+        try:
+            if _arg in _list_out:
+                _list_out.remove(_arg)
+        except Exception as _e:  # sometimes causes errors when comparing multi objects
+            _ = _e
+            pass
         for _el in force_list(_arg):
             if _el in _list_out:
                 _list_out.remove(_el)
@@ -1004,16 +1065,13 @@ def append_to_dict_list(dct: Union[dict, defaultdict], append: Union[dict, list]
 @export
 def is_scalar(obj: Any) -> bool:
     """
-    Checks if a given python object is scalar, i.e. one of int, float, str, bytyes
+    Checks if a given python object is scalar, i.e. one of int, float, str, bytes
 
     :param obj: Any python object
     :return: True if scaler, else False
     """
 
-    for _type in [int, float, str, bytes]:
-        if isinstance(obj, _type):
-            return True
-    return False
+    return isinstance(obj, Scalar.__args__)
 
 
 @export
@@ -1032,21 +1090,26 @@ def is_list_like(obj: Any) -> bool:
     # str, bytes
     if isinstance(obj, (str, bytes)):
         return False
-    # Sequence
-    if isinstance(obj, Sequence):
+    # Sequence and similar
+    if isinstance(obj, (Sequence, {}.keys().__class__, {}.values().__class__, pd.Index)):
         return True
     # Iterable
     if isinstance(obj, Iterable):
+        # check if the first element of the cast list is different from the object itself (object is castable to list)
+        try:  # try is needed because pandas objects return a sequence for != operator
+            if list(obj)[0] != obj:
+                return True
+        except (ValueError, IndexError):
+            pass
+        # check if the object is array like
         _shape = np.array(obj).shape
+        # 1d arrays are list like
         if len(_shape) == 1:
             return True
         elif len(_shape) == 2:
+            # 2d arrays are list like if the 2nd dimension contains only one entry (e.g. single column DataFrame)
             if _shape[1] == 1:
                 return True
-            else:
-                return False
-        else:
-            return False
     # Other
     return False
 
@@ -1073,10 +1136,13 @@ def force_list(*args: Any) -> list:
     # Regular case
     for _it, _arg in enumerate(args):
         if is_list_like(_arg):
-            # not all iterables implement list() in the same way -> cast to np.array and flatten
-            if isinstance(_arg, Iterable):
+            # require direct casts
+            if isinstance(_arg, (Sequence, {}.keys().__class__, {}.values().__class__, pd.Index)):
+                _arg = list(_arg)
+            elif isinstance(_arg, Iterable):
+                # not all iterables implement list() in the same way -> cast to np.array and flatten
                 _arg = list(np.array(_arg).flatten())
-            else:  # Sequences can be cast to list directly
+            else:  # other cases: direct cast
                 _arg = list(_arg)
         else:
             _arg = [_arg]
@@ -1192,22 +1258,26 @@ def to_hdf(df: pd.DataFrame, file: str, groupby: Union[str, List[str]] = None, k
     """
     assert (groupby is not None) or (key is not None), "You must supply either groupby or key"
 
+    # -- init
+    # - no inplace
+    df = pd.DataFrame(df).copy()
+    # - defaults
+    # groupby
     if groupby is None:
-        groupby = ['_dummy']
-        df = df.assign(_dummy=1)
+        groupby = GROUPBY_DUMMY
+        df[groupby] = 1
 
+    # -- main
+    # remove old file
     if replace and os.path.exists(file):
-
         os.remove(file)
         if do_print:
+            tprint()
             print('removed old {}'.format(file))
 
-    _i = 0
     _i_max = df[groupby].drop_duplicates().shape[0]
 
-    for _index, _df_i in df.groupby(groupby):
-
-        _i += 1
+    for _it, (_index, _df_i) in enumerate(df.groupby(groupby)):
 
         if key is None:
             _key = qformat(_index, as_string=True)
@@ -1215,14 +1285,15 @@ def to_hdf(df: pd.DataFrame, file: str, groupby: Union[str, List[str]] = None, k
             _key = key
 
         if do_print:
-            tprint('writing key {} / {} - {}...'.format(_i, _i_max, _key))
+            progressbar(_it, _i_max, print_prefix=f"writing key {_key:<30}: ")
 
-        if '_dummy' in _df_i.columns:
-            _df_i = _df_i.drop(['_dummy'], axis=1)
+        if GROUPBY_DUMMY in _df_i.columns:
+            _df_i = _df_i.drop(GROUPBY_DUMMY, axis=1)
 
         pd.DataFrame.to_hdf(_df_i, file, key=_key, format='table', **kwargs)
 
     if do_print:
+        tprint()
         print('{}saved to {}'.format('\n', file))
 
 
@@ -1290,14 +1361,19 @@ def read_hdf(file: str, key: Union[str, List[str]] = None, sample: int = None, r
                 _df.append(pd.read_hdf(file, key=_key))
             except KeyboardInterrupt:
                 raise KeyboardInterrupt
-            except Exception as exc:
-                print('error "{}" at key {} / {} : {}...'.format(exc, _i, len(_keys), _key))
+            except Exception as _e:
+                tprint('')
+                print(f"{_e.__class__.__name__}: '{_e}' while reading key {_key}")
         else:
             _df.append(pd.read_hdf(file, key=_key))
 
     if do_print:
         tprint('concat...')
-    _df = pd.concat(_df, ignore_index=True, sort=False)
+    try:
+        _df = pd.concat(_df, ignore_index=True, sort=False)
+    except Exception as _e:
+        tprint('')
+        print(f"{_e.__class__.__name__}: {_e} during pandas.concat")
 
     if do_print:
         tprint('read {} ; keys: {}'.format(file, _read_keys))

@@ -7,7 +7,8 @@ to provide convenient train test functions.
 
 """
 
-# standard imports
+# ---- imports
+# --- standard imports
 import itertools
 import warnings
 import numpy as np
@@ -15,7 +16,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# third party imports
+# --- third party imports
 from copy import deepcopy
 from typing import Sequence, Mapping, Union, Callable, Optional, Any
 
@@ -26,14 +27,13 @@ try:
 except ImportError:
     display = print
 
-# local imports
+# --- local imports
 from hhpy.main import export, BaseClass, is_list_like, force_list, tprint, DocstringProcessor, SequenceOrScalar
-from hhpy.ds import k_split, df_score
+from hhpy.ds import _assert_df, k_split, df_score
 from hhpy.plotting import ax_as_list, legend_outside, rcParams as hpt_rcParams, docstr as docstr_hpt
 
-# --- constants
-__all__ = []
-
+# ---- variables
+# --- validations
 validations = {
     'Model__predict__return_type': ['y', 'df', 'DataFrame'],
     'Models__predict__return_type': ['y', 'df', 'DataFrame', 'self'],
@@ -41,7 +41,7 @@ validations = {
     'Models__score__scores': ['r2', 'rmse', 'mae', 'stdae', 'medae'],
     'fit__fit_type': ['train_test', 'k_cross', 'final'],
 }
-
+# --- docstr
 docstr = DocstringProcessor(
     df='Pandas DataFrame containing the training and testing data. '
        'Can be saved to the Model object or supplied on an as needed basis.',
@@ -71,7 +71,7 @@ docstr = DocstringProcessor(
 )
 
 
-# --- classes
+# ---- classes
 # noinspection PyPep8Naming
 @docstr
 @export
@@ -86,7 +86,7 @@ class Model(BaseClass):
     """
 
     # --- globals
-    __name__ = 'cf.Model'
+    __name__ = 'Model'
     __attributes__ = ['name', 'model', 'X_ref', 'y_ref', 'is_fit']
 
     # --- functions
@@ -131,13 +131,13 @@ class Model(BaseClass):
 
                 _df_X = X.copy()
                 _df_y = pd.DataFrame(y.copy())
-                _df = pd.concat([_df_X, _df_y], axis=1)
+                df = pd.concat([_df_X, _df_y], axis=1)
 
             else:
 
                 _df_X = pd.DataFrame(X)
                 _df_y = pd.DataFrame(y)
-                _df = pd.concat([_df_X, _df_y], ignore_index=True, sort=False, axis=1)
+                df = pd.concat([_df_X, _df_y], ignore_index=True, sort=False, axis=1)
 
             self.X_ref = _df_X.columns
             self.y_ref = _df_y.columns
@@ -150,29 +150,31 @@ class Model(BaseClass):
                 self.X_ref = force_list(X)
             if self.y_ref is None:
                 self.y_ref = force_list(y)
-            _df = df.copy()
-            del df
+            df = _assert_df(df)
 
+        # handle dropna
+        if dropna:
+            df = df.dropna(subset=self.X_ref + self.y_ref)
+            if df_test is None:
+                df_test = df_test.dropna(subset=self.X_ref + self.y_ref)
+
+        # - init X / y train
+        _X = df[self.X_ref]
+        _y = df[self.y_ref]
+
+        # - init X / y test
         if df_test is None:
-
             _X_test = X_test
             _y_test = y_test
-
         else:
-
             _X_test = df_test[self.X_ref]
             _y_test = df_test[self.y_ref]
-
-        if dropna:
-            _df = _df.dropna()
-
-        _X = _df[self.X_ref]
-        _y = _df[self.y_ref]
 
         # -- fit
 
         _kwargs = {'X': _X, 'y': _y}
 
+        # pass X / y test only if fit can handle it
         if 'X_test' in self.model.fit.__code__.co_varnames:
             _kwargs['X_test'] = _X_test
         if 'y_test' in self.model.fit.__code__.co_varnames:
@@ -253,7 +255,7 @@ class Models(BaseClass):
     """
 
     # --- globals
-    __name__ = 'hhpy.modelling.Models'
+    __name__ = 'Models'
     __attributes__ = ['models', 'fit_type', 'df', 'X_ref', 'y_ref', 'scaler_X', 'scaler_y', 'model_names', 'df_score']
 
     # --- functions
@@ -261,9 +263,15 @@ class Models(BaseClass):
                  y_ref: SequenceOrScalar = None, scaler_X: Any = None, scaler_y: Any = None,
                  printf: Callable = tprint) -> None:
 
+        # -- assert
+        if isinstance(scaler_X, type):
+            scaler_X = scaler_X()
+        if isinstance(scaler_y, type):
+            scaler_y = scaler_y()
+
+        # -- init
         _models = []
         _model_names = []
-
         # ensure hhpy.modelling.Model
         _it = -1
         for _arg in args:
@@ -317,7 +325,8 @@ class Models(BaseClass):
         assert self.df is not None, 'You must specify a df'
 
         # -- split
-        self.df['_k_index'] = k_split(df=self.df, return_type='s', **kwargs)
+        _k_index = k_split(df=self.df, return_type='s', **kwargs)
+        self.df['_k_index'] = _k_index
 
     @docstr
     def model_by_name(self, name: Union[list, str]) -> Union[Model, list]:
@@ -357,6 +366,8 @@ class Models(BaseClass):
 
         _df_X = self.df[self.X_ref]
         _df_y = self.df[self.y_ref]
+        # -- apply scaler
+        warnings.simplefilter('ignore', DataConversionWarning)
         if self.scaler_X is not None:
             self.scaler_X = self.scaler_X.fit(_df_X)
             _df_X_scaled = pd.DataFrame(self.scaler_X.transform(_df_X), columns=_df_X.columns)
@@ -367,6 +378,7 @@ class Models(BaseClass):
             _df_y_scaled = pd.DataFrame(self.scaler_y.transform(_df_y), columns=_df_y.columns)
         else:
             _df_y_scaled = _df_y.copy()
+        warnings.simplefilter('default', DataConversionWarning)
 
         _df_scaled = pd.concat([_df_X_scaled, _df_y_scaled], axis=1)
 
@@ -637,7 +649,7 @@ class Models(BaseClass):
             plt.show(fig)
 
 
-# --- functions
+# ---- functions
 @export
 def dict_to_model(dic: Mapping) -> Model:
     """
@@ -672,7 +684,7 @@ def force_model(model: Any) -> Model:
         return model
 
     if '__name__' in model.keys():
-        if model['__name__'] in ['hhpy.modelling.Model']:
+        if model['__name__'] in ['Model']:
             _model = dict_to_model(model)
         else:
             raise ValueError('__name__ not recognized')

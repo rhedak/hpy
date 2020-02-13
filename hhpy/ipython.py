@@ -5,16 +5,17 @@ hhpy.ipython.py
 Contains convenience wrappers for ipython
 
 """
-# standard imports
+# ---- imports
+# --- standard imports
 import pandas as pd
-
-# third party imports
+# --- third party imports
 from IPython.display import display, HTML
+# --- local imports
+from hhpy.main import export, force_list, list_exclude
 
-# local imports
-from hhpy.main import export
 
-
+# ---- functions
+# --- export
 @export
 def wide_notebook(width: int = 90):
     """
@@ -59,15 +60,17 @@ def hide_code():
 
 
 @export
-def display_full(*args, **kwargs):
+def display_full(*args, rows=None, cols=None, **kwargs):
     """
     wrapper to display a pandas DataFrame with all rows and columns
 
+    :param rows: number of rows to display, defaults to all
+    :param cols: number of columns to display, defaults to all
     :param args: passed to display
     :param kwargs: passed to display
     :return: None
     """
-    with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+    with pd.option_context('display.max_rows', rows, 'display.max_columns', cols):
         display(*args, **kwargs)
 
 
@@ -78,7 +81,7 @@ def pd_display(*args, number_format='{:,.2f}', full=True, **kwargs):
 
     :param args: passed to display
     :param number_format: the number format to apply
-    :param full: whether to show all rows and columns or keep default behaviour
+    :param full: whether to use :func:`~display_full` (True) or standard display (False)
     :param kwargs: passed to display
     :return: None
     """
@@ -108,22 +111,23 @@ def display_df(df, int_format=',', float_format=',.2f', exclude=None, full=True,
 
     if exclude is None:
         exclude = []
-    if not isinstance(df, pd.DataFrame):
-        _df = pd.DataFrame(df)
     else:
-        _df = df.copy()
-    del df
+        exclude = force_list(exclude)
+    # avoid inplace
+    df = pd.DataFrame(df).copy()
 
-    _cols_int = [_ for _ in _df.select_dtypes(int).columns if _ not in exclude]
-    _cols_float = [_ for _ in _df.select_dtypes(float).columns if _ not in exclude]
+    _cols_int = list_exclude(df.select_dtypes(int).columns, exclude)
+    _cols_float = list_exclude(df.select_dtypes(float).columns, exclude)
 
-    for _col in _cols_int: _df[_col] = _df[_col].apply(lambda _: format(_, int_format))
-    for _col in _cols_float: _df[_col] = _df[_col].apply(lambda _: format(_, float_format))
+    for _col in _cols_int:
+        df[_col] = df[_col].apply(lambda _: format(_, int_format) if not pd.isna(_) else '<NaN>')
+    for _col in _cols_float:
+        df[_col] = df[_col].apply(lambda _: format(_, float_format) if not pd.isna(_) else '<NaN>')
 
     if full:
-        display_full(_df, **kwargs)
+        display_full(df, **kwargs)
     else:
-        display(_df, **kwargs)
+        display(df, **kwargs)
 
 
 # --- pandas styles

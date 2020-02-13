@@ -15,9 +15,12 @@
       <w>barchart</w>
       <w>barh</w>
       <w>barplot</w>
+      <w>borderwidth</w>
       <w>btype</w>
       <w>bubblecountplot</w>
       <w>bubbleplot</w>
+      <w>callables</w>
+      <w>castable</w>
       <w>cbar</w>
       <w>ceiled</w>
       <w>changepoint</w>
@@ -33,6 +36,7 @@
       <w>customizeable</w>
       <w>datapoint</w>
       <w>dataset</w>
+      <w>datetimez</w>
       <w>defaultdic</w>
       <w>defaultdict</w>
       <w>demojize</w>
@@ -44,6 +48,9 @@
       <w>distplot</w>
       <w>docrep</w>
       <w>docstr</w>
+      <w>downcasted</w>
+      <w>downcasting</w>
+      <w>dropdown</w>
       <w>dropna</w>
       <w>dtype</w>
       <w>edgecolor</w>
@@ -62,6 +69,7 @@
       <w>googletrans</w>
       <w>gridf</w>
       <w>groupby</w>
+      <w>groupbys</w>
       <w>hacky</w>
       <w>hanssen</w>
       <w>heatmap</w>
@@ -70,6 +78,7 @@
       <w>histplot</w>
       <w>hpy</w>
       <w>hspace</w>
+      <w>iint</w>
       <w>iloc</w>
       <w>importances</w>
       <w>includehidden</w>
@@ -95,6 +104,7 @@
       <w>markeredgewidth</w>
       <w>markerfacecolor</w>
       <w>matplotlib</w>
+      <w>maxchar</w>
       <w>maxcount</w>
       <w>maxlevel</w>
       <w>maxperc</w>
@@ -117,6 +127,7 @@
       <w>perc</w>
       <w>performant</w>
       <w>plim</w>
+      <w>plotly</w>
       <w>pred</w>
       <w>preds</w>
       <w>preprocessing</w>
@@ -132,9 +143,11 @@
       <w>quickstart</w>
       <w>rankby</w>
       <w>reformated</w>
+      <w>regressor</w>
       <w>regressors</w>
       <w>resample</w>
       <w>resampling</w>
+      <w>reuseable</w>
       <w>rgba</w>
       <w>rmsd</w>
       <w>rmsdplot</w>
@@ -152,6 +165,8 @@
       <w>seedable</w>
       <w>sharex</w>
       <w>sharey</w>
+      <w>showactive</w>
+      <w>showarrow</w>
       <w>signif</w>
       <w>sklearn</w>
       <w>sortby</w>
@@ -169,11 +184,15 @@
       <w>tprint</w>
       <w>trendline</w>
       <w>twinx</w>
+      <w>uint</w>
+      <w>updatemenu</w>
+      <w>updatemenus</w>
       <w>vectorize</w>
       <w>viewcode</w>
       <w>vline</w>
       <w>vlineplot</w>
       <w>vlines</w>
+      <w>xaxis</w>
       <w>xerr</w>
       <w>xkcd</w>
       <w>xlabel</w>
@@ -187,6 +206,7 @@
       <w>yerr</w>
       <w>ylim</w>
       <w>ylims</w>
+      <w>yref</w>
       <w>yticklabels</w>
     </words>
   </dictionary>

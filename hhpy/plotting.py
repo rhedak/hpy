@@ -2,11 +2,12 @@
 hhpy.plotting.py
 ~~~~~~~~~~~~~~~~
 
-Contains plotting functions
+Contains plotting functions using matplotlib.pyplot
 
 """
 
-# standard imports
+# -- imports
+# - standard imports
 from copy import deepcopy
 
 import pandas as pd
@@ -15,8 +16,9 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import logging
 import warnings
+import itertools
 
-# third party imports
+# - third party imports
 from matplotlib import patches
 from matplotlib.animation import FuncAnimation
 from matplotlib.legend import Legend
@@ -24,15 +26,27 @@ from colour import Color
 from scipy import stats
 from typing import Union, Sequence, Mapping, Callable, List
 
+# local imports
+from hhpy.main import export, concat_cols, is_list_like, floor_signif, ceil_signif, list_intersection, \
+    force_list, progressbar, DocstringProcessor, Scalar, SequenceOrScalar
+from hhpy.ds import get_df_corr, lfit, kde, df_count, quantile_split, top_n_coding, df_rmsd, df_agg
+
+# - optional imports
+logger = logging.getLogger('hhpy.plotting')
 try:
     from IPython.core.display import HTML
 except ImportError:
-    HTML = None
+    # noinspection PyPep8Naming
+    def HTML(obj):
+        logger.warning('Missing optional dependency IPython.core.display.HTML')
+        return obj
 
-# local imports
-from hhpy.main import export, concat_cols, is_list_like, floor_signif, ceil_signif, list_intersection, \
-    force_list, progressbar, DocstringProcessor
-from hhpy.ds import get_df_corr, lfit, kde, df_count, quantile_split, top_n_coding, df_rmsd, df_agg
+try:
+    # noinspection PyPackageRequirements
+    from plotly import graph_objects as go
+except ImportError:
+    logger.warning('Missing optional dependency plotly')
+    go = None
 
 # --- constants
 
@@ -68,9 +82,9 @@ validations = {
 }
 
 docstr = DocstringProcessor(
-    ax_in='The axes object to plot on, defaults to current axis [optional]',
-    ax_out='The axes object with the plot on it',
-    fig_ax_out='if return_fig_ax: figure and axis objects as tuple, else None',
+    ax_in='The matplotlib.pyplot.Axes object to plot on, defaults to current axis [optional]',
+    ax_out='The matplotlib.pyplot.Axes object with the plot on it',
+    fig_ax_out='if return_fig_ax: figure and axes objects as tuple, else None',
     x='Name of the x variable in data or vector data',
     y='Name of the y variable in data or vector data',
     t='Name of the t variable in data or vector data',
@@ -80,13 +94,13 @@ docstr = DocstringProcessor(
     data='Pandas DataFrame containing named data, optional if vector data is used',
     data_novec='Pandas DataFrame containing named data',
     hue='Further split the plot by the levels of this variable [optional]',
-    order='Either a string describing how the (hue) levels or to be ordered or an explicit list of levels to be'
-    'used for plotting. Accepted strings are:'
+    order='Either a string describing how the (hue) levels or to be ordered or an explicit list of levels to be ' 
+    'used for plotting. Accepted strings are: '
     '''
     
         * ``sorted``: following python standard sorting conventions (alphabetical for string, ascending for value)
         
-        * ``inv``: following sort of python standard sorting conventions but in inverse order
+        * ``inv``: following python standard sorting conventions but in inverse order
         
         * ``count``: sorted by value counts
         
@@ -110,9 +124,9 @@ docstr = DocstringProcessor(
     subplot_height='Height of each individual subplot [optional]',
     trendline='Whether to add a trendline [optional]',
     alpha='Alpha transparency level [optional]',
-    max_n='Maximum number of samples to be used for plotting, if this number is exceeded max_n samples are drawn'
-          'at random from the data which triggers a warning unless sample_warn is set to False.'
-          'Set to False or None to use all samples for plotting. [optional]',
+    max_n='''Maximum number of samples to be used for plotting, if this number is exceeded max_n samples are drawn '
+          'at random from the data which triggers a warning unless sample_warn is set to False. '
+          'Set to False or None to use all samples for plotting. [optional]''',
     max_n_random_state='Random state (seed) used for drawing the random samples [optional]',
     max_n_sample_warn='Whether to trigger a warning if the data has more samples than max_n [optional]',
     return_fig_ax='Whether to return the figure and axes objects as tuple to be captured as fig,ax = ..., '
@@ -140,6 +154,14 @@ docstr = DocstringProcessor(
     x_tick_rotation='Set x tick label rotation to this value [optional]',
     std_cutoff='Remove data outside of std_cutoff standard deviations, for a good visual experience try 3 [optional]',
     do_print='Whether to print intermediate steps to console [optional]',
+    x_min='Lower limit for the x axis [optional]',
+    x_max='Upper limit for the x axis [optional]',
+    y_min='Lower limit for the y axis [optional]',
+    y_max='Upper limit for the y axis [optional]',
+    title_plotly='Figure title, passed to plotly.Figure.update_layout [optional]',
+    xaxis_title='x axis title, passed to plotly.Figure.update_layout [optional]',
+    yaxis_title='y axis title, passed to plotly.Figure.update_layout [optional]',
+    fig_plotly='The plotly.Figure object to draw the plot on [optional]',
     **validations
 )
 
@@ -256,7 +278,7 @@ def corrplot_bar(data: pd.DataFrame, target: str = None, columns: List[str] = No
                  corr_cutoff: float = rcParams['corr_cutoff'], corr_as_alpha: bool = False,
                  xlim: tuple = (-1, 1), ax: plt.Axes = None):
     """
-    Correlation plot as barchart based on :func: `~hhpy.ds.get_df_corr`
+    Correlation plot as barchart based on :func:`~hhpy.ds.get_df_corr`
     
     :param data: %(data)s
     :param target: %(corr_target)s
@@ -1344,7 +1366,7 @@ def facet_wrap(func: Callable, data: pd.DataFrame, facet: Union[list, str], *arg
     :param kwargs: other keyword arguments passed to func
     :return: %(fig_ax_out)s
 
-    **examples**
+    **Examples**
 
     Check out the `example notebook <https://colab.research.google.com/drive/1bAEFRoWJgwPzkEqOoPBHVX849qQjxLYC>`_
     """
@@ -1708,7 +1730,7 @@ def rmsdplot(x: str, data: pd.DataFrame, groups: Union[Sequence, str] = None, hu
              color_as_balance: bool = False, balance_cutoff: float = None, rmsd_as_alpha: bool = False,
              sort_by_hue: bool = False, palette=None, barh_kws=None, **kwargs):
     """
-    creates a seaborn.barplot showing the rmsd calculating hhpy.ds.df_rmsd
+    creates a seaborn.barplot showing the rmsd calculating :func:`~hhpy.ds.df_rmsd`
     
     :param x: %(x)s
     :param data: %(data)s
@@ -1717,14 +1739,20 @@ def rmsdplot(x: str, data: pd.DataFrame, groups: Union[Sequence, str] = None, hu
     :param hue_order: %(order)s 
     :param cutoff: drop rmsd values smaller than cutoff [optional]
     :param ax: %(ax_in)s
-    :param color_as_balance: whether to color the bars based on how balanced the levels are [optional] 
-    :param balance_cutoff: if specified the balance coloring red for worse balance than balance cutoff [optional]
-    :param rmsd_as_alpha: whether to use set the alpha values of the columns based on the rmsd value [optional]
-    :param sort_by_hue: passed to hhpy.ds.df_rmsd [optional]
+    :param color_as_balance: Whether to color the bars based on how balanced (based on maxperc values) the levels are
+        [optional]
+    :param balance_cutoff: If specified: all bars with worse balance (based on maxperc values) than cutoff are shown
+        in red [optional]
+    :param rmsd_as_alpha: Whether to use set the alpha values of the columns based on the rmsd value [optional]
+    :param sort_by_hue: Whether to sort the plot by hue value [optional]
     :param palette: %(palette)s
     :param barh_kws: other keyword arguments passed to seaborn.barplot [optional]
-    :param kwargs: other keyword arguments passed to hhpy.ds.rf_rmsd [optional]
+    :param kwargs: other keyword arguments passed to :func:`hhpy.ds.rf_rmsd` [optional]
     :return: %(ax_out)s
+
+    **Examples**
+
+    Check out the `example notebook <https://colab.research.google.com/drive/1wvkYK80if0okXJGf1j2Kl-SxXZdl-97k>`_
     """
     if palette is None:
         palette = rcParams['palette']
@@ -1770,7 +1798,7 @@ def rmsdplot(x: str, data: pd.DataFrame, groups: Union[Sequence, str] = None, hu
         elif is_list_like(palette):
             _df_rmsd['_color'] = _df_rmsd[hue].apply(lambda _: palette[list(_hues).index(_)])
         else:
-            _df_rmsd['color'] = palette
+            _df_rmsd['_color'] = palette
 
         _rgba_colors[:, 0] = _df_rmsd['_color'].apply(lambda _: Color(_).red)
         _rgba_colors[:, 1] = _df_rmsd['_color'].apply(lambda _: Color(_).green)
@@ -2327,7 +2355,7 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
     :param kwargs: other keyword arguments passed to pyplot.plot
     :return: see mode
 
-    **examples**
+    **Examples**
 
     Check out the `example notebook <https://drive.google.com/open?id=1hJRfZn3Zwnc1n4cK7h2-UPSEj4BmsxhY>`_
     """
@@ -3480,7 +3508,7 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
               annotate_format: str = rcParams['int_format'], legend_loc: str = 'upper right',
               barplot_kws: Mapping = None, count_twinx_kws: Mapping = None, **kwargs):
     """
-    Based on seaborn barplot but with a few more options
+    Based on seaborn barplot but with a few more options, uses :func:`~hhpy.ds.df_count`
     
     :param x: %(x)s
     :param data: %(data)s
@@ -3499,7 +3527,7 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
     :param legend_loc: %(legend_loc)s
     :param barplot_kws: Additional keyword arguments passed to seaborn.barplot [optional]
     :param count_twinx_kws: Additional keyword arguments passed to pyplot.plot [optional]
-    :param kwargs: Additional keyword arguments passed to :func: `~hhpy.ds.df_count` [optional]
+    :param kwargs: Additional keyword arguments passed to :func:`~hhpy.ds.df_count` [optional]
     :return: %(ax_out)s
     """
 
@@ -3673,3 +3701,170 @@ def quantile_plot(x: Union[Sequence, str], data: pd.DataFrame = None, qs: Union[
     ax.set_ylabel(_label)
 
     return ax
+
+
+@docstr
+@export
+def plotly_aggplot(data: pd.DataFrame, x: Scalar, y: Scalar, hue: Scalar = None, groupby: SequenceOrScalar = None,
+                   sep: str = ';', agg: str = 'sum', hue_order: Union[list, str] = None, x_min: Scalar = None,
+                   x_max: Scalar = None, y_min: Scalar = None, y_max: Scalar = None, mode: str = 'lines+markers',
+                   title: str = None, xaxis_title: str = None, yaxis_title: str = None, label_maxchar: int = 15,
+                   direction: str = 'up', showactive: bool = True, dropdown_x: float = 0, dropdown_y: float = -.1,
+                   fig: go.Figure = None, do_print: bool = True, kws_dropdown: Mapping = None, kws_fig: Mapping = None,
+                   **kwargs) -> go.Figure:
+    """
+    create a (grouped) plotly aggplot that let's you select the groupby categories
+
+    :param data: %(data)s
+    :param x: %(x_novec)s
+    :param y: %(y_novec)s
+    :param hue: %(hue)s
+    :param groupby: Column name(s) to split the plot by [optional]
+    :param sep: Separator used for groupby columns [optional]
+    :param agg: Aggregate function to use [optional]
+    :param hue_order: %(order)s
+    :param x_min: %(x_min)s
+    :param x_max: %(x_max)s
+    :param y_min: %(y_min)s
+    :param y_max: %(y_max)s
+    :param mode: plotly mode [optional]
+    :param title: %(title_plotly)s
+    :param xaxis_title: %(xaxis_title)s
+    :param yaxis_title: %(yaxis_title)s
+    :param label_maxchar: Maximum allowed number of characters of the labels [optional]
+    :param direction: One of ['up', 'down'] , direction of the dropdown [optional]
+    :param showactive: Whether to show the active selection in the dropdown [optional]
+    :param dropdown_x: x position of the first dropdown [optional]
+    :param dropdown_y: y position of the first dropdown [optional]
+    :param fig: %(fig_plotly)s
+    :param do_print: %(do_print)s
+    :param kws_dropdown: Other keyword arguments passed to the dropdown updatemenu [optional]
+    :param kws_fig: other keyword arguments passed to plotly.graph_objects.Figure [optional]
+    :param kwargs: other keyword arguments passed to plotly.graph_objects.scatter [optional]
+    :return: plotly Figure with the plot on it
+    """
+    # -- assert
+    if (y_min is not None and y_max is None) or (y_min is None and y_max is not None):
+        raise ValueError('If you supply y_min or y_max you must also supply the other')
+
+    # -- functions
+    def _get_xy(fltr: tuple = None, hue_i: Scalar = None) -> tuple:
+        _df = data.copy()
+        if hue != '__dummy__':
+            _df = _df[_df[hue] == hue_i]
+        if fltr is not None:
+            for __it, _value in enumerate(fltr):
+                _key = groupby[__it]
+                if _value != '<ALL>':
+                    _df = _df[_df[_key] == _value]
+        _df_agg = _df.groupby(x).agg({y: agg}).reset_index()
+        return _df_agg[x], _df_agg[y]
+
+    # -- init
+    # - no inplace
+    data = pd.DataFrame(data).copy()
+    # - defaults
+    if kws_dropdown is None:
+        kws_dropdown = {}
+    if kws_fig is None:
+        kws_fig = {}
+    if title is None:
+        title = f"{agg} of '{y}' over '{x}'"
+        if groupby is not None:
+            title += f", filtered by '{groupby}'"
+        if groupby is not None:
+            title += f", split by '{hue}'"
+    if xaxis_title is None:
+        xaxis_title = x
+    elif xaxis_title in [False, 'None']:
+        xaxis_title = None
+    if yaxis_title is None:
+        yaxis_title = y
+    elif yaxis_title in [False, 'None']:
+        yaxis_title = None
+    if hue is None:
+        hue = '__dummy__'
+        data[hue] = 1
+        _hues = [1]
+    else:
+        _hues = _get_ordered_levels(data, hue, hue_order)
+    if fig is None:
+        fig = go.Figure(**kws_fig)
+    # - force_list
+    groupby = force_list(groupby)
+    # - x_min / x_max
+    if x_min is not None:
+        data = data[data[x] >= x_min]
+    if x_max is not None:
+        data = data[data[x] <= x_max]
+
+    # -- main
+    # - scatter
+    for _hue in _hues:
+        _x, _y = _get_xy(hue_i=_hue)
+        fig.add_trace(go.Scatter(x=_x, y=_y, mode=mode, name=_hue, **kwargs))
+    # - concat groupbys
+    _groupby_dict = {}
+    for _groupby in groupby:
+        _groupby_dict[_groupby] = ['<ALL>'] + data[_groupby].drop_duplicates().sort_values().tolist()
+    _groupby_values = list(itertools.product(*list(_groupby_dict.values())))
+    _len_groupby_values = len(_groupby_values)
+    # - updatemenus
+    _updatemenus = []
+    _buttons = []
+    for _it_group, _category in enumerate(_groupby_values):
+        # show progressbar
+        if do_print:
+            progressbar(_it_group, _len_groupby_values)
+        # get x, y by hue
+        _xs = []
+        _ys = []
+        for _hue in _hues:
+            _x, _y = _get_xy(fltr=_category, hue_i=_hue)
+            _xs.append(_x)
+            _ys.append(_y)
+        # get label
+        _label = ''
+        for _it_cat, _category_i in enumerate(force_list(_category)):
+            if _it_cat > 0:
+                _label += sep
+            _label_i = str(_category_i)
+            if len(_label_i) > label_maxchar:
+                _label_i = _label_i[:label_maxchar] + '...'
+            _label += _label_i
+        # create button
+        _buttons.append({
+            'method': 'restyle',
+            'label': _label,
+            'args': [{'x': _xs, 'y': _ys}]
+        })
+        # print(_buttons)
+        _updatemenus.append({
+            'buttons': _buttons,
+            'direction': direction,
+            'showactive': showactive,
+            'x': dropdown_x,
+            'y': dropdown_y,
+            **kws_dropdown
+        })
+
+    # - fig
+    # noinspection PyUnboundLocalVariable
+    fig.update_layout(updatemenus=_updatemenus)
+    # # - annotation (not properly aligned, therefore dropped for now)
+    # _annotation = sep.join([str(_) for _ in force_list(groupby)])
+    # _fig.update_layout(annotations=[
+    #     go.layout.Annotation(text=_annotation, showarrow=False, x=dropdown_x, y=dropdown_y+.1, xref="paper",
+    #                          yref="paper", align="left")
+    # ])
+    # - title / axis titles
+    fig.update_layout(title=title, xaxis_title=xaxis_title, yaxis_title=yaxis_title)
+    # - y_min / y_max
+    if y_min is not None:
+        fig.update_yaxes(range=[y_min, y_max])
+    # - final progressbar
+    if do_print:
+        progressbar()
+
+    # -- return
+    return fig
