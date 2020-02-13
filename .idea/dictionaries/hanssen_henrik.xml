@@ -19,6 +19,7 @@
       <w>btype</w>
       <w>bubblecountplot</w>
       <w>bubbleplot</w>
+      <w>bugfixes</w>
       <w>callables</w>
       <w>castable</w>
       <w>cbar</w>
@@ -88,6 +89,7 @@
       <w>iterrows</w>
       <w>jshtml</w>
       <w>kdeplot</w>
+      <w>kwdefaults</w>
       <w>kwhist</w>
       <w>kwline</w>
       <w>lcurveplot</w>

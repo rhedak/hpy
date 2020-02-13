@@ -16,8 +16,10 @@ import sys
 import datetime
 import h5py
 import re
+import functools
 # --- third party imports
 from typing import Any, Callable, Union, Sequence, Mapping, List, Optional, Iterable
+from types import FunctionType
 from docrep import DocstringProcessor
 from collections import defaultdict
 from copy import deepcopy
@@ -274,7 +276,7 @@ def _get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = 
             __repr_i = f"{__name}{value.__code__.co_varnames}"
         # eval custom rules
         for _type, _callable in rules.items():
-            if isinstance(value, _type):  # or (value == _type)
+            if isinstance(value, _type) or (value == _type):
                 try:
                     __repr_i = _callable(value)
                 except Exception as _e:
@@ -1536,3 +1538,18 @@ def dict_inv(dct: Mapping, key_as_str: bool = False, duplicates: str = 'keep') -
         _dct_inv[_value] = _key
 
     return _dct_inv
+
+
+@export
+def copy_function(f: FunctionType) -> FunctionType:
+    """
+    return a copy of a function, based on this StackOverflow answer
+    https://stackoverflow.com/questions/13503079/how-to-create-a-copy-of-a-python-function
+
+    :param f: a function
+    :return: copy of function
+    """
+    _f = FunctionType(f.__code__, f.__globals__, name=f.__name__, argdefs=f.__defaults__, closure=f.__closure__)
+    _f = functools.update_wrapper(_f, f)
+    _f.__kwdefaults__ = f.__kwdefaults__
+    return _f
