@@ -1,6 +1,6 @@
 """
 hhpy.main.py
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~
 
 Contains basic calculation functions that are used in the more specialized versions of the package but can also be used
 on their own
@@ -18,7 +18,7 @@ import h5py
 import re
 import functools
 # --- third party imports
-from typing import Any, Callable, Union, Sequence, Mapping, List, Optional, Iterable
+from typing import Any, Callable, Union, Sequence, Mapping, List, Optional, Iterable, AbstractSet, ValuesView
 from types import FunctionType
 from docrep import DocstringProcessor
 from collections import defaultdict
@@ -48,8 +48,9 @@ global_tprint_len = 0  # for temporary printing
 # --- typing classes
 Scalar = Union[int, float, str, bytes]
 ListOfScalars = Union[List[Scalar], Scalar]
-SequenceOrScalar = Union[Sequence, Scalar]
+SequenceOrScalar = Union[Sequence, Scalar, AbstractSet]
 SequenceOfScalars = Union[Sequence[Scalar], Scalar]
+DFOrArray = Union[pd.DataFrame, np.ndarray]
 # --- rcParams
 rcParams = {
     'tprint.r_loc': 'front',
@@ -62,7 +63,8 @@ GROUPBY_DUMMY = '__groupby__'
 # --- validations
 validations = {
     'reformat_string__case': ['lower', 'upper'],
-    'dict_inv__duplicates': ['adjust', 'drop']
+    'dict_inv__duplicates': ['adjust', 'drop'],
+    'progressbar__mode': ['perc', 'remaining', 'elapsed'],
 }
 # --- docstr
 docstr = DocstringProcessor(
@@ -97,6 +99,7 @@ class BaseClass:
     # --- globals
     __name__ = 'BaseClass'
     __attributes__ = []
+    __attributes_no_repr__ = []
 
     # --- functions
     def __repr__(self):
@@ -150,8 +153,10 @@ class BaseClass:
                     if '__name__' in _attr.keys():
 
                         _name = _attr['__name__']
-                        if _name[:3] == 'cf.':
-                            _name = _name[3:]
+                        # remnant of a time when this was a file called cf.py
+                        # if _name[:3] == 'cf.':
+                        #     _name = _name[3:]
+                        # evaluate, i.e. instantiate
                         _attr_eval = eval(_name + '()')
                         if 'from_dict' in dir(_attr_eval):
                             _attr_eval.from_dict(_attr)
@@ -263,11 +268,11 @@ def _get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = 
         __repr_i = repr(value)
         # case by case selector
         if isinstance(value, np.ndarray):
-            __repr_i = f"numpy.ndarray{value.shape})"
+            __repr_i = f"Array{value.shape})"
         elif isinstance(value, pd.DataFrame):
-            __repr_i = f"pandas.DataFrame{value.shape}"
+            __repr_i = f"DataFrame{value.shape}"
         elif isinstance(value, pd.Series):
-            __repr_i = f"pandas.Series{value.shape}"
+            __repr_i = f"Series{value.shape}"
         elif hasattr(value, '__code__'):
             if hasattr(value, '__name__'):
                 __name = value.__name__
@@ -275,12 +280,13 @@ def _get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = 
                 __name = 'Callable'
             __repr_i = f"{__name}{value.__code__.co_varnames}"
         # eval custom rules
-        for _type, _callable in rules.items():
-            if isinstance(value, _type) or (value == _type):
-                try:
-                    __repr_i = _callable(value)
-                except Exception as _e:
-                    print(f"{_e.__class__.__name__}: {_e} handled for {value}")
+        if rules is not None:
+            for _type, _callable in rules.items():
+                if isinstance(value, _type) or (value == _type):
+                    try:
+                        __repr_i = _callable(value)
+                    except Exception as _e:
+                        print(f"{_e.__class__.__name__}: {_e} handled for {value}")
 
         return __repr_i
 
@@ -298,6 +304,9 @@ def _get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = 
     # - attributes
     if hasattr(obj, '__attributes__'):
         _attributes = obj.__attributes__
+        # exclude attributes to be hidden in repr
+        if hasattr(obj, '__attributes_no_repr__'):
+            _attributes = list_exclude(_attributes, obj.__attributes_no_repr__)
     else:
         warnings.warn('Object has no __attributes__ attribute, did you declare it?')
         _attributes = []
@@ -627,6 +636,7 @@ def remaining_time(i: int, i_max: int) -> datetime.timedelta:
     return _remaining_time
 
 
+@docstr
 @export
 def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', empty_symbol: str = '_', mid: str = None,
                 mode: str = 'perc', print_prefix: str = '', p_step: int = 1, printf: Callable = tprint,
@@ -639,7 +649,7 @@ def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', empty_symbol: str
     :param symbol: symbol that represents reached progress blocks
     :param empty_symbol: symbol that represents not yet reached progress blocks
     :param mid: what to write in the middle of the progressbar, if mid is passed mode is ignored
-    :param mode: {'perc', 'total', 'elapsed'}.
+    :param mode: One of %(progressbar__mode)s
         If perc is passed writes percentage. If 'remaining' or 'elapsed' writes remaining or elapsed time respectively.
         [optional]
     :param print_prefix: what to write in front of the progressbar. Useful when calling progressbar multiple times
@@ -650,6 +660,9 @@ def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', empty_symbol: str
     :param kwargs: Passed to print function
     :return:
     """
+    # -- assert
+    if mode not in validations['progressbar__mode']:
+        raise ValueError(f"mode must be one of {validations['progressbar__mode']}")
     # -- init
     _perc_f = i / i_max * 100
     _perc = int(np.floor(_perc_f))
@@ -672,6 +685,10 @@ def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', empty_symbol: str
         _mid = mid
     elif mode in ['remaining', 'elapsed']:
 
+        # if i == 0: init elapse time
+        if i == 0:
+            elapsed_time_init()
+        # get elapsed time
         _elapsed_time = elapsed_time(do_return=True)
 
         # special case for i==0 since we cannot calculate remaining time
@@ -751,7 +768,7 @@ def cf_vec(x: Any, func: Callable, to_list: bool = True, *args, **kwargs) -> Any
                 _x_i[...] = func(_x_i, *args, **kwargs)
         _out = _x
     if to_list:
-        _out = force_list(_out)
+        _out = assert_list(_out)
     return _out
 
 
@@ -842,7 +859,7 @@ def concat_cols(df: pd.DataFrame, columns: list, sep: str = '_', to_int: bool = 
 
     _df['_out'] = ''
 
-    for _it, _column in enumerate(force_list(columns)):
+    for _it, _column in enumerate(assert_list(columns)):
 
         if _it > 0:
             _df['_out'] = _df['_out'] + sep
@@ -865,7 +882,7 @@ def list_unique(lst: Any) -> list:
     :param lst: any list like object
     :return: list containing each element only once
     """
-    return list(dict.fromkeys(force_list(lst)))
+    return list(dict.fromkeys(assert_list(lst)))
 
 
 @export
@@ -889,7 +906,7 @@ def list_flatten(lst: Any) -> list:
     :param lst: list of lists
     :return: flattened list
     """
-    return list(np.array(force_list(lst)).flat)
+    return list(np.array(assert_list(lst)).flat)
 
 
 @export
@@ -912,7 +929,7 @@ def list_merge(*args: Any, unique: bool = True, flatten: bool = False) -> list:
         if flatten:
             _arg = list_flatten(_arg)
         else:
-            _arg = force_list(_arg)
+            _arg = assert_list(_arg)
 
         _list += _arg
 
@@ -932,10 +949,10 @@ def list_intersection(lst: SequenceOrScalar, *args: SequenceOrScalar) -> list:
     :return: the list of common elements
     """
     # more performant than list comprehension
-    _list_out = force_list(lst)
+    _list_out = assert_list(lst)
 
     for _arg in args:
-        _list = force_list(_arg)
+        _list = assert_list(_arg)
         _list_out = list(set(_list_out).intersection(_list))
 
     return _list_out
@@ -952,7 +969,7 @@ def list_exclude(lst: SequenceOrScalar, *args: SequenceOrScalar) -> list:
     :return: the filtered list
     """
     # more performant than list comprehension
-    _list_out = force_list(lst)
+    _list_out = assert_list(lst)
 
     for _arg in args:
         try:
@@ -961,7 +978,7 @@ def list_exclude(lst: SequenceOrScalar, *args: SequenceOrScalar) -> list:
         except Exception as _e:  # sometimes causes errors when comparing multi objects
             _ = _e
             pass
-        for _el in force_list(_arg):
+        for _el in assert_list(_arg):
             if _el in _list_out:
                 _list_out.remove(_el)
 
@@ -1022,7 +1039,7 @@ def dict_list(*args, dict_type: str = 'defaultdict') -> dict:
         _dict = defaultdict(list)
 
     for _arg in args:
-        for _list in force_list(_arg):
+        for _list in assert_list(_arg):
             _dict[_list] = []
 
     return _dict
@@ -1092,8 +1109,8 @@ def is_list_like(obj: Any) -> bool:
     # str, bytes
     if isinstance(obj, (str, bytes)):
         return False
-    # Sequence and similar
-    if isinstance(obj, (Sequence, {}.keys().__class__, {}.values().__class__, pd.Index)):
+    # Sequence and similar (AbstractSet includes KeysView and ItemsView but not ValuesView)
+    if isinstance(obj, (Sequence, AbstractSet, ValuesView, pd.Index)):
         return True
     # Iterable
     if isinstance(obj, Iterable):
@@ -1117,9 +1134,9 @@ def is_list_like(obj: Any) -> bool:
 
 
 @export
-def force_list(*args: Any) -> list:
+def assert_list(*args: Any) -> list:
     """
-    Takes any python objects and turns them into an iterable list.
+    Takes any python object(s) and turns them into an iterable list.
 
     :param args: Any python object
     :return: List
@@ -1159,8 +1176,13 @@ def force_list(*args: Any) -> list:
     return args
 
 
+def force_list(*args, **kwargs):
+    warnings.warn('force_list is deprecated, please use assert_list instead', DeprecationWarning)
+    return assert_list(*args, **kwargs)
+
+
 @export
-def force_scalar(obj: Any, warn: bool = True) -> Scalar:
+def assert_scalar(obj: Any, warn: bool = True) -> Scalar:
     """
     Takes any python object and turns it into a scalar object.
 
@@ -1168,12 +1190,17 @@ def force_scalar(obj: Any, warn: bool = True) -> Scalar:
     :param warn: Whether to trigger a warning when objects are being truncated
     :return: List
     """
-    _lst = force_list(obj)
+    _lst = assert_list(obj)
     _len = len(_lst)
     if warn and _len > 1:
         warnings.warn(f"force scalar: object {obj} has length {_len}, retaining only first entry")
 
     return _lst[0]
+
+
+def force_scalar(*args, **kwargs):
+    warnings.warn('force_scalar is deprecated, please use assert_list instead', DeprecationWarning)
+    return assert_scalar(*args, **kwargs)
 
 
 @export
@@ -1242,20 +1269,24 @@ def qformat(value: Any, int_format: str = ',', float_format: str = ',.2f', datet
     return _string
 
 
+# noinspection PyShadowingBuiltins
 @export
-def to_hdf(df: pd.DataFrame, file: str, groupby: Union[str, List[str]] = None, key: str = None, replace: bool = False,
-           do_print=True, **kwargs) -> None:
+def to_hdf(df: pd.DataFrame, file: str, groupby: Union[str, List[str]] = None, write_groupby: bool = True,
+           key: str = None, replace: bool = False, format: str = 'table', do_print=True, **kwargs) -> None:
     """
     saves a pandas DataFrame as h5 file, if groupby is supplied will save each group with a different key.
     Needs with groupby OR key to be supplied. Extends on pandas.DataFrame.to_hdf.
 
     :param df: DataFrame to save
     :param file: filename to save the DataFrame as
-    :param groupby: if supplied will save each sub-DataFrame as a different key. [optional]
-    :param key: The key to write as. Ignored if groupby is supplies.
-    :param replace: Whether to replace or append to existing files. Defaults to append. [optional]
+    :param groupby: if supplied will save each sub-DataFrame as a different key [optional]
+    :param write_groupby: Whether groupby columns should be written to hdf [optional]
+    :param key: The key to write as. Ignored if groupby is supplied [optional]
+    :param replace: Whether to replace or append to existing files. Defaults to append [optional]
+    :param format: Table format to use, passed to pandas.DataFrame.to_hdf. Defaults to 'table' while pandas defaults
+        to 'fixed' [optional]
     :param do_print: Whether to print intermediate steps to console [optional]
-    :param kwargs: Other keyword arguments passed to pd.DataFrame.to_hdf [optional]
+    :param kwargs: Other keyword arguments passed to pandas.DataFrame.to_hdf [optional]
     :return: None
     """
     assert (groupby is not None) or (key is not None), "You must supply either groupby or key"
@@ -1282,21 +1313,24 @@ def to_hdf(df: pd.DataFrame, file: str, groupby: Union[str, List[str]] = None, k
     for _it, (_index, _df_i) in enumerate(df.groupby(groupby)):
 
         if key is None:
-            _key = qformat(_index, as_string=True)
+            _key = qformat(_index, int_format='', float_format='.2f')
         else:
-            _key = key
+            _key = str(key)
 
         if do_print:
-            progressbar(_it, _i_max, print_prefix=f"writing key {_key:<30}: ")
+            progressbar(_it, _i_max, print_prefix=f"writing key {_key:<30}: ", p_step=2)
 
-        if GROUPBY_DUMMY in _df_i.columns:
-            _df_i = _df_i.drop(GROUPBY_DUMMY, axis=1)
+        if write_groupby:
+            if GROUPBY_DUMMY in _df_i.columns:
+                _df_i = _df_i.drop(GROUPBY_DUMMY, axis=1)
+        else:
+            _df_i = _df_i.drop(groupby, axis=1)
 
-        pd.DataFrame.to_hdf(_df_i, file, key=_key, format='table', **kwargs)
+        pd.DataFrame.to_hdf(_df_i, file, key=_key, format=format, **kwargs)
 
     if do_print:
         tprint()
-        print('{}saved to {}'.format('\n', file))
+        tprint('{}saved to {}'.format('\n', file))
 
 
 @export
@@ -1310,23 +1344,26 @@ def get_hdf_keys(file: str) -> List[str]:
 
     with h5py.File(file, 'r') as _file:
         _keys = list(_file.keys())
-        _file.close()
 
     return _keys
 
 
 @export
 def read_hdf(file: str, key: Union[str, List[str]] = None, sample: int = None, random_state: int = None,
-             do_print: bool = True, catch_error: bool = True) -> pd.DataFrame:
+             key_to_col: Union[bool, str] = False, do_print: bool = True, catch_error: bool = True,
+             **kwargs) -> pd.DataFrame:
     """
-    read a DataFrame from hdf file
+    read a DataFrame from hdf file based on pandas.read_hdf but with default option to read all keys (since we're
+        expecting a DataFrame)
 
     :param file: The path to the file to read from
     :param key: The key(s) to read, if not specified all keys are read [optional]
     :param sample: If specified will read sample keys at random from the file, ignored if key is specified [optional]
     :param random_state: Random state for sample [optional]
+    :param key_to_col: Whether to save the key value to a column, if a string then used as column name [optional]
     :param do_print: Whether to print intermediate steps [optional]
     :param catch_error: Whether to catch errors when reading [optional]
+    :param kwargs: Other keyword arguments passed to pandas.read_hdf [optional]
     :return: pandas DataFrame
     """
 
@@ -1350,24 +1387,31 @@ def read_hdf(file: str, key: Union[str, List[str]] = None, sample: int = None, r
 
     _df = []
 
-    _i = 0
-
-    for _key in _keys:
-
-        _i += 1
+    for _it, _key in enumerate(_keys):
 
         if do_print:
-            tprint('reading {} - key {} / {} : {}...'.format(file, _i, len(_keys), _key))
+            tprint('reading {} - key {} / {} : {}...'.format(file, _it+1, len(_keys), _key))
         if catch_error:
             try:
-                _df.append(pd.read_hdf(file, key=_key))
+                _df_i = pd.read_hdf(file, key=_key, **kwargs)
             except KeyboardInterrupt:
                 raise KeyboardInterrupt
             except Exception as _e:
                 tprint('')
                 print(f"{_e.__class__.__name__}: '{_e}' while reading key {_key}")
+                continue
         else:
-            _df.append(pd.read_hdf(file, key=_key))
+            _df_i = pd.read_hdf(file, key=_key, **kwargs)
+        if key_to_col:
+            if isinstance(key_to_col, str):
+                _key_name = key_to_col
+            else:
+                _key_name = '_key'
+            # noinspection PyUnresolvedReferences
+            _df_i[_key_name] = _key
+
+        # append to list
+        _df.append(_df_i)
 
     if do_print:
         tprint('concat...')
@@ -1376,10 +1420,10 @@ def read_hdf(file: str, key: Union[str, List[str]] = None, sample: int = None, r
     except Exception as _e:
         tprint('')
         print(f"{_e.__class__.__name__}: {_e} during pandas.concat")
+        return pd.DataFrame()
 
     if do_print:
         tprint('read {} ; keys: {}'.format(file, _read_keys))
-        print('')
 
     return _df
 
@@ -1458,7 +1502,9 @@ def reformat_string(string: str, case: Optional[str] = 'lower', replace: Optiona
 
     # -- trans: (needs to come after demojize but before the rest)
     if trans:
-        assert Translator, 'Missing optional dependency googletrans'
+        if Translator is None:
+            raise ModuleNotFoundError('Missing optional dependency googletrans, please install it to use trans=True')
+
         _translator = Translator()
         try:
             # avoid rate limits
@@ -1553,3 +1599,19 @@ def copy_function(f: FunctionType) -> FunctionType:
     _f = functools.update_wrapper(_f, f)
     _f.__kwdefaults__ = f.__kwdefaults__
     return _f
+
+
+@export
+def get_else_key(dct: Mapping, key: Any, exclude: SequenceOrScalar = None) -> Any:
+    """
+    Returns a value from a dictionary if the key is present, if not returns the key
+
+    :param dct: dictionary or similar Mapping
+    :param key: Key of value to attempt get
+    :param exclude: Keys to not get the value from (always return as is)
+    :return: Value if key in dictionary keys, else key
+    """
+    if key in list_exclude(dct.keys(), exclude):
+        return dct[key]
+    else:
+        return key

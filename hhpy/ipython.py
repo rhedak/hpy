@@ -1,6 +1,6 @@
 """
 hhpy.ipython.py
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
 
 Contains convenience wrappers for ipython
 
@@ -11,7 +11,7 @@ import pandas as pd
 # --- third party imports
 from IPython.display import display, HTML
 # --- local imports
-from hhpy.main import export, force_list, list_exclude
+from hhpy.main import export, assert_list, list_exclude
 
 
 # ---- functions
@@ -112,7 +112,7 @@ def display_df(df, int_format=',', float_format=',.2f', exclude=None, full=True,
     if exclude is None:
         exclude = []
     else:
-        exclude = force_list(exclude)
+        exclude = assert_list(exclude)
     # avoid inplace
     df = pd.DataFrame(df).copy()
 

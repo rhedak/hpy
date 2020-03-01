@@ -1,6 +1,6 @@
 """
 hhpy.ds.py
-~~~~~~~~~~~~~~~~
+~~~~~~~~~~
 
 Contains DataScience functions extending on pandas and sklearn
 
@@ -18,15 +18,18 @@ from scipy import stats, signal
 from scipy.spatial import distance
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, median_absolute_error
 from sklearn.preprocessing import StandardScaler
-from typing import Mapping, Sequence, Callable, Union, List, Optional, Tuple
+from typing import Mapping, Sequence, Callable, Union, List, Optional, Tuple, Any
 from io import StringIO
 
 # --- local imports
-from hhpy.main import export, BaseClass, force_list, tprint, progressbar, qformat, list_intersection, round_signif, \
+from hhpy.main import export, BaseClass, assert_list, tprint, progressbar, qformat, list_intersection, round_signif, \
     is_list_like, dict_list, append_to_dict_list, concat_cols, DocstringProcessor, reformat_string, dict_inv, \
-    list_exclude, docstr as docstr_main, SequenceOfScalars, SequenceOrScalar, STRING_NAN, is_scalar, GROUPBY_DUMMY
+    list_exclude, docstr as docstr_main, SequenceOfScalars, SequenceOrScalar, STRING_NAN, is_scalar, GROUPBY_DUMMY, \
+    assert_scalar
 
 # ---- variables
+# --- constants
+ROW_DUMMY = '__row__'
 # --- validations
 validations = {
     'DFMapping__from_df__return_type': ['self', 'tuple'],
@@ -89,11 +92,11 @@ class DFMapping(BaseClass):
     """
 
     # --- globals
-    __name__ = 'hhpy.ds.DFMapping'
+    __name__ = 'DFMapping'
     __attributes__ = ['col_mapping', 'value_mapping']
 
     # --- functions
-    def __init__(self, df: Union[pd.DataFrame, str] = None, **kwargs) -> None:
+    def __init__(self, df: Union[pd.DataFrame, dict, str] = None, **kwargs) -> None:
 
         self.col_mapping = {}
         self.value_mapping = {}
@@ -103,7 +106,10 @@ class DFMapping(BaseClass):
         # DataFrame is passed: init from it
         if isinstance(df, pd.DataFrame):
             self.from_df(df, **kwargs)
-        # path to excel file is passed: init from it
+        # Dict is passed: init from it
+        elif isinstance(df, dict):
+            self.from_dict(df)
+        # path to excel or pickle file is passed: init from it
         elif isinstance(df, str):
             if '.xlsx' in df:
                 self.from_excel(df)
@@ -125,7 +131,7 @@ class DFMapping(BaseClass):
         :param printf: %(printf)s
         :param duplicate_limit: allowed number of reformated duplicates per column, each duplicate is suffixed with '_'
             but if you have too many you likely have a column of non allowed character strings and the mapping
-            would take a very long time. The duplicate handling therefor stops and a warning is triggered
+            would take a very long time. The duplicate handling therefore stops and a warning is triggered
             since the transformation is no longer invertible. Consider excluding the column or using cat codes
             [optional]
         :param warn: %(warn)s
@@ -133,15 +139,15 @@ class DFMapping(BaseClass):
         :return: see return_type
         """
 
+        # -- assert
+        df = assert_df(df)
+
         # -- init
         # assert
         if return_type not in validations['DFMapping__from_df__return_type']:
             if warn:
                 warnings.warn(f'Unknown return_type {return_type}, falling back to self')
             return_type = 'self'
-
-        # avoid inplace operations
-        df = _assert_df(df)
 
         # -- main
         # extract columns
@@ -242,7 +248,7 @@ class DFMapping(BaseClass):
         # -- init
         # handle inplace
         if not inplace:
-            df = _assert_df(df)
+            df = assert_df(df)
         # get helpers
         if col_names:
             _col_mapping = self.col_mapping
@@ -380,23 +386,36 @@ class DFMapping(BaseClass):
 
 
 # ---- functions
-# --- internal
-def _assert_df(df: pd.DataFrame, inplace: bool = False, name: str = 'df') -> pd.DataFrame:
-    if inplace:
-        if isinstance(df, pd.DataFrame):
-            return df
-        else:
-            raise ValueError(f"{name} must be a DataFrame when using inplace=True")
-    else:
-        try:
-            df = pd.DataFrame(df).copy()
-            return df
-        except Exception as _e:
-            print(f"{_e.__class__.__name__}: {_e}")
-            raise ValueError(f"{name} must be a DataFrame or castable to DataFrame")
-
-
 # --- export
+@export
+def assert_df(df: Any, name: str = 'df', groupby: Union[SequenceOrScalar, bool] = False
+              ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, List]]:
+    """
+    assert that input is a pandas DataFrame, raise ValueError if it cannot be cast to DataFrame
+
+    :param df: Object to be cast to DataFrame
+    :param name: name to use in the ValueError, useful when calling from another function
+    :param groupby: column to use as groupby
+    :return: pandas DataFrame
+    """
+
+    try:
+        df = pd.DataFrame(df).copy()
+    except Exception as _e:
+        print(f"{_e.__class__.__name__}: {_e}")
+        raise ValueError(f"{name} must be a DataFrame or castable to DataFrame")
+
+    if isinstance(groupby, bool) and not groupby:
+        return df
+    elif groupby is None:
+        groupby = GROUPBY_DUMMY
+        df[GROUPBY_DUMMY] = 1
+    else:
+        groupby = assert_list(groupby)
+
+    return df, groupby
+
+
 @export
 def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_cat: bool = True, cat_frac: float = .5,
                 convert_dtypes: bool = True, drop_all_na_cols: bool = False) -> pd.DataFrame:
@@ -418,7 +437,7 @@ def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_ca
     def _do_downcast(df, cols, downcast):
         if downcast is None:
             return df
-        for _col in force_list(cols):
+        for _col in assert_list(cols):
             # downcast
             try:
                 df[_col] = pd.to_numeric(df[_col], downcast=downcast)
@@ -428,7 +447,7 @@ def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_ca
 
     # -- init
     # avoid inplace operations
-    df = _assert_df(df)
+    df = assert_df(df)
 
     # pandas version flag
     _pandas_version_1_plus = int(pd.__version__.split('.')[0]) > 0
@@ -510,16 +529,12 @@ def get_df_corr(df: pd.DataFrame, columns: List[str] = None, target: str = None,
     :param groupby: Returns correlations for each level of the group [optional]
     :return: pandas DataFrame containing all pearson correlations in a melted format
     """
+    # -- assert
+    # df / groupby
+    df, groupby = assert_df(df=df, groupby=groupby)
     # -- init
-    # no inplace
-    df = _assert_df(df)
     # if there is a column called index it will create problems so rename it to '__index__'
     df = df.rename({'index': '__index__'}, axis=1)
-    # add dummy groupby if groupby is None
-    if groupby is None:
-        groupby = GROUPBY_DUMMY
-        df[groupby] = 1
-    groupby = force_list(groupby)
     # columns defaults to numeric columns
     if columns is None:
         columns = df.select_dtypes(include=np.number).columns
@@ -544,7 +559,7 @@ def get_df_corr(df: pd.DataFrame, columns: List[str] = None, target: str = None,
         # append to list of dfs
         _df_corr.append(_df_corr_i)
     # merge
-    _df_corr = df_merge(_df_corr)
+    _df_corr = concat(_df_corr)
 
     # clean dummy groupby
     if GROUPBY_DUMMY in _df_corr.columns:
@@ -653,12 +668,7 @@ def outlier_to_nan(df: pd.DataFrame, col: str, groupby: Union[list, str] = None,
     :param do_print: whether to print steps to console
     :return: pandas Series with outliers set to nan
     """
-    df = _assert_df(df)
-
-    if groupby is None:
-        groupby = GROUPBY_DUMMY
-        df[groupby] = 1
-    groupby = force_list(groupby)
+    df, groupby = assert_df(df=df, groupby=groupby)
 
     for _rep in range(reps):
 
@@ -743,7 +753,7 @@ def pass_by_group(df: pd.DataFrame, col: str, groupby: Union[str, list], btype: 
     :param order: order of the filter
     :return: filtered DataFrame
     """
-    df = _assert_df(df)
+    df = assert_df(df)
 
     _df_out_grouped = df.groupby(groupby)
 
@@ -802,7 +812,7 @@ def lfit(x: SequenceOrScalar, y: SequenceOrScalar = None, w: SequenceOrScalar = 
     if groupby is None:
         groupby = [GROUPBY_DUMMY]
         _df[GROUPBY_DUMMY] = 1
-    groupby = force_list(groupby)
+    groupby = assert_list(groupby)
 
     _it_max = _df[groupby].drop_duplicates().shape[0]
 
@@ -869,7 +879,7 @@ def lfit(x: SequenceOrScalar, y: SequenceOrScalar = None, w: SequenceOrScalar = 
 
         _df_fit.append(_df_fit_i)
 
-    _df_fit = df_merge(_df_fit)
+    _df_fit = concat(_df_fit)
 
     if do_print and _it_max > 1:
         progressbar()
@@ -909,7 +919,7 @@ def rolling_lfit(x: SequenceOrScalar, window: int, df: pd.DataFrame = None, grou
         groupby = [GROUPBY_DUMMY]
         df[GROUPBY_DUMMY] = 1
     else:
-        groupby = force_list(groupby)
+        groupby = assert_list(groupby)
 
     # -- main
     # init output as dict
@@ -1285,7 +1295,7 @@ def f1_pr(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.D
 
 
 @export
-def f_score(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None, dropna: bool = False,
+def f_score(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None, dropna: bool = True,
             f: Callable = r2_score, groupby: Union[list, str] = None, f_name: str = None) -> Union[pd.DataFrame, float]:
     """
     generic scoring function base on pandas DataFrame.
@@ -1296,7 +1306,7 @@ def f_score(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd
     :param dropna: whether to dropna values [optional]
     :param f: scoreing function to apply, default is sklearn.metrics.r2_score, should return a scalar value. [optional]
     :param groupby: if supplied then the result is returned for each group level [optional]
-    :param f_name: name of the scoreing function, by default uses .__name__ property of fuction [optional]
+    :param f_name: name of the scoreing function, by default uses .__name__ property of function [optional]
     :return: if groupby is supplied: pandas DataFrame, else: scalar value
     """
     if df is None:
@@ -1305,8 +1315,8 @@ def f_score(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd
 
         _y_true = 'y_true'
         _y_pred = 'y_pred'
-        _df[_y_true] = y_true
-        _df[_y_pred] = y_pred
+        _df[_y_true] = assert_scalar(y_true)
+        _df[_y_pred] = assert_scalar(y_pred)
 
     else:
 
@@ -1317,7 +1327,7 @@ def f_score(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd
         del df
 
     if dropna:
-        _df = _df.dropna(subset=[_y_true, _y_pred])
+        _df = _df.replace(np.inf, np.nan).replace(-np.inf, np.nan).dropna(subset=[_y_true, _y_pred])
         if groupby is not None:
             _df = _df.dropna(subset=groupby)
     if _df.shape[0] == 0:
@@ -1333,13 +1343,13 @@ def f_score(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd
 
         for _i, _df_group in _df.groupby(groupby):
 
-            _df_i = _df_group[force_list(groupby)].head(1)
+            _df_i = _df_group[assert_list(groupby)].head(1)
             if f_name is None:
                 f_name = f.__name__
             _df_i[f_name] = f(_df_group[_y_true], _df_group[_y_pred])
             _df_out.append(_df_i)
 
-        _df_out = df_merge(_df_out)
+        _df_out = concat(_df_out)
 
         return _df_out
 
@@ -1430,8 +1440,8 @@ def corr(*args, **kwargs) -> Union[pd.DataFrame, float]:
 
 @export
 def df_score(df: pd.DataFrame, y_true: Union[List[str], str], pred_suffix: list = None, scores: List[Callable] = None,
-             pivot: bool = True, scale: Union[dict, list, int] = None,
-             groupby: Union[list, str] = None) -> pd.DataFrame:
+             pivot: bool = True, scale: Union[dict, list, int] = None, groupby: Union[list, str] = None
+             ) -> pd.DataFrame:
     """
     creates a DataFrame displaying various kind of scores
 
@@ -1450,18 +1460,18 @@ def df_score(df: pd.DataFrame, y_true: Union[List[str], str], pred_suffix: list 
     if scores is None:
         scores = [r2, rmse, mae, stdae, medae]
     else:
-        scores = force_list(scores)
+        scores = assert_list(scores)
     _df = df.copy()
     del df
 
     if groupby:
-        _groupby = force_list(groupby)
+        _groupby = assert_list(groupby)
     else:
         _groupby = ['_dummy']
         _df['_dummy'] = 1
 
-    _target = force_list(y_true)
-    _model_names = force_list(pred_suffix)
+    _target = assert_list(y_true)
+    _model_names = assert_list(pred_suffix)
 
     if isinstance(scale, Mapping):
         for _key, _value in scale.items():
@@ -2008,7 +2018,7 @@ def col_to_front(df: pd.DataFrame, cols: SequenceOfScalars, inplace: bool = Fals
     :param inplace: %(inplace)s
     :return: Modified copy of the DataFrame
     """
-    _cols = force_list(cols)
+    _cols = assert_list(cols)
     _df = df[_cols + [_ for _ in df.columns if _ not in _cols]]
 
     if inplace:
@@ -2034,7 +2044,7 @@ def lr(df, x, y, groupby=None, t_unit='D', do_print=True):
 
     # defaults
     if groupby:
-        groupby = force_list(groupby)
+        groupby = assert_list(groupby)
     else:
         _df['_dummy'] = 1
         groupby = ['_dummy']
@@ -2121,7 +2131,7 @@ def df_split(df: pd.DataFrame, split_by: Union[List[str], str], return_type: str
     :return: see return_type
     """
 
-    _split_by = force_list(split_by)
+    _split_by = assert_list(split_by)
 
     if return_type == 'list':
         _dfs = []
@@ -2139,8 +2149,8 @@ def df_split(df: pd.DataFrame, split_by: Union[List[str], str], return_type: str
     return _dfs
 
 
-# merges a df, wrapper for pd.concat
-def df_merge(obj, ignore_index=True, sort=False, **kwargs):
+# concats a df, wrapper for pandas.concat
+def concat(obj, ignore_index=True, sort=False, **kwargs):
     if isinstance(obj, pd.DataFrame):
         return obj
     elif len(obj) > 1:
@@ -2149,38 +2159,46 @@ def df_merge(obj, ignore_index=True, sort=False, **kwargs):
         return obj[0]
 
 
-def rank(df, rankby, groupby=None, score_ascending=True, sortby=None, sortby_ascending=None):
+@docstr
+@export
+def rank(df: pd.DataFrame, rankby: SequenceOrScalar, groupby: SequenceOrScalar = None,
+         rank_ascending: bool = True, sortby: SequenceOrScalar = None,
+         sortby_ascending: Union[bool, List[bool]] = None) -> pd.Series:
+    """
+    creates a ranking (without duplicate ranks) based on columns of a DataFrame
 
-    # -- init
-    # no inplace
-    df = _assert_df(df)
+    :param df: %(df)s
+    :param rankby: the column(s) to rankby
+    :param groupby: %(groupby)s
+    :param rank_ascending: Whether to rank in ascending order [optional]
+    :param sortby: After the rankby column(s) the sortby columns will be sorted to break ties [optional]
+    :param sortby_ascending: The sorting preference for each sortby column [optional]
+    :return: pandas Series containing the rank (no duplicates)
+    """
 
-    # defaults
-    rankby = force_list(rankby)
-    sortby = force_list(sortby)
-    if groupby:
-        groupby = force_list(groupby)
-    else:
-        groupby = ['_dummy']
-        df['_dummy'] = 1
+    # -- assert
+    df, groupby = assert_df(df=df, groupby=groupby)
+    rankby = assert_list(rankby)
+    sortby = assert_list(sortby)
 
     # -- main
     # save row
-    df['_row'] = df.assign(_row=1)['_row'].cumsum()
+    df[ROW_DUMMY] = range(df.shape[0])
     # handle ascending
     if sortby_ascending is None:
-        _ascending = score_ascending
+        _ascending = rank_ascending
     else:
-        _ascending = force_list(score_ascending) + [True for _ in groupby] + force_list(sortby_ascending)
+        _ascending = assert_list(rank_ascending) + [True for _ in groupby] + assert_list(sortby_ascending)
     # sort
-    df = df.sort_values(by=rankby + groupby + sortby, ascending=_ascending).assign(rank=1)
+    _by = rankby + groupby + sortby
+    df = df.sort_values(by=_by, ascending=_ascending).assign(rank=1)
     # rank
-    df['_rank'] = df.groupby(groupby)['rank'].cumsum()
+    df['__rank__'] = df.groupby(groupby)['rank'].cumsum()
     # sort back to original row order
-    df = df.sort_values(by='_row')
+    df = df.sort_values(by=ROW_DUMMY)
 
     # -- return
-    return df['_rank']
+    return df['__rank__']
 
 
 def kde(x, df=None, x_range=None, perc_cutoff=.1, range_cutoff=None, x_steps=1000):
@@ -2362,7 +2380,7 @@ def multi_melt(df, cols, suffixes, id_vars, var_name='variable', sep='_', **kwar
 
         _df_out_i = _df.melt(id_vars=id_vars, value_vars=_value_vars, value_name=_col, var_name=var_name, **kwargs)
         _df_out_i[var_name] = _df_out_i[var_name].str.slice(len(_col) + len(sep))
-        _df_out_i = _df_out_i.sort_values(by=force_list(id_vars) + [var_name]).reset_index(drop=True)
+        _df_out_i = _df_out_i.sort_values(by=assert_list(id_vars) + [var_name]).reset_index(drop=True)
         _df_out.append(_df_out_i)
 
     _df_out = pd.concat(_df_out, axis=1).pipe(drop_duplicate_cols)
@@ -2384,7 +2402,7 @@ def resample(df, rule=1, on=None, groupby=None, agg='mean', columns=None, adj_co
     else:
         _columns = columns
     if groupby is not None:
-        _columns = [_ for _ in _columns if _ not in force_list(groupby)]
+        _columns = [_ for _ in _columns if _ not in assert_list(groupby)]
         _df = _df.groupby(groupby)
 
     # convert int to seconds to be able to use .resample
@@ -2411,7 +2429,7 @@ def resample(df, rule=1, on=None, groupby=None, agg='mean', columns=None, adj_co
     if _adj_column_names:
         _column_names = []
         for _col in _columns:
-            for _agg in force_list(agg):
+            for _agg in assert_list(agg):
                 _column_names += ['{}_{}'.format(_col, _agg)]
         _df.columns = _column_names
 
@@ -2444,7 +2462,7 @@ def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count:
     """
     # -- init
     # avoid inplace operations
-    df = _assert_df(df)
+    df = assert_df(df)
 
     # if applicable: drop NaN
     if (not na) or (na == 'drop'):
@@ -2680,14 +2698,8 @@ def k_split(df: pd.DataFrame, k: int = 5, groupby: Union[Sequence, str] = None,
     if do_print:
         tprint('splitting 1:{} ...'.format(k))
 
-    # -- init
-    # - no inplace
-    df = _assert_df(df)
-    # - row where to split
-    # - groupby
-    if groupby is None:
-        groupby = GROUPBY_DUMMY
-        df[GROUPBY_DUMMY] = 1
+    # -- assert
+    df, groupby = assert_df(df=df, groupby=groupby)
 
     # -- main
     _df_out = []
@@ -2702,17 +2714,17 @@ def k_split(df: pd.DataFrame, k: int = 5, groupby: Union[Sequence, str] = None,
                 _df_i = _df_i.sort_index()
             else:
                 _df_i = _df_i.sort_values(by=sortby)
-        # get row numbers
-        _df_i['__row__'] = range(_df_i.shape[0])
+        # get row numbers in INVERSE order so that key ordering will be inverse (in case of sorted: new data has k = 0)
+        _df_i[ROW_DUMMY] = range(_df_i.shape[0])[::-1]
         # assign k index based on row number
         _row_split = int(np.ceil(_df_i.shape[0] / k))
-        _df_i['_k_index'] = _df_i['__row__'] // _row_split
+        _df_i['_k_index'] = _df_i[ROW_DUMMY] // _row_split
         # append to list
         _df_out.append(_df_i)
     # - merge
     _df_out = pd.concat(_df_out).sort_index()
-    # drop __row__ dummy
-    _df_out = _df_out.drop('__row__', axis=1)
+    # drop row dummy
+    _df_out = _df_out.drop(ROW_DUMMY, axis=1)
     # drop groupby dummy
     if GROUPBY_DUMMY in _df_out.columns:
         _df_out = _df_out.drop(GROUPBY_DUMMY, axis=1)
@@ -2737,7 +2749,7 @@ def remove_unused_categories(df: pd.DataFrame, inplace: bool = False) -> Optiona
     """
 
     if not inplace:
-        df = _assert_df(df)
+        df = assert_df(df)
 
     for _col in df.select_dtypes('category'):
         df[_col] = df[_col].cat.remove_unused_categories()
@@ -2798,7 +2810,7 @@ def get_columns(df: pd.DataFrame, dtype: Union[SequenceOrScalar, np.number] = No
     # -- main
     # - dtype filter
     for _index, _value in df.dtypes.iteritems():
-        for _dtype in force_list(dtype):
+        for _dtype in assert_list(dtype):
             # map int, float, boolean, np.number to their string representation
             if _dtype in [int, float, bool]:
                 _dtype = 'int'

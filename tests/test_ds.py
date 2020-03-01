@@ -38,5 +38,5 @@ def test_dfmapping_to_excel(testdata_jp_dfmapping: hds.DFMapping):
 def test_dfmapping_from_excel():
     _path = 'files/testdata_jp_dfmapping.xlsx'
     _testdata_jp_dfmapping = hds.DFMapping(_path)
-    print(_testdata_jp_dfmapping)
+    # print(_testdata_jp_dfmapping)
     assert _testdata_jp_dfmapping.col_mapping and _testdata_jp_dfmapping.value_mapping

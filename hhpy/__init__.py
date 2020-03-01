@@ -11,3 +11,4 @@ from hhpy.ds import *
 from hhpy.ipython import *
 from hhpy.modelling import *
 from hhpy.plotting import *
+from hhpy.regression import *

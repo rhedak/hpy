@@ -19,7 +19,7 @@ import warnings
 import itertools
 
 # - third party imports
-from matplotlib import patches
+from matplotlib import patches, colors as mpl_colors
 from matplotlib.animation import FuncAnimation
 from matplotlib.legend import Legend
 from colour import Color
@@ -28,7 +28,7 @@ from typing import Union, Sequence, Mapping, Callable, List
 
 # local imports
 from hhpy.main import export, concat_cols, is_list_like, floor_signif, ceil_signif, list_intersection, \
-    force_list, progressbar, DocstringProcessor, Scalar, SequenceOrScalar
+    assert_list, progressbar, DocstringProcessor, Scalar, SequenceOrScalar
 from hhpy.ds import get_df_corr, lfit, kde, df_count, quantile_split, top_n_coding, df_rmsd, df_agg
 
 # - optional imports
@@ -78,7 +78,8 @@ rcParams = {
 }
 
 validations = {
-    'valid_distfits': ['kde', 'gauss', 'False', 'None']
+    'distplot__distfit': ['kde', 'gauss', 'False', 'None'],
+    'cat_to_color__out_type': [None, 'hex', 'rgb', 'rgba', 'rgba_array']
 }
 
 docstr = DocstringProcessor(
@@ -548,7 +549,7 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
     :param std_cutoff: automatically cutoff data outside of the std_cutoff standard deviations range,
         by default this is off but a recommended value for a good visual experience without outliers is 3 [optional]
     :param hist: whether to show the histogram, default False if hue else True [optional]
-    :param distfit: one of %(valid_distfits)s. If 'kde' fits a kernel density distribution to the data.
+    :param distfit: one of %(distplot__distfit)s. If 'kde' fits a kernel density distribution to the data.
         If gauss fits a gaussian distribution with the observed mean and std to the data. [optional]
     :param fill: whether to fill the area under the distfit curve, ignored if hist is True [optional]
     :param legend: %(legend)s
@@ -571,7 +572,8 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
     :return: %(ax_out)s
     """
     # -- asserts
-    assert (distfit in validations['valid_distfits']), 'distfit must be one of {}'.format(validations['valid_distfits'])
+    if distfit not in validations['distplot__distfit']:
+        raise ValueError(f"distfit must be one of {validations['distplot__distfit']}")
     # -- defaults
     if palette is None:
         palette = rcParams['palette']
@@ -1427,7 +1429,7 @@ def facet_wrap(func: Callable, data: pd.DataFrame, facet: Union[list, str], *arg
         # for list set target to be in line with facet to ensure proper naming
         if facet_type == 'cols':
             _df_facet = _df.copy()
-            _args = force_list(_facet) + list(args)
+            _args = assert_list(_facet) + list(args)
         else:
             _df_facet = _df[_df[facet] == _facet]
             _args = args
@@ -2749,7 +2751,7 @@ def custom_legend(colors: Union[list, str], labels: Union[list, str], do_show=Tr
     """
     _handles = []
 
-    for _color, _label in zip(force_list(colors), force_list(labels)):
+    for _color, _label in zip(assert_list(colors), assert_list(labels)):
         _handles.append(patches.Patch(color=_color, label=_label))
 
     if do_show:
@@ -3791,7 +3793,7 @@ def plotly_aggplot(data: pd.DataFrame, x: Scalar, y: Scalar, hue: Scalar = None,
     if fig is None:
         fig = go.Figure(**kws_fig)
     # - force_list
-    groupby = force_list(groupby)
+    groupby = assert_list(groupby)
     # - x_min / x_max
     if x_min is not None:
         data = data[data[x] >= x_min]
@@ -3825,7 +3827,7 @@ def plotly_aggplot(data: pd.DataFrame, x: Scalar, y: Scalar, hue: Scalar = None,
             _ys.append(_y)
         # get label
         _label = ''
-        for _it_cat, _category_i in enumerate(force_list(_category)):
+        for _it_cat, _category_i in enumerate(assert_list(_category)):
             if _it_cat > 0:
                 _label += sep
             _label_i = str(_category_i)
@@ -3868,3 +3870,46 @@ def plotly_aggplot(data: pd.DataFrame, x: Scalar, y: Scalar, hue: Scalar = None,
 
     # -- return
     return fig
+
+
+def cat_to_color(s: pd.Series, palette: SequenceOrScalar = None, out_type: str = None) -> pd.Series:
+    """
+    Encodes a categorical column as colors of a specified palette
+
+    :param s: pandas Series
+    :param palette: %(palette)s
+    :param out_type: Color output type, one of %(cat_to_color__out_type); defaults to None (no conversion) [optional]
+    :return: pandas Series of color names
+    """
+
+    # -- functions
+    def _to_color(color_index: int):
+        _color = palette[color_index % len(palette)]
+        if out_type == 'hex':
+            _color = mpl_colors.to_hex(_color)
+        elif out_type == 'rgb':
+            _color = mpl_colors.to_rgb(_color)
+        elif out_type == 'rgba':
+            _color = mpl_colors.to_rgba(_color)
+        elif out_type == 'rgba_array':
+            _color = mpl_colors.to_rgba_array(_color)
+        return _color
+
+    # -- assert
+    # - no inplace
+    s = pd.Series(s).copy()
+    # - out_type
+    if out_type not in validations['cat_to_color__out_type']:
+        raise ValueError(f"out_type must be one of {validations['cat_to_color__out_type']}")
+
+    # -- init
+    # - defaults
+    if palette is None:
+        palette = rcParams['palette']
+    palette = assert_list(palette)
+
+    s = s.astype('category')
+    if len(s.cat.categories) > len(palette):
+        warnings.warn('Not enough colors in palette, colors will be reused')
+
+    return s.cat.codes.apply(_to_color).astype('category')

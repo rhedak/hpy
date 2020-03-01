@@ -31,6 +31,7 @@
       <w>coefs</w>
       <w>concats</w>
       <w>concatting</w>
+      <w>conv</w>
       <w>corrplot</w>
       <w>corrs</w>
       <w>countplot</w>
@@ -53,6 +54,7 @@
       <w>downcasting</w>
       <w>dropdown</w>
       <w>dropna</w>
+      <w>dstack</w>
       <w>dtype</w>
       <w>edgecolor</w>
       <w>emoji</w>
@@ -89,6 +91,7 @@
       <w>iterrows</w>
       <w>jshtml</w>
       <w>kdeplot</w>
+      <w>keras</w>
       <w>kwdefaults</w>
       <w>kwhist</w>
       <w>kwline</w>
@@ -147,6 +150,7 @@
       <w>reformated</w>
       <w>regressor</w>
       <w>regressors</w>
+      <w>relu</w>
       <w>resample</w>
       <w>resampling</w>
       <w>reuseable</w>
@@ -189,6 +193,7 @@
       <w>uint</w>
       <w>updatemenu</w>
       <w>updatemenus</w>
+      <w>varnames</w>
       <w>vectorize</w>
       <w>viewcode</w>
       <w>vline</w>
