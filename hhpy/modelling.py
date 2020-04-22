@@ -18,9 +18,10 @@ import seaborn as sns
 
 # --- third party imports
 from copy import deepcopy
-from typing import Sequence, Mapping, Union, Callable, Optional, Any, Tuple
+from typing import Sequence, Mapping, Union, Callable, Optional, Any, Tuple, List
 
 from sklearn.exceptions import DataConversionWarning
+from sklearn.base import clone
 
 # ---- optional imports
 try:
@@ -30,9 +31,10 @@ except ImportError:
 
 # --- local imports
 from hhpy.main import GROUPBY_DUMMY, export, BaseClass, is_list_like, assert_list, tprint, DocstringProcessor, \
-    SequenceOrScalar, DFOrArray, list_exclude, list_merge
+    SequenceOrScalar, DFOrArray, list_exclude, list_merge, list_intersection
 from hhpy.ds import docstr as docstr_ds, assert_df, k_split, df_score, drop_duplicate_cols
 from hhpy.plotting import ax_as_list, legend_outside, rcParams as hpt_rcParams, docstr as docstr_hpt
+from hhpy.ipython import display_df
 
 # ---- variables
 # --- validations
@@ -40,8 +42,9 @@ validations = {
     'Model__predict__return_type': ['y', 'df', 'DataFrame'],
     'Models__predict__return_type': ['y', 'df', 'DataFrame', 'self'],
     'Models__score__return_type': ['self', 'df', 'DataFrame'],
-    'Models__score__scores': ['r2', 'rmse', 'mae', 'stdae', 'medae'],
+    'Models__score__scores': ['r2', 'rmse', 'mae', 'stdae', 'medae', 'pae'],
     'fit__fit_type': ['train_test', 'k_cross', 'final'],
+    'setattr__target': ['all', 'self', 'children', 'a', 's', 'c']
 }
 # --- docstr
 docstr = DocstringProcessor(
@@ -56,20 +59,24 @@ docstr = DocstringProcessor(
     df_train='Pandas DataFrame containing the training data, optional if array like data is passed for X/y',
     df_test='Pandas DataFrame containing the testing data, optional if array like data is passed for X/y test',
     X_predict='The feature (predictor) data used for predicting as DataFrame, np.array or column names',
+    y_predict='The label (target) data used for predicting as DataFrame, np.array or column names. Specifying y '
+              'is only necessary for convolutional or time-series type models [optional]',
     df_predict='Pandas DataFrame containing the predict data, optional if array like data is passed for X_predict',
     model_in='Any model object that implements .fit and .predict',
     name='Name of the model, used for naming columns [optional]',
     dropna='Whether to drop rows containing NA in the training data [optional]',
     scaler_X='Scalar object that implements .transform and .inverse_transform, applied to the features (predictors)'
-             'before training and inversely after predicting',
+             'before training and inversely after predicting [optional]',
     scaler_y='Scalar object that implements .transform and .inverse_transform, applied to the labels (targets)'
-             'before training and inversely after predicting',
-    do_print='Whether to print the steps to console',
-    display_score='Whether to display the score DataFrame',
+             'before training and inversely after predicting [optional]',
+    do_print='Whether to print the steps to console [optional]',
+    display_score='Whether to display the score DataFrame [optional]',
     ensemble='if True also predict with Ensemble like combinations of models. If True or mean calculate'
-             'mean of individual predictions. If median calculate median of individual predictions.',
-    printf='print function to use for logging',
+             'mean of individual predictions. If median calculate median of individual predictions. [optional]',
+    printf='print function to use for logging [optional]',
     groupby=docstr_ds.params['groupby'],
+    key='key of attribute to set',
+    value='value of attribute to set',
     **validations
 )
 
@@ -116,6 +123,16 @@ class Model(BaseClass):
         self.groupby = groupby
         self.is_fit = False
 
+    def reset(self) -> None:
+        """
+        reset self to unfit state and delete copy of model
+
+        :return: None
+        """
+
+        self.is_fit = False
+        self.model = [clone(self.model[0])]
+
     @docstr
     def fit(self, X: Union[DFOrArray, SequenceOrScalar] = None, y: Union[DFOrArray, SequenceOrScalar] = None,
             df: pd.DataFrame = None, dropna: bool = True, X_test: Union[DFOrArray, SequenceOrScalar] = None,
@@ -141,6 +158,7 @@ class Model(BaseClass):
         if groupby is None:
             groupby = self.groupby
         groupby = assert_list(groupby)
+        self.groupby = groupby
         # - df
         # if X and y are passed separately: concat them to a DataFrame
         if df is None:
@@ -164,18 +182,21 @@ class Model(BaseClass):
                 self.X_ref = assert_list(X)
             if self.y_ref is None:
                 self.y_ref = assert_list(y)
-            df = assert_df(df)
+
+        df = assert_df(df)
+        if df_test is not None:
+            df_test = assert_df(df_test)
 
         # handle dropna
         if dropna:
-            _dropna_cols = list_merge(self.X_ref, self.y_ref, groupby)
+            _dropna_cols = list_intersection(df.columns, list_merge(self.X_ref, self.y_ref, groupby))
             df = df.dropna(subset=_dropna_cols)
-            if df_test is None:
+            if df_test is not None:
                 df_test = df_test.dropna(subset=_dropna_cols)
 
         # -- init
         # - X / y train
-        _X = df[list_merge(self.X_ref, groupby)]
+        _X = df[self.X_ref]
         _y = df[self.y_ref]
 
         # - X / y test
@@ -183,7 +204,7 @@ class Model(BaseClass):
             _X_test = X_test
             _y_test = y_test
         else:
-            _X_test = df_test[list_merge(self.X_ref, groupby, unique=True)]
+            _X_test = df_test[self.X_ref]
             _y_test = df_test[self.y_ref]
 
         # -- fit
@@ -193,33 +214,39 @@ class Model(BaseClass):
         # get model by index
         _model = self.model[k]
         _varnames = _model.fit.__code__.co_varnames
-        _kwargs = {'X': _X, 'y': _y}
+        _kwargs = {}
 
         # pass X / y test only if fit can handle it
+        if 'groupby' in _varnames and groupby not in [None, []]:
+            _X = pd.concat([_X, df[groupby]], axis=1)
+            if _X_test is not None:
+                _X_test = pd.concat([_X_test, df_test[groupby]], axis=1)
+            _kwargs['groupby'] = groupby
         if 'X_test' in _varnames:
             _kwargs['X_test'] = _X_test
         if 'y_test' in _varnames:
             _kwargs['y_test'] = _y_test
-        if 'groupby' in _varnames:
-            _kwargs['groupby'] = groupby
 
         warnings.simplefilter('ignore', (FutureWarning, DataConversionWarning))
-        _model.fit(**_kwargs)
+        _model.fit(X=_X, y=_y, **_kwargs)
         warnings.simplefilter('default', (FutureWarning, DataConversionWarning))
         self.is_fit = True
 
     @docstr
-    def predict(self, X: Union[DFOrArray, SequenceOrScalar] = None, df: pd.DataFrame = None, return_type: str = 'y',
-                k_index: pd.Series = None, groupby: SequenceOrScalar = None) -> Union[pd.Series, pd.DataFrame]:
+    def predict(self, X: Union[DFOrArray, SequenceOrScalar] = None, y: Union[DFOrArray, SequenceOrScalar] = None,
+                df: pd.DataFrame = None, return_type: str = 'y', k_index: pd.Series = None,
+                groupby: SequenceOrScalar = None, handle_na: bool = True) -> Union[pd.Series, pd.DataFrame]:
         """
         Generalized predict method based on model.predict
         
         :param X: %(X)s
+        :param y: %(y)s
         :param df: %(df)s
         :param return_type: one of %(Model__predict__return_type)s, if 'y' returns a pandas Series / DataFrame
             with only the predictions, if one of 'df','DataFrame' returns the full DataFrame with predictions added
         :param k_index: If specified and model is k_cross split: return only the predictions for each test subset
         :param groupby: %(groupby)s
+        :param handle_na: Whether to handle NaN values (prediction will be NaN)
         :return: see return_type
         """
 
@@ -234,9 +261,9 @@ class Model(BaseClass):
         if df is not None:
             df = assert_df(df)
         else:
-            df = assert_df(X)
+            df = pd.concat([assert_df(X), assert_df(y)], axis=1)
         # - groupby
-        if groupby is None:
+        if groupby in [None, []]:
             groupby = self.groupby
         groupby = assert_list(groupby)
 
@@ -254,33 +281,64 @@ class Model(BaseClass):
             # get y lab
             if _ks == 1:
                 _y_lab = _y_ref_pred
-                _y_labs = _y_ref_pred
+                _y_labs = [_y_ref_pred]
             else:
-                _y_lab = [f"{_}_{_k}" for _ in assert_list(_y_ref_pred)]
                 if k_index is None:
+                    _y_lab = [f"{_}_{_k}" for _ in assert_list(_y_ref_pred)]
                     _y_labs += _y_lab
                 else:
-                    _y_labs = _y_ref_pred
+                    _y_labs = [_y_ref_pred]
 
-            # handle kwargs
+            # - handle kwargs
             _kwargs = {}
             _varnames = _model.predict.__code__.co_varnames
-
+            # groupby
             if 'groupby' in _varnames:
-                _X = df[self.X_ref + groupby].dropna()
+                _X = df[self.X_ref + groupby]  # .dropna()
                 _kwargs['groupby'] = groupby
             else:
                 _X = df[self.X_ref]
-            # predict
-            _y_pred = _model.predict(_X, **_kwargs)
+            # noinspection PyUnresolvedReferences
+            _na_indices = _X[_X.isna().any(axis=1)].index.tolist()
+            # y
+            if 'y' in _varnames:
+                _y = df[self.y_ref]
+                # noinspection PyUnresolvedReferences
+                _na_indices = list_merge(_na_indices, _X[_X.isna().any(axis=1)].index.tolist())
+                if handle_na:  # drop na
+                    _y = _y.drop(_na_indices)
+                _kwargs['y'] = _y
+            if handle_na:  # drop na (has to be here so y na indices have been handled)
+                _X = _X.drop(_na_indices)
+            # - predict
+            try:
+                _y_pred = _model.predict(_X, **_kwargs)
+            except TypeError:
+                # sometimes the model accepts y as keyword argument but cannot actually handle it
+                # I'm looking at you sklearn.multioutput
+                _kwargs.pop('y')
+                _y_pred = _model.predict(_X, **_kwargs)
 
             # cast to pandas
-            _y_pred = pd.DataFrame(_y_pred)
-            _y_pred.index = _X.index
+            _y_pred = pd.DataFrame(_y_pred, index=_X.index)
+            # bring back dropped nans
+            if handle_na:
+                _y_pred = pd.concat([_y_pred, pd.DataFrame(np.nan, index=_na_indices, columns=_y_pred.columns)])\
+                    .sort_index()
 
             # feed back to df
-            if k_index is None:
-                df[_y_lab] = _y_pred
+            if len(_y_labs) < _y_pred.shape[1]:  # some regressors (TimeSeriesRegressors)
+                # might return multi output
+                _y_labs_new = []
+                _multi = _y_pred.shape[1] // len(_y_labs)
+                for _y_lab in _y_labs:
+                    for _it in range(_multi):
+                        _y_labs_new.append(f"{_y_lab}_{_it}")
+                _y_labs = _y_labs_new + []
+
+            if k_index is None:  # all
+                for _it, _y_lab in enumerate(_y_labs):
+                    df[_y_lab] = _y_pred[_y_pred.columns[_it]]
             else:
                 # during first iteration: assert output columns are available
                 if _k == 0:
@@ -297,6 +355,33 @@ class Model(BaseClass):
             return df[_y_labs]
         else:
             return df
+
+    @docstr
+    def setattr(self, key: str, value: Any, target: str = 'all') -> None:
+        """
+        Set attribute on self and or all k instances of one's model
+
+        :param key: %(key)s
+        :param value: %(value)s
+        :param target: One of %(setattr__target)s, for 'self' sets only on self, for 'children' sets for children and
+            for 'all' tries to set on both
+        :return: None
+        """
+
+        # -- assert
+        if target not in validations['setattr__target']:
+            raise ValueError(f"target must be one of {validations['setattr__target']}")
+
+        # -- main
+        # - self
+        if target in ['all', 'a', 'self', 's'] and hasattr(self, key):
+            setattr(self, key, value)
+
+        # - children
+        if target in ['all', 'a', 'children', 'c']:
+            for _model in self.model:
+                if hasattr(_model, key):
+                    setattr(_model, key, value)
 
 
 # noinspection PyPep8Naming
@@ -336,6 +421,8 @@ class Models(BaseClass):
             X_ref = assert_list(X_ref)
         if y_ref is not None:
             y_ref = assert_list(y_ref)
+        if groupby is not None:
+            groupby = assert_list(groupby)
 
         # -- init
         _models = []
@@ -348,13 +435,13 @@ class Models(BaseClass):
                 _it += 1
 
                 if not isinstance(_model, Model):
-                    if 'name' in dir(_model):
+                    if hasattr(_model, 'name'):
                         _name = _model.name
-                    elif '__name__' in dir(_model):
-                        _name = '{}_{}'.format(_model.__name__, _it)
+                    elif hasattr(_model, '__name__'):
+                        _name = f"{_model.__name__}_{_it}"
                     else:
-                        _name = 'model_{}'.format(_it)
-                    _model = Model(_model, name=_name)
+                        _name = f"model_{_it}"
+                    _model = Model(_model, name=_name, X_ref=X_ref, y_ref=y_ref, groupby=groupby)
                 _models.append(deepcopy(_model))
                 if _model.name not in _model_names:
                     _model_names.append(_model.name)
@@ -371,13 +458,10 @@ class Models(BaseClass):
             self.X_ref = X_ref
         elif df is not None:
             # default to all columns not in y_ref / groupby
-            self.X_ref = [_ for _ in df.columns if _ not in y_ref + assert_list(groupby)]
+            self.X_ref = [_ for _ in df.columns if _ not in y_ref + groupby]
         else:
             self.X_ref = []
-        if groupby is not None:
-            self.groupby = assert_list(groupby)
-        else:
-            self.groupby = None
+        self.groupby = groupby
         self.scaler_X = scaler_X
         self.scaler_y = scaler_y
         self.model_names = _model_names
@@ -386,18 +470,53 @@ class Models(BaseClass):
         # - not given attributes
         self.df_score = None
         self.k_tests = None
+        self.y_pred = []
+        self.multi = None
+
+    @property
+    def df_test(self) -> Union[None, pd.DataFrame, List[pd.DataFrame]]:
+        # None case
+        if self.df is None or self.fit_type is None:
+            return None
+        # train-test case
+        if self.fit_type == 'train_test':
+            return self.df[lambda _: _['_k_index'] == self.k_tests[0]]
+        # k-cross case
+        _df_tests = []
+        for _k_test in self.k_tests:
+            _df_tests.append(self.df[lambda _: _['_k_index'] == _k_test])
+        return _df_tests
+
+    def reset(self) -> None:
+        """
+        reset all child models to an unfit state
+
+        :return: None
+        """
+
+        # - loop child models and call reset
+        for _model in self.models:
+            _model.reset()
+        # - reset df score
+        self.df_score = None
+        # - reset k tests
+        self.k_tests = None
+        # - drop predictions from df
+        for _y_pred in list_intersection(self.y_pred, assert_list(self.df.columns)):
+            self.df = self.df.drop(_y_pred, axis=1)
 
     @docstr
     def k_split(self, **kwargs):
         """
         apply hhpy.ds.k_split to self to create train-test or k-cross ready data
         
-        :param kwargs: keyword arguments passed to hhpy.ds.k_split
+        :param kwargs: keyword arguments passed to :func:`~hhpy.ds.k_split`
         :return: None
         """
 
         # -- init
-        assert self.df is not None, 'You must specify a df'
+        if self.df is None:
+            raise ValueError('You must specify a df')
 
         # -- split
         _k_index = k_split(df=self.df, return_type='s', **kwargs)
@@ -422,67 +541,60 @@ class Models(BaseClass):
         return _models
 
     @docstr
-    def fit(self, fit_type: str = 'train_test',  k_test: Optional[int] = 0, do_print: bool = True, **kwargs):
+    def fit(self, fit_type: str = 'train_test',  k_test: Optional[int] = 0, groupby: SequenceOrScalar = None,
+            do_print: bool = True, **kwargs):
         """
         fit all Model objects in collection
         
         :param fit_type: one of %(fit__fit_type)s
         :param k_test: which k_index to use as test data
+        :param groupby: %(groupby)s
         :param do_print: %(do_print)s
         :param kwargs: Other keyword arguments passed to :func:`~Model.fit`
         :return: None
         """
-
-        # TODO - CROSS VALIDATION
 
         # -- assert
         if fit_type not in validations['fit__fit_type']:
             raise ValueError(f"fit type must be one of {validations['fit__fit_type']}")
 
         # -- init
-        # split into sub dfs
-        _df_X = self.df[self.X_ref]
-        _df_y = self.df[self.y_ref]
+        if groupby is None:
+            groupby = self.groupby
+        # get df
+        _df = self.df.copy()
         # groupby and k index
-        # noinspection PyTypeChecker
-        _df_groupby_k = self.df[assert_list(self.groupby) + ['_k_index']]
         # -- apply scaler to X and y separately
         warnings.simplefilter('ignore', DataConversionWarning)
-        if self.scaler_X is not None:
-            self.scaler_X = self.scaler_X.fit(_df_X)
-            _df_X_scaled = pd.DataFrame(self.scaler_X.transform(_df_X), columns=_df_X.columns)
+        if self.scaler_X is not None and _df[self.X_ref].shape[1] > 0:  # 0 column features cannot be scaled
+            self.scaler_X = self.scaler_X.fit(_df[self.X_ref])
+            _df[self.X_ref] = self.scaler_X.transform(_df[self.X_ref])
         else:
-            _df_X_scaled = _df_X.copy()
+            self.scaler_X = None
         if self.scaler_y is not None:
-            self.scaler_y = self.scaler_y.fit(_df_y)
-            _df_y_scaled = pd.DataFrame(self.scaler_y.transform(_df_y), columns=_df_y.columns)
-        else:
-            _df_y_scaled = _df_y.copy()
+            self.scaler_y = self.scaler_y.fit(_df[self.y_ref])
+            _df[self.y_ref] = self.scaler_y.transform(_df[self.y_ref])
         warnings.simplefilter('default', DataConversionWarning)
-        # concat back together
-        _df_scaled = pd.concat([_df_groupby_k, _df_X_scaled, _df_y_scaled], axis=1)
-        # in case columns are shared between X and y (Conv type neural networks)
-        _df_scaled = drop_duplicate_cols(_df_scaled)
         # split
         if fit_type == 'train_test':
             _k_tests = [k_test]
             # self.df['_test'] = self.df['_k_index'] == k_test
         elif fit_type == 'k_cross':
-            _k_tests = sorted(_df_scaled['_k_index'].unique())
+            _k_tests = sorted(_df['_k_index'].unique())
         else:  # fit_type == 'final'
             _k_tests = [-1]
         # get df train and df test
         for _k_test in _k_tests:
 
-            _df_train = _df_scaled[lambda _: _['_k_index'] != _k_test]
-            _df_test = _df_scaled[lambda _: _['_k_index'] != _k_test]
+            _df_train = _df[lambda _: _['_k_index'] != _k_test]
+            _df_test = _df[lambda _: _['_k_index'] == _k_test]
 
             for _model in self.models:
 
                 if do_print:
                     self.printf('fitting model {}...'.format(_model.name))
 
-                _model.fit(X=self.X_ref, y=self.y_ref, df=_df_train, df_test=_df_test, groupby=self.groupby,
+                _model.fit(X=self.X_ref, y=self.y_ref, df=_df_train, df_test=_df_test, groupby=groupby,
                            k=_k_test, **kwargs)
 
         self.fit_type = fit_type
@@ -490,45 +602,47 @@ class Models(BaseClass):
 
     @docstr
     def predict(
-            self, X: Union[DFOrArray, SequenceOrScalar] = None, df: pd.DataFrame = None, return_type: str = 'self',
-            ensemble: bool = False, k_predict_type: str = 'test', do_print: bool = True
+            self, X: Union[DFOrArray, SequenceOrScalar] = None, y: Union[DFOrArray, SequenceOrScalar] = None,
+            df: pd.DataFrame = None, return_type: str = 'self', ensemble: bool = False, k_predict_type: str = 'test',
+            groupby: SequenceOrScalar = None, do_print: bool = True
     ) -> Optional[Union[pd.Series, pd.DataFrame]]:
         """
         predict with all models in collection
         
         :param X: %(X_predict)s
+        :param y: %(y_predict)s
         :param df: %(df_predict)s
         :param return_type: one of %(Models__predict__return_type)s
         :param ensemble: %(ensemble)s
         :param k_predict_type: 'test' or 'all'
+        :param groupby: %(groupby)s
         :param do_print: %(do_print)s
         :return: if return_type is self: None, else see Model.predict
         """
 
+        # -- assert
+        # return_type
         _valid_return_types = ['self', 'df', 'DataFrame']
-
         assert(return_type in _valid_return_types), 'return_type must be one of {}'.format(_valid_return_types)
-
+        # fit_type
         if not self.fit_type:
             raise ValueError('Model is not fit yet')
-
-        if X is None:
-            if df is None:
-                X = self.df
+        # X / y
+        if df is None:
+            if isinstance(X, pd.DataFrame):
+                if isinstance(y, pd.DataFrame):
+                    df = pd.concat([X, y], axis=1)
+                else:
+                    df = X
             else:
-                X = df
+                df = self.df.copy()
 
-        if df is not None:
-            _X = df[X]
-        elif isinstance(X, pd.DataFrame):
-            _X = X[self.X_ref]
-        else:
-            _X = X
-
+        # - handle scaler transformation
+        warnings.simplefilter('ignore', DataConversionWarning)
         if self.scaler_X is not None:
-            # noinspection PyUnresolvedReferences
-            _X = self.scaler_X.transform(_X)
-        _X = pd.DataFrame(_X, columns=self.X_ref)
+            df[self.X_ref] = self.scaler_X.transform(df[self.X_ref])
+        if self.scaler_y is not None:
+            df[self.y_ref] = self.scaler_y.transform(df[self.y_ref])
 
         _y_preds = []
         _y_ref_preds = []
@@ -555,10 +669,9 @@ class Models(BaseClass):
             else:
                 _y_ref_preds += [f"{_}_{_model.name}" for _ in _model.y_ref]
 
-            _y_pred_scaled = _model.predict(X=_X, groupby=self.groupby, k_index=_k_index)
+            _y_pred_scaled = _model.predict(df=df, groupby=groupby, k_index=_k_index)
 
-            # -- handle scaler
-            warnings.simplefilter('ignore', DataConversionWarning)
+            # - handle scaler inverse transformation
             if self.scaler_y is None:
                 _y_pred = deepcopy(_y_pred_scaled)
             else:
@@ -571,17 +684,36 @@ class Models(BaseClass):
                             _df_y_pred_scaled[_col] = np.nan
                     # ensure correct order
                     _df_y_pred_scaled = _df_y_pred_scaled[self.y_ref]
+
                 _df_y_pred = self.scaler_y.inverse_transform(_df_y_pred_scaled)
                 _df_y_pred = pd.DataFrame(_df_y_pred)
                 _df_y_pred.columns = self.y_ref
                 _y_pred = _df_y_pred[_model.y_ref]
             _y_preds.append(_y_pred)
-            warnings.simplefilter('default', DataConversionWarning)
+        warnings.simplefilter('default', DataConversionWarning)
 
         _df = pd.concat(_y_preds, axis=1, sort=False)
-        _df.columns = _y_ref_preds
 
-        if ensemble:  # supports up to 3 model ensembles
+        # feed back to df
+        if len(_y_ref_preds) < _df.shape[1]:  # some regressors (TimeSeriesRegressors)
+            # might return multi output
+            _y_ref_preds_new = []
+            _multi = _df.shape[1] // len(_y_ref_preds)
+            for _y_ref_pred in _y_ref_preds:
+                for _it in range(_multi):
+                    _y_ref_preds_new.append(f"{_y_ref_pred}_{_it}")
+            _y_ref_preds = _y_ref_preds_new + []
+        else:
+            _multi = None
+
+        # save
+        self.multi = _multi
+
+        # to df
+        _df.columns = _y_ref_preds
+        _df.index = df.index
+
+        if ensemble:  # supports up to 3 model ensembles (does not support multi regression)
             # drop duplicates
             _model_names = list(set(_model_names))
             # get all combinations
@@ -599,13 +731,15 @@ class Models(BaseClass):
         if return_type == 'self':
             for _col in _df.columns:
                 self.df[_col] = _df[_col]
+                if _col not in self.y_pred:
+                    self.y_pred.append(_col)
         elif return_type in ['df', 'DataFrame']:
             return _df
 
     @docstr
     def score(
-            self, return_type: str = 'self', pivot: bool = False, do_print: bool = True,  display_score: bool = True,
-            **kwargs
+            self, return_type: str = 'self', pivot: bool = False, groupby: SequenceOrScalar = None,
+            do_print: bool = True,  display_score: bool = True, display_format: str = ',.3f', **kwargs
     ) -> Optional[pd.DataFrame]:
         """
         calculate score of the Model predictions
@@ -614,36 +748,39 @@ class Models(BaseClass):
         :param pivot: whether to pivot the DataFrame for easier readability [optional]
         :param do_print: %(do_print)s
         :param display_score: %(display_score)s
-        :param kwargs: other keyword arguments passed to :func: `~hhpy.ds.df_score`
+        :param display_format: Format to use when displaying the score DataFrame [optional]
+        :param groupby: %(groupby)s
+        :param kwargs: other keyword arguments passed to :func:`~hhpy.ds.df_score`
         :return: if return_type is 'self': None, else: pandas DataFrame containing the scores
         """
 
-        if do_print:
-            self.printf('scoring...')
-
+        # -- assert
         _valid_return_types = ['self', 'df', 'DataFrame']
         assert(return_type in _valid_return_types),\
             'return_type must be one of {}'.format(_valid_return_types)
-
+        groupby = assert_list(groupby)
         _df = self.df.copy()
-        _groupby = None
 
-        if not self.fit_type:
+        # -- init
+        if do_print:
+            self.printf('scoring...')
+
+        if self.fit_type is None:
             raise ValueError('Model is not fit yet')
         elif self.fit_type == 'k_cross':
-            _groupby = '_k_index'
+            groupby.append('_k_index')
         elif self.fit_type == 'train_test':
             _df = _df[lambda _: _['_k_index'].isin(self.k_tests)]
 
-        _df_score = df_score(df=_df, y_true=self.y_ref, pred_suffix=self.model_names, pivot=pivot, groupby=_groupby,
-                             **kwargs)
+        _df_score = df_score(df=_df, y_true=self.y_ref, pred_suffix=self.model_names, pivot=pivot, groupby=groupby,
+                             multi=self.multi, **kwargs)
 
         if display_score:
             if pivot:
                 _display_score = _df_score
             else:
-                _display_score = _df_score.pivot_table(index=['y_ref', 'model'], columns='score', values='value')
-            display(_display_score)
+                _display_score = _df_score.pivot_table(index=['y_true', 'y_pred'], columns='score', values='value')
+            display_df(_display_score, float_format=display_format)
 
         if return_type == 'self':
             self.df_score = _df_score
@@ -654,7 +791,7 @@ class Models(BaseClass):
     def train(
             self, df: pd.DataFrame = None, k: int = 5, groupby: Union[Sequence, str] = None,
             sortby: Union[Sequence, str] = None, random_state: int = None, fit_type: str = 'train_test',
-            k_test: Optional[int] = 0, ensemble: bool = False, scores: Union[Sequence, str] = None,
+            k_test: Optional[int] = 0, ensemble: bool = False, scores: Union[Sequence, str, Callable] = None,
             scale: float = None, do_predict: bool = True, do_score: bool = True, do_split: bool = True,
             do_fit: bool = True, do_print: bool = True, display_score: bool = True
     ) -> None:
@@ -679,13 +816,6 @@ class Models(BaseClass):
         :param do_score: whether to create self.df_score [optional]
         :return: None
         """
-
-        # -- init
-        # - defaults
-        if groupby is None:
-            groupby = self.groupby
-
-        # -- write
         if df is not None:
             self.df = df
 
@@ -693,9 +823,9 @@ class Models(BaseClass):
         if do_split:
             self.k_split(k=k, groupby=groupby, sortby=sortby, random_state=random_state, do_print=do_print)
         if do_fit:
-            self.fit(fit_type=fit_type, k_test=k_test, do_print=do_print)
+            self.fit(fit_type=fit_type, k_test=k_test, do_print=do_print, groupby=groupby)
         if do_predict:
-            self.predict(ensemble=ensemble, do_print=do_print)
+            self.predict(ensemble=ensemble, do_print=do_print, groupby=groupby)
         if do_score:
             self.score(scores=scores, scale=scale, do_print=do_print, display_score=display_score)
         if do_print:
@@ -728,7 +858,7 @@ class Models(BaseClass):
 
         # -- init
         if row_order is None:
-            row_order = ['r2', 'rmse', 'mae', 'stdae', 'medae']
+            row_order = ['r2', 'rmse', 'mae', 'stdae', 'medae', 'pae']
         if hue_order is None:
             hue_order = self.model_names
         if palette is None:
@@ -760,6 +890,33 @@ class Models(BaseClass):
             return fig, ax
         else:
             plt.show(fig)
+
+    @docstr
+    def setattr(self, key: str, value: Any, target: str = 'all', child_target: str = 'all') -> None:
+        """
+        Set attribute on self and or all child models
+
+        :param key: %(key)s
+        :param value: %(value)s
+        :param target: One of %(setattr__target)s, for 'self' sets only on self, for 'children' sets for children and
+            for 'all' tries to set on both
+        :param child_target: Same as target but passed to :func:`~Model.setattr`
+        :return: None
+        """
+
+        # -- assert
+        if target not in validations['setattr__target']:
+            raise ValueError(f"target must be one of {validations['setattr__target']}")
+
+        # -- main
+        # - self
+        if target in ['all', 'a', 'self', 's'] and hasattr(self, key):
+            setattr(self, key, value)
+
+        # - children
+        if target in ['all', 'a', 'children', 'c']:
+            for _model in self.models:
+                _model.setattr(key, value, target=child_target)
 
 
 # ---- functions
@@ -977,7 +1134,7 @@ def to_keras_3d(x: DFOrArray, window: int, y: DFOrArray = None, groupby: Sequenc
     # - convert x and y to DataFrames
     x = assert_df(x)
     # - groupby
-    if groupby is None:
+    if groupby in [None, []]:
         groupby = GROUPBY_DUMMY
         x[GROUPBY_DUMMY] = 1
     groupby = assert_list(groupby)
@@ -1458,7 +1615,7 @@ def to_keras_3d(x: DFOrArray, window: int, y: DFOrArray = None, groupby: Sequenc
 #         do_print=False,
 #         display_score=False,
 #         **kwargs
-#     )
+#     )f
 #
 #     _score = _dict['score']
 #     _score = _score[_score.index.isin(target)]

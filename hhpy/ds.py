@@ -388,14 +388,14 @@ class DFMapping(BaseClass):
 # ---- functions
 # --- export
 @export
-def assert_df(df: Any, name: str = 'df', groupby: Union[SequenceOrScalar, bool] = False
+def assert_df(df: Any, groupby: Union[SequenceOrScalar, bool] = False, name: str = 'df',
               ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, List]]:
     """
     assert that input is a pandas DataFrame, raise ValueError if it cannot be cast to DataFrame
 
     :param df: Object to be cast to DataFrame
-    :param name: name to use in the ValueError, useful when calling from another function
     :param groupby: column to use as groupby
+    :param name: name to use in the ValueError message, useful when calling from another function
     :return: pandas DataFrame
     """
 
@@ -407,11 +407,14 @@ def assert_df(df: Any, name: str = 'df', groupby: Union[SequenceOrScalar, bool] 
 
     if isinstance(groupby, bool) and not groupby:
         return df
-    elif groupby is None:
-        groupby = GROUPBY_DUMMY
+    elif groupby is None or groupby in [[], GROUPBY_DUMMY, [GROUPBY_DUMMY]]:
+        groupby = [GROUPBY_DUMMY]
         df[GROUPBY_DUMMY] = 1
     else:
         groupby = assert_list(groupby)
+
+    # drop duplicate columns
+    df = drop_duplicate_cols(df)
 
     return df, groupby
 
@@ -598,7 +601,7 @@ def drop_zero_cols(df: pd.DataFrame) -> pd.DataFrame:
 
 
 @export
-def get_duplicate_indices(df: pd.DataFrame) -> Sequence:
+def get_duplicate_indices(df: pd.DataFrame) -> pd.Series:
     """
     Returns duplicate indices from a pandas DataFrame
 
@@ -609,7 +612,7 @@ def get_duplicate_indices(df: pd.DataFrame) -> Sequence:
 
 
 @export
-def get_duplicate_cols(df: pd.DataFrame) -> Sequence:
+def get_duplicate_cols(df: pd.DataFrame) -> pd.Series:
     """
     Returns names of duplicate columns from a pandas DataFrame
 
@@ -620,24 +623,34 @@ def get_duplicate_cols(df: pd.DataFrame) -> Sequence:
 
 
 @export
-def drop_duplicate_indices(df: pd.DataFrame) -> pd.DataFrame:
+def drop_duplicate_indices(df: pd.DataFrame, warn: bool = True) -> pd.DataFrame:
     """
     Drop duplicate indices from pandas DataFrame
 
     :param df: pandas DataFrame
+    :param warn: Whether to trigger a warning if duplicate indices are dropped
     :return: pandas DataFrame without the duplicates indices
     """
+    if warn:
+        _duplicate_indices = get_duplicate_indices(df).tolist()
+        if _duplicate_indices:
+            print(f"Dropping duplicate indices: {_duplicate_indices}")
     return df.loc[~df.index.duplicated(), :]
 
 
 @export
-def drop_duplicate_cols(df: pd.DataFrame) -> pd.DataFrame:
+def drop_duplicate_cols(df: pd.DataFrame, warn: bool = True) -> pd.DataFrame:
     """
     Drop duplicate columns from pandas DataFrame
 
     :param df: pandas DataFrame
+    :param warn: Whether to trigger a warning if duplicate columns are dropped
     :return: pandas DataFrame without the duplicates columns
     """
+    if warn:
+        _duplicate_cols = get_duplicate_cols(df).tolist()
+        if _duplicate_cols:
+            warnings.warn(f"Dropping duplicate columns: {_duplicate_cols}")
     return df.loc[:, ~df.columns.duplicated()]
 
 
@@ -1315,13 +1328,13 @@ def f_score(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd
 
         _y_true = 'y_true'
         _y_pred = 'y_pred'
-        _df[_y_true] = assert_scalar(y_true)
-        _df[_y_pred] = assert_scalar(y_pred)
+        _df[_y_true] = y_true
+        _df[_y_pred] = y_pred
 
     else:
 
-        _y_true = y_true
-        _y_pred = y_pred
+        _y_true = assert_scalar(y_true)
+        _y_pred = assert_scalar(y_pred)
 
         _df = df.copy()
         del df
@@ -1424,6 +1437,27 @@ def medae(*args, **kwargs) -> Union[pd.DataFrame, float]:
 
 
 @export
+def pae(*args, times_hundred: bool = True, pmax: int = 999, **kwargs) -> Union[pd.DataFrame, float]:
+    """
+    wrapper for f_score using percentage absolute error
+
+    :param args: passed to f_score
+    :param times_hundred: Whether to multiply by 100 for human readable percentages
+    :param pmax: Max value for the percentage absolute error, used as a fallback because pae can go to infinity as
+        y_true approaches zero
+    :param kwargs: passed to f_score
+    :return: if groupby is supplied: pandas DataFrame, else: scalar value
+    """
+    def _pae(y_true, y_pred):
+        _score = np.mean(np.abs((y_pred / y_true - 1)))
+        _score = np.where(_score > pmax, pmax, _score)
+        if times_hundred:
+            _score *= 100
+        return _score
+    return f_score(*args, f=_pae, **kwargs)
+
+
+@export
 def corr(*args, **kwargs) -> Union[pd.DataFrame, float]:
     """
     wrapper for f_score using pandas.Series.corr
@@ -1439,95 +1473,134 @@ def corr(*args, **kwargs) -> Union[pd.DataFrame, float]:
 
 
 @export
-def df_score(df: pd.DataFrame, y_true: Union[List[str], str], pred_suffix: list = None, scores: List[Callable] = None,
-             pivot: bool = True, scale: Union[dict, list, int] = None, groupby: Union[list, str] = None
+def df_score(df: pd.DataFrame, y_true: SequenceOrScalar, y_pred: SequenceOrScalar = None, pred_suffix: list = None,
+             scores: List[Callable] = None, pivot: bool = True, scale: Union[dict, list, int] = None,
+             groupby: Union[list, str] = None, multi: int = None, dropna: bool = True,
              ) -> pd.DataFrame:
     """
     creates a DataFrame displaying various kind of scores
 
     :param df: pandas DataFrame containing the true, pred data
-    :param y_true: name of the true variable inside df
+    :param y_true: name of the true variable(s) inside df
+    :param y_pred: name of the pred variable(s) inside df, specify either this or pred_suffix
     :param pred_suffix: name of the predicted variable suffixes. Supports multiple predictions.
         By default assumed suffix 'pred' [optional]
     :param scores: scoring functions to be used [optional]
     :param pivot: whether to pivot the DataFrame for easier readability [optional]
     :param scale: a scale for multiplying the scores, default 1 [optional]
     :param groupby: if supplied then the scores are calculated by group [optional]
+    :param multi: how many multi outputs are there [optional]
+    :param dropna: whether to drop na [optional]
     :return: pandas DataFrame containing al the scores
     """
+    # -- assert
+    if multi is None:
+        multi = ['']
+    else:
+        multi = [f"_{_}" for _ in range(multi)]
     if pred_suffix is None:
         pred_suffix = ['pred']
     if scores is None:
-        scores = [r2, rmse, mae, stdae, medae]
+        scores = [r2, rmse, mae, pae, stdae, medae]
     else:
         scores = assert_list(scores)
-    _df = df.copy()
-    del df
+    df = assert_df(df)
 
     if groupby:
-        _groupby = assert_list(groupby)
+        groupby = assert_list(groupby)
     else:
-        _groupby = ['_dummy']
-        _df['_dummy'] = 1
+        groupby = [GROUPBY_DUMMY]
+        df[GROUPBY_DUMMY] = 1
 
-    _target = assert_list(y_true)
-    _model_names = assert_list(pred_suffix)
+    y_true = assert_list(y_true)
+    pred_suffix = assert_list(pred_suffix)
+
+    if y_pred is None:
+        _y_true_new = []
+        y_pred = []
+        for _y_true in y_true:
+            for _pred_suffix in pred_suffix:
+                for _multi in multi:
+                    _y_true_new.append(_y_true)
+                    y_pred.append(f"{_y_true}_{_pred_suffix}{_multi}")
+        y_true = _y_true_new
+    else:
+        y_pred = assert_list(y_pred)
+        # check if y_pred is longer than y_true
+        if len(y_pred) > len(y_true):
+            warnings.warn('y_pred is longer than y_true, trailing entries will be dropped. If one y_true belongs'
+                          'to multiple y_pred please specify it multiple times')
+        elif len(y_true) > len(y_pred):
+            warnings.warn('y_true is longer than y_pred, trailing entries will be dropped.')
+
+    # -- init
+    if dropna:
+        df = df.dropna(subset=y_true + y_pred)
 
     if isinstance(scale, Mapping):
-        for _key, _value in scale.items():
-            _df[_key] *= _value
-            for _model_name in _model_names:
-                _df['{}_{}'.format(_key, _model_name)] *= _value
+        for _y_true, _scale in scale.items():
+            df[_y_true] *= _scale
+            _index = y_true.index(_y_true)
+            _y_pred = y_pred[_index]
+            df[_y_pred] *= _scale
     elif is_list_like(scale):
         _i = -1
-        # noinspection PyTypeChecker
-        for _scale in scale:
-            _i += 1
-            _df[_target[_i]] *= _scale
-            for _model_name in _model_names:
-                _df['{}_{}'.format(_target[_i], _model_name)] *= _scale
+        for _scale, _y_true, _y_pred in zip(scale, y_true, y_pred):
+            df[_y_true] *= _scale
+            df[_y_pred] *= _scale
     elif scale is not None:
-        for _y_ref in _target:
-            _df[_y_ref] *= scale
-            for _model_name in _model_names:
-                _df['{}_{}'.format(_y_ref, _model_name)] *= scale
+        for _y_true in y_true:
+            df[_y_true] *= scale
+        for _y_pred in y_pred:
+            df[_y_pred] *= scale
 
-    _df_score = dict_list(_groupby + ['y_ref', 'model', 'score', 'value'])
-    for _y_ref in _target:
-        for _model_name in _model_names:
-            for _score in scores:
+    # -- main
+    _df_score = dict_list(groupby + ['y_true', 'y_pred', 'y_ref', 'model', 'score', 'value'])
 
-                _y_ref_pred = '{}_{}'.format(_y_ref, _model_name)
-                if _y_ref_pred not in _df.columns:
-                    raise KeyError('{} not in columns'.format(_y_ref_pred))
+    for _y_true, _y_pred in zip(y_true, y_pred):
 
-                for _index, _df_i in _df.groupby(_groupby):
+        if _y_pred not in df.columns:
+            raise KeyError(f"{_y_pred} not in columns")
 
-                    _value = _score(_y_ref, _y_ref_pred, df=_df_i)
+        for _score in scores:
 
-                    _append_dict = {
-                        'y_ref': _y_ref,
-                        'model': _model_name,
-                        'score': _score.__name__,
-                        'value': _value
-                    }
+            for _index, _df_i in df.groupby(groupby):
 
-                    for _groupby_i in _groupby:
-                        _append_dict[_groupby_i] = _df_i[_groupby_i].iloc[0]
+                _value = _score(_y_true, _y_pred, df=_df_i)
 
-                    append_to_dict_list(_df_score, _append_dict)
+                _append_dict = {
+                    'y_true': _y_true,
+                    'y_pred': _y_pred,
+                    'y_ref': _y_true,
+                    'model': _y_pred,
+                    'score': _score.__name__,
+                    'value': _value
+                }
+
+                for _groupby_i in groupby:
+                    _append_dict[_groupby_i] = _df_i[_groupby_i].iloc[0]
+
+                append_to_dict_list(_df_score, _append_dict)
 
     _df_score = pd.DataFrame(_df_score)
+    _df_score[['y_true', 'y_pred', 'score']] = _df_score[['y_true', 'y_pred', 'score']].astype(str)
+    _df_score['value'] = _df_score['value'].astype(float)
 
-    _pivot_index = ['y_ref', 'model']
+    if _df_score.shape[0] == 0:
+        raise ValueError("df_score is empty")
 
-    if groupby:
-        _pivot_index += _groupby
+    _pivot_index = ['y_true', 'y_pred']
+
+    if groupby != [GROUPBY_DUMMY]:
+        _pivot_index += groupby
+        _df_score[groupby] = _df_score[groupby].astype(str)
     else:
-        _df_score = _df_score.drop(['_dummy'], axis=1)
+        _df_score = _df_score.drop([GROUPBY_DUMMY], axis=1)
 
     if pivot:
-        _df_score = _df_score.pivot_table(index=_pivot_index, columns='score', values='value')
+        _columns = _pivot_index + ['score', 'value']
+        _df_score = _df_score[_columns]
+        _df_score = pd.pivot_table(_df_score, index=_pivot_index, columns='score', values='value')
 
     return _df_score
 
@@ -2238,7 +2311,7 @@ def kde(x, df=None, x_range=None, perc_cutoff=.1, range_cutoff=None, x_steps=100
     assert (len(_x) > 0), 'Series {} has zero length'.format(_x_name)
     _x = pd.Series(_x).reset_index(drop=True)
 
-    _x_name_max = _x_name + '_max'
+    _x_name_max = f"{_x_name }_max"
 
     if x_range is None:
         x_range = np.linspace(np.nanmin(_x), np.nanmax(_x), x_steps)
@@ -2618,22 +2691,47 @@ def numeric_to_group(pd_series, step=None, outer_limit=4, suffix=None, use_abs=F
 
 
 @export
-def top_n(s: Sequence, n: int, w: Optional[Sequence] = None) -> list:
+def top_n(s: Sequence, n: Union[int, str], w: Optional[Sequence] = None, n_max: int = 20) -> list:
     """
-    Select n elements form a categorical pandas series with the highest counts
+    Select n elements form a categorical pandas series with the highest counts. Ties are broken by sorting
+        s ascending
 
     :param s: pandas Series to select from
-    :param n: how many elements to return
+    :param n: how many elements to return, you can pass a percentage to return the top n %
     :param w: weights, if given the weights are summed instead of just counting entries in s [optional]
+    :param n_max: how many elements to return at max if n is a percentage, set to None for no max [optional]
     :return: List of top n elements
     """
 
-    # faster
-    if w is None:
-        return list(pd.Series(s).value_counts().reset_index()['index'][:n])
-    else:
-        return pd.DataFrame({'s': s, 'w': w}).groupby('s').agg({'w': 'sum'}) \
-                   .sort_values(by='w', ascending=False).index.tolist()[:n]
+    # -- case int:
+    if isinstance(n, int) or str(n).isnumeric():
+        n = int(n)
+        if w is None:
+            return list(pd.Series(s).value_counts().reset_index()['index'][:n])
+        else:
+            return pd.DataFrame({'s': s, 'w': w}).groupby('s').agg({'w': 'sum'}) \
+                       .sort_values(by='w', ascending=False).index.tolist()[:n]
+    # -- case str (percent)
+    elif isinstance(n, str):
+        if '%' not in n:
+            raise ValueError(f"Please specify n as integer or percent with percentage sign %")
+        n = float(n.split('%')[0]) / 100.
+        _df = pd.DataFrame({'s': s})
+        # get weights
+        if w is None:
+            _df['w'] = 1
+        else:
+            _df['w'] = w
+        # sum weights
+        _df = _df.groupby('s').agg({'w': 'sum'}).reset_index().sort_values(by=['w', 's'], ascending=[False, True])
+        # calculate cutoff
+        _df['c'] = _df['w'].cumsum() / _df['w'].sum()
+        _df = _df[_df['c'].shift(1).fillna(0) <= n]
+        _n_list = _df['s'].tolist()
+        if n_max is not None and len(_n_list) > n_max:
+            _n_list = _n_list[:n_max]
+
+        return _n_list
 
 
 @docstr
@@ -2696,7 +2794,7 @@ def k_split(df: pd.DataFrame, k: int = 5, groupby: Union[Sequence, str] = None,
     """
 
     if do_print:
-        tprint('splitting 1:{} ...'.format(k))
+        tprint(f"k_split: splitting 1:{k} ...")
 
     # -- assert
     df, groupby = assert_df(df=df, groupby=groupby)
@@ -2728,6 +2826,9 @@ def k_split(df: pd.DataFrame, k: int = 5, groupby: Union[Sequence, str] = None,
     # drop groupby dummy
     if GROUPBY_DUMMY in _df_out.columns:
         _df_out = _df_out.drop(GROUPBY_DUMMY, axis=1)
+    # tprint
+    if do_print:
+        tprint('k_split done')
     # -- return
     if return_type in range(k):
         _df_train = _df_out[_df_out['_k_index'] != return_type].drop('_k_index', axis=1)
@@ -2840,3 +2941,24 @@ def get_columns(df: pd.DataFrame, dtype: Union[SequenceOrScalar, np.number] = No
         _columns = pd.Index(_columns)
     # -- return
     return _columns
+
+
+@docstr
+@export
+def reformat_columns(df: pd.DataFrame, printf: Callable = None, **kwargs) -> pd.DataFrame:
+    """
+    A quick way to clean the column names of a DataFrame
+
+    :param df: %(df)s
+    :param printf: Printing Function to use for steps [optional]
+    :param kwargs: Additional keyword arguments passed to DFMapping [optional]
+    :return: DataFrame with reformated column names
+    """
+
+    # -- assert
+    df = assert_df(df)
+
+    # -- main
+    df = DFMapping(df, values=False, printf=printf).transform(df)
+
+    return df

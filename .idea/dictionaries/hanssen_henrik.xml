@@ -32,6 +32,7 @@
       <w>concats</w>
       <w>concatting</w>
       <w>conv</w>
+      <w>convolutional</w>
       <w>corrplot</w>
       <w>corrs</w>
       <w>countplot</w>
@@ -117,6 +118,7 @@
       <w>medae</w>
       <w>meth</w>
       <w>mins</w>
+      <w>multioutput</w>
       <w>nbviewer</w>
       <w>ncol</w>
       <w>ncols</w>
@@ -133,6 +135,7 @@
       <w>performant</w>
       <w>plim</w>
       <w>plotly</w>
+      <w>pmax</w>
       <w>pred</w>
       <w>preds</w>
       <w>preprocessing</w>

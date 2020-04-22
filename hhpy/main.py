@@ -46,7 +46,7 @@ pd.options.mode.chained_assignment = None
 global_t = datetime.datetime.now()  # for times progress bar
 global_tprint_len = 0  # for temporary printing
 # --- typing classes
-Scalar = Union[int, float, str, bytes]
+Scalar = Union[int, float, str, bytes, None]
 ListOfScalars = Union[List[Scalar], Scalar]
 SequenceOrScalar = Union[Sequence, Scalar, AbstractSet]
 SequenceOfScalars = Union[Sequence[Scalar], Scalar]
@@ -103,7 +103,7 @@ class BaseClass:
 
     # --- functions
     def __repr__(self):
-        return _get_repr(self)
+        return get_repr(self)
 
     def to_dict(self) -> dict:
         """
@@ -254,7 +254,7 @@ class BaseClass:
 
 # ---- functions
 # --- internal functions
-def _get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = True, map_dict: bool = True) -> str:
+def get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = True, map_dict: bool = True) -> str:
     """
     basic reuseable repr method for custom classes
 
@@ -1134,23 +1134,34 @@ def is_list_like(obj: Any) -> bool:
 
 
 @export
-def assert_list(*args: Any) -> list:
+def assert_list(*args: Any, default: SequenceOrScalar = None) -> list:
     """
     Takes any python object(s) and turns them into an iterable list.
 
     :param args: Any python object
+    :param default: What to return if args are Empty or None
     :return: List
     """
+    # -- init
+    # - handle default
+    if default is None:
+        default = []
+    elif is_list_like(default):
+        default = list(default)
+    else:
+        default = [default]
+
+    # -- main
     args = list(args)
 
     # Empty case
     if len(args) == 0:
-        return []
+        return default
 
     # None case
     if len(args) == 1:
         if args[0] is None:
-            return []
+            return default
 
     # Regular case
     for _it, _arg in enumerate(args):
@@ -1176,24 +1187,44 @@ def assert_list(*args: Any) -> list:
     return args
 
 
+@export
+def assert_tuple(*args: Any, **kwargs) -> tuple:
+    """
+    Takes any python object(s) and turns them into an iterable tuple.
+
+    :param args: Any python object
+    :param kwargs: Keyword arguments passed to :~func: assert_list
+    :return: List
+    """
+
+    return tuple(assert_list(*args, **kwargs))
+
+
 def force_list(*args, **kwargs):
     warnings.warn('force_list is deprecated, please use assert_list instead', DeprecationWarning)
     return assert_list(*args, **kwargs)
 
 
 @export
-def assert_scalar(obj: Any, warn: bool = True) -> Scalar:
+def assert_scalar(obj: Any, warn: bool = True, default: Scalar = None) -> Scalar:
     """
     Takes any python object and turns it into a scalar object.
 
     :param obj: Any python object
     :param warn: Whether to trigger a warning when objects are being truncated
+    :param default: What to return if obj is None
     :return: List
     """
+    if obj is None:
+        obj = default
+
     _lst = assert_list(obj)
     _len = len(_lst)
+    if _len == 0:
+        warnings.warn("empty list cannot be cast to scalar, returning None")
+        return None
     if warn and _len > 1:
-        warnings.warn(f"force scalar: object {obj} has length {_len}, retaining only first entry")
+        warnings.warn(f"assert_scalar: object {obj} has length {_len}, retaining only first entry")
 
     return _lst[0]
 

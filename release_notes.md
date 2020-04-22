@@ -1,5 +1,15 @@
 # Release Notes
 
+## v0.1.4
+- hhpy.modelling
+  - class Model not supports setattr, a function that sets an attribute of all k instances of it's model
+  - support for multi output one input regressors with attribute multi
+  - various bugfixes
+- hhpy.ds
+  - function top_n supports passing a percentage with a max number
+  - convenience function reformat_columns to unify column names
+  - reworked df_score to work with the y_true, y_pred format
+
 ## v0.1.3
 - hhpy.regression (new module)
   - Conv1DNN model: wrapper for keras.Conv1D

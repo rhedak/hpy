@@ -583,15 +583,13 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
     # case: vector data
     if data is None:
 
-        if 'name' in dir(x):
-            # noinspection PyUnresolvedReferences
-            _x = x.name
-            _x_name = _x
+        if hasattr(x, 'name'):
+            _x_name = x.name
         else:
-            _x = 'x'
-            _x_name = None
+            _x_name = 'x'
 
-        _df = pd.DataFrame.from_dict({_x: x})
+        _df = pd.DataFrame({_x_name: x})
+        x = _x_name
 
     # data: DataFrame
     else:
@@ -600,17 +598,11 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
         del data
 
         if is_list_like(x) and len(x) > 1:
-            hue = '__variable'
-            _x = '__value'
-            _x_name = _x
-            hue_order = x
+            hue_order = assert_list(x)
             title = False
-            _df = pd.melt(_df, value_vars=x, value_name=_x, var_name=hue)
-        else:
-            _x = x
-            _x_name = _x
-
-    del x
+            hue = '__variable__'
+            x = '__value__'
+            _df = pd.melt(_df, value_vars=x, value_name=x, var_name=hue)
 
     # handle hue and default values
     if hue is None:
@@ -633,8 +625,8 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
     if max_n and (len(_df) > max_n):
         if sample_warn:
             warnings.warn(
-                'Limiting samples to {:,} for calc speed. Turn this off with max_n=None or suppress this warning '
-                'with sample_warn=False.'.format(max_n))
+                f"Limiting samples to {max_n:,} for calc speed. Turn this off with max_n=None or suppress this warning "
+                "with sample_warn=False.")
         _df = _df.sample(max_n, random_state=random_state)
 
     # the actual plot
@@ -672,8 +664,8 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
                 ]
 
         # for plot trimming
-        _x_mins.append(_df_i[_x_name].min())
-        _x_maxs.append(_df_i[_x_name].max())
+        _x_mins.append(_df_i[x].min())
+        _x_maxs.append(_df_i[x].max())
 
         # handle label
         try:
@@ -696,7 +688,7 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
         else:
             _label = _f_x_label
 
-        # plot histogam
+        # plot histogram
         if hist:
             _hist_n, _hist_bins = _f_ax.hist(_df_i[_f_x], _f_bins, density=perc, facecolor=_f_facecolor,
                                              edgecolor=edgecolor,
@@ -776,7 +768,7 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
 
     # -- preparing the data frame
     # drop nan values
-    _df = _df[np.isfinite(_df[_x])]
+    _df = _df[np.isfinite(_df[x])]
 
     # init plot
     if ax is None:
@@ -797,13 +789,13 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
 
         elif std_cutoff is not None:
 
-            _x_min = _df[_x].mean() - _df[_x].std() * std_cutoff
-            _x_max = _df[_x].mean() + _df[_x].std() * std_cutoff
+            _x_min = _df[x].mean() - _df[x].std() * std_cutoff
+            _x_max = _df[x].mean() + _df[x].std() * std_cutoff
 
         else:
 
-            _x_min = _df[_x].min()
-            _x_max = _df[_x].max()
+            _x_min = _df[x].min()
+            _x_max = _df[x].max()
 
         # edge case
         if _x_min == _x_max:
@@ -816,8 +808,8 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
             _x_step = (_x_max - _x_min) / bins
             _bins = np.arange(_x_min, _x_max + _x_step, _x_step)
 
-            _plot_x_min = _df[_x].min() - _x_step
-            _plot_x_max = _df[_x].max() + _x_step
+            _plot_x_min = _df[x].min() - _x_step
+            _plot_x_max = _df[x].max() + _x_step
         else:
             _bins = bins
             _plot_x_min = np.min(bins)
@@ -832,7 +824,7 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
             _color = palette
 
         # plot
-        ax, ax2 = _f_distplot(_f_x=_x, _f_data=_df, _f_x_label=_x_name, _f_facecolor=_color,
+        ax, ax2 = _f_distplot(_f_x=x, _f_data=_df, _f_x_label=x, _f_facecolor=_color,
                               _f_distfit_color=linecolor,
                               _f_bins=_bins, _f_std_cutoff=std_cutoff,
                               _f_xlim=xlim, _f_distfit_line=linestyle, _f_ax=ax, _f_ax2=ax2, _f_fill=fill)
@@ -849,7 +841,7 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
                 _hues = list(_hues) + [other_name]
         # parse hue order
         else:
-            _hues = _get_ordered_levels(_df, hue, hue_order, _x)
+            _hues = _get_ordered_levels(_df, hue, hue_order, x)
 
         # find shared _x_min ; _x_max
         if xlim is not None:
@@ -863,11 +855,11 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
 
             _std_cutoff_hues = None
 
-            _x_min = _df[_x].min()
-            _x_max = _df[_x].max()
+            _x_min = _df[x].min()
+            _x_max = _df[x].max()
 
         else:
-            _df_agg = _df.groupby(hue).agg({_x: ['mean', 'std']}).reset_index()
+            _df_agg = _df.groupby(hue).agg({x: ['mean', 'std']}).reset_index()
             _df_agg.columns = [hue, 'mean', 'std']
             _df_agg['x_min'] = _df_agg['mean'] - _df_agg['std'] * std_cutoff
             _df_agg['x_max'] = _df_agg['mean'] + _df_agg['std'] * std_cutoff
@@ -881,8 +873,8 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
         # handle bins
         _x_step = (_x_max - _x_min) / bins
 
-        _plot_x_min = _df[_x].min() - _x_step
-        _plot_x_max = _df[_x].max() + _x_step
+        _plot_x_min = _df[x].min() - _x_step
+        _plot_x_max = _df[x].max() + _x_step
 
         _bins = np.arange(_x_min, _x_max + _x_step, _x_step)
 
@@ -906,7 +898,7 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
             _df_hue = _df[_df[hue] == _hue]
 
             # one plot per hue
-            ax, ax2 = _f_distplot(_f_x=_x, _f_data=_df_hue, _f_x_label=_hue, _f_facecolor=_color,
+            ax, ax2 = _f_distplot(_f_x=x, _f_data=_df_hue, _f_x_label=_hue, _f_facecolor=_color,
                                   _f_distfit_color=_color, _f_bins=_bins,
                                   _f_std_cutoff=_std_cutoff_hues,
                                   _f_xlim=xlim, _f_distfit_line=_linestyle, _f_ax=ax, _f_ax2=ax2, _f_fill=fill)
@@ -928,9 +920,9 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
 
     # handle title
     if title:
-        _title = '{}{}'.format(title_prefix, _x_name)
+        _title = f"{title_prefix}{x}"
         if hue is not None:
-            _title += ' by {}'.format(hue)
+            _title += f" by {hue}"
         ax.set_title(_title)
 
     # handle xlim
