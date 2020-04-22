@@ -715,7 +715,6 @@ class Models(BaseClass):
 
         # save
         self.multi = multi
-        print(multi)
 
         # to df
         _df.columns = _y_ref_preds
