@@ -235,7 +235,8 @@ class Model(BaseClass):
     @docstr
     def predict(self, X: Union[DFOrArray, SequenceOrScalar] = None, y: Union[DFOrArray, SequenceOrScalar] = None,
                 df: pd.DataFrame = None, return_type: str = 'y', k_index: pd.Series = None,
-                groupby: SequenceOrScalar = None, handle_na: bool = True) -> Union[pd.Series, pd.DataFrame]:
+                groupby: SequenceOrScalar = None, handle_na: bool = True, multi: SequenceOrScalar = None
+                ) -> Union[pd.Series, pd.DataFrame]:
         """
         Generalized predict method based on model.predict
         
@@ -246,7 +247,8 @@ class Model(BaseClass):
             with only the predictions, if one of 'df','DataFrame' returns the full DataFrame with predictions added
         :param k_index: If specified and model is k_cross split: return only the predictions for each test subset
         :param groupby: %(groupby)s
-        :param handle_na: Whether to handle NaN values (prediction will be NaN)
+        :param handle_na: Whether to handle NaN values (prediction will be NaN) [optional]
+        :param multi: Postfixes to use for multi output models [optional]
         :return: see return_type
         """
 
@@ -330,11 +332,14 @@ class Model(BaseClass):
             if len(_y_labs) < _y_pred.shape[1]:  # some regressors (TimeSeriesRegressors)
                 # might return multi output
                 _y_labs_new = []
-                _multi = _y_pred.shape[1] // len(_y_labs)
+                if multi is None:
+                    multi = _y_pred.shape[1] // len(_y_labs)
                 for _y_lab in _y_labs:
-                    for _it in range(_multi):
+                    for _it in range(multi):
                         _y_labs_new.append(f"{_y_lab}_{_it}")
                 _y_labs = _y_labs_new + []
+
+            print(_y_labs)
 
             if k_index is None:  # all
                 for _it, _y_lab in enumerate(_y_labs):
@@ -604,7 +609,7 @@ class Models(BaseClass):
     def predict(
             self, X: Union[DFOrArray, SequenceOrScalar] = None, y: Union[DFOrArray, SequenceOrScalar] = None,
             df: pd.DataFrame = None, return_type: str = 'self', ensemble: bool = False, k_predict_type: str = 'test',
-            groupby: SequenceOrScalar = None, do_print: bool = True
+            groupby: SequenceOrScalar = None, multi: SequenceOrScalar = None, do_print: bool = True
     ) -> Optional[Union[pd.Series, pd.DataFrame]]:
         """
         predict with all models in collection
@@ -616,6 +621,7 @@ class Models(BaseClass):
         :param ensemble: %(ensemble)s
         :param k_predict_type: 'test' or 'all'
         :param groupby: %(groupby)s
+        :param multi: postfixes to use for multi output [optional]
         :param do_print: %(do_print)s
         :return: if return_type is self: None, else see Model.predict
         """
@@ -698,16 +704,18 @@ class Models(BaseClass):
         if len(_y_ref_preds) < _df.shape[1]:  # some regressors (TimeSeriesRegressors)
             # might return multi output
             _y_ref_preds_new = []
-            _multi = _df.shape[1] // len(_y_ref_preds)
+            if multi is None:
+                multi = range(_df.shape[1] // len(_y_ref_preds))
             for _y_ref_pred in _y_ref_preds:
-                for _it in range(_multi):
-                    _y_ref_preds_new.append(f"{_y_ref_pred}_{_it}")
+                for _multi in multi:
+                    _y_ref_preds_new.append(f"{_y_ref_pred}_{_multi}")
             _y_ref_preds = _y_ref_preds_new + []
         else:
-            _multi = None
+            multi = None
 
         # save
-        self.multi = _multi
+        self.multi = multi
+        print(multi)
 
         # to df
         _df.columns = _y_ref_preds
@@ -792,6 +800,7 @@ class Models(BaseClass):
             self, df: pd.DataFrame = None, k: int = 5, groupby: Union[Sequence, str] = None,
             sortby: Union[Sequence, str] = None, random_state: int = None, fit_type: str = 'train_test',
             k_test: Optional[int] = 0, ensemble: bool = False, scores: Union[Sequence, str, Callable] = None,
+            multi: SequenceOrScalar = None,
             scale: float = None, do_predict: bool = True, do_score: bool = True, do_split: bool = True,
             do_fit: bool = True, do_print: bool = True, display_score: bool = True
     ) -> None:
@@ -806,7 +815,8 @@ class Models(BaseClass):
         :param fit_type: see .fit
         :param k_test: see .fit
         :param ensemble: %(ensemble)s
-        :param scores: see .score
+        :param scores: see .score [optional]
+        :param multi: postfixes to use for multi output [optional]
         :param scale: see .score
         :param do_print: %(do_print)s
         :param display_score: %(display_score)s
@@ -825,7 +835,7 @@ class Models(BaseClass):
         if do_fit:
             self.fit(fit_type=fit_type, k_test=k_test, do_print=do_print, groupby=groupby)
         if do_predict:
-            self.predict(ensemble=ensemble, do_print=do_print, groupby=groupby)
+            self.predict(ensemble=ensemble, do_print=do_print, groupby=groupby, multi=multi)
         if do_score:
             self.score(scores=scores, scale=scale, do_print=do_print, display_score=display_score)
         if do_print:

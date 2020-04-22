@@ -1,5 +1,10 @@
 # Release Notes
 
+## v0.1.5
+- hhpy.modelling
+  - can now specify multi output postfixes
+  - bugfixes
+
 ## v0.1.4
 - hhpy.modelling
   - class Model not supports setattr, a function that sets an attribute of all k instances of it's model
