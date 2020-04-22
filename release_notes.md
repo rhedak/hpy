@@ -1,5 +1,10 @@
 # Release Notes
 
+## v0.1.6
+- hhpy.modelling
+  - can now specify multi output postfixes
+  - bugfixes
+
 ## v0.1.5
 - hhpy.modelling
   - can now specify multi output postfixes
