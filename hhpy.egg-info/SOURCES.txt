@@ -9,6 +9,7 @@ hhpy/ipython.py
 hhpy/main.py
 hhpy/modelling.py
 hhpy/plotting.py
+hhpy/regression.py
 hhpy.egg-info/PKG-INFO
 hhpy.egg-info/SOURCES.txt
 hhpy.egg-info/dependency_links.txt
