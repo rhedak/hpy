@@ -339,8 +339,6 @@ class Model(BaseClass):
                         _y_labs_new.append(f"{_y_lab}_{_it}")
                 _y_labs = _y_labs_new + []
 
-            print(_y_labs)
-
             if k_index is None:  # all
                 for _it, _y_lab in enumerate(_y_labs):
                     df[_y_lab] = _y_pred[_y_pred.columns[_it]]
