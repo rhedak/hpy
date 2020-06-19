@@ -25,7 +25,7 @@ from io import StringIO
 from hhpy.main import export, BaseClass, assert_list, tprint, progressbar, qformat, list_intersection, round_signif, \
     is_list_like, dict_list, append_to_dict_list, concat_cols, DocstringProcessor, reformat_string, dict_inv, \
     list_exclude, docstr as docstr_main, SequenceOfScalars, SequenceOrScalar, STRING_NAN, is_scalar, GROUPBY_DUMMY, \
-    assert_scalar
+    assert_scalar, list_merge
 
 # ---- variables
 # --- constants
@@ -1439,7 +1439,7 @@ def medae(*args, **kwargs) -> Union[pd.DataFrame, float]:
 @export
 def pae(*args, times_hundred: bool = True, pmax: int = 999, **kwargs) -> Union[pd.DataFrame, float]:
     """
-    wrapper for f_score using percentage absolute error
+    Wrapper for f_score using percentage absolute error. Does NOT work if y_true is 0 (returns np.nan in this case)
 
     :param args: passed to f_score
     :param times_hundred: Whether to multiply by 100 for human readable percentages
@@ -1449,7 +1449,10 @@ def pae(*args, times_hundred: bool = True, pmax: int = 999, **kwargs) -> Union[p
     :return: if groupby is supplied: pandas DataFrame, else: scalar value
     """
     def _pae(y_true, y_pred):
-        _score = np.mean(np.abs((y_pred / y_true - 1)))
+
+        _y_true = np.where(y_true == 0, np.nan, y_true)
+        _frac = np.abs((y_pred / _y_true - 1))
+        _score = np.nanmean(_frac)
         _score = np.where(_score > pmax, pmax, _score)
         if times_hundred:
             _score *= 100
@@ -1501,7 +1504,7 @@ def df_score(df: pd.DataFrame, y_true: SequenceOrScalar, y_pred: SequenceOrScala
     if pred_suffix is None:
         pred_suffix = ['pred']
     if scores is None:
-        scores = [r2, rmse, mae, pae, stdae, medae]
+        scores = [r2, rmse, mae, pae, corr]
     else:
         scores = assert_list(scores)
     df = assert_df(df)
@@ -1535,7 +1538,10 @@ def df_score(df: pd.DataFrame, y_true: SequenceOrScalar, y_pred: SequenceOrScala
 
     # -- init
     if dropna:
-        df = df.dropna(subset=y_true + y_pred)
+        df = df.dropna(subset=list_merge(y_true, y_pred))
+    for _groupby in groupby:
+        if df[_groupby].dtype.name == 'category':
+            df[_groupby] = df[_groupby].cat.remove_unused_categories()
 
     if isinstance(scale, Mapping):
         for _y_true, _scale in scale.items():
@@ -2773,14 +2779,15 @@ def top_n_coding(s: Sequence, n: int, other_name: str = 'other', na_to_other: bo
 
 
 @export
-def k_split(df: pd.DataFrame, k: int = 5, groupby: Union[Sequence, str] = None,
+def k_split(df: pd.DataFrame, k: Union[int, str] = 5, groupby: Union[Sequence, str] = None,
             sortby: Union[Sequence, str] = None, random_state: int = None, do_print: bool = True,
-            return_type: Union[str, int] = 1) -> Union[pd.Series, tuple]:
+            return_type: Union[str, int] = 0) -> Union[pd.Series, tuple]:
     """
     Splits a DataFrame into k (equal sized) parts that can be used for train test splitting or k_cross splitting
 
     :param df: pandas DataFrame to be split
-    :param k: how many (equal sized) parts to split the DataFrame into [optional]
+    :param k: if integer: how many (equal sized) parts to split the DataFrame into
+      if string: (timestamp) value where to split, requires sortby [optional]
     :param groupby: passed to pandas.DataFrame.groupby before splitting,
         ensures that each group will be represented equally in each split part [optional]
     :param sortby: if True the DataFrame is ordered by these column(s) and then sliced into parts from the top
@@ -2788,7 +2795,7 @@ def k_split(df: pd.DataFrame, k: int = 5, groupby: Union[Sequence, str] = None,
     :param random_state: random_state to be used in random sorting, ignore if sortby is True [optional]
     :param do_print: whether to print steps to console [optional]
     :param return_type: if one of ['Series', 's'] returns a pandas Series containing the k indices range(k)
-        if a positive integer < k returns tuple of shape (df_train, df_test) where the return_type'th part
+        if integer < k returns tuple of shape (df_train, df_test) where the return_type'th part
         is equal to df_test and the other parts are equal to df_train
     :return: depending on return_type either a pandas Series or a tuple
     """
@@ -2800,32 +2807,41 @@ def k_split(df: pd.DataFrame, k: int = 5, groupby: Union[Sequence, str] = None,
     df, groupby = assert_df(df=df, groupby=groupby)
 
     # -- main
-    _df_out = []
-    # - split each group
-    for _index, _df_i in df.groupby(groupby):
-
-        # sort (randomly or by given value)
+    if isinstance(k, str):
         if sortby is None:
-            _df_i = _df_i.sample(frac=1, random_state=random_state)
-        else:
-            if sortby == 'index':
-                _df_i = _df_i.sort_index()
+            raise ValueError(f"k={k} (string) required sortby")
+        _df_out = df.copy()
+        _df_out['_k_index'] = np.where(_df_out[sortby] < k, 1, 0)
+        # set k to 1 because the df is split in only 2 parts
+        k = 1
+    else:
+        _df_out = []
+        # - split each group
+        for _index, _df_i in df.groupby(groupby):
+
+            # sort (randomly or by given value)
+            if sortby is None:
+                _df_i = _df_i.sample(frac=1, random_state=random_state)
             else:
-                _df_i = _df_i.sort_values(by=sortby)
-        # get row numbers in INVERSE order so that key ordering will be inverse (in case of sorted: new data has k = 0)
-        _df_i[ROW_DUMMY] = range(_df_i.shape[0])[::-1]
-        # assign k index based on row number
-        _row_split = int(np.ceil(_df_i.shape[0] / k))
-        _df_i['_k_index'] = _df_i[ROW_DUMMY] // _row_split
-        # append to list
-        _df_out.append(_df_i)
-    # - merge
-    _df_out = pd.concat(_df_out).sort_index()
-    # drop row dummy
-    _df_out = _df_out.drop(ROW_DUMMY, axis=1)
-    # drop groupby dummy
-    if GROUPBY_DUMMY in _df_out.columns:
-        _df_out = _df_out.drop(GROUPBY_DUMMY, axis=1)
+                if sortby == 'index':
+                    _df_i = _df_i.sort_index()
+                else:
+                    _df_i = _df_i.sort_values(by=sortby)
+            # get row numbers in INVERSE order so that key ordering will be inverse
+            # (in case of sorted: new data has k = 0)
+            _df_i[ROW_DUMMY] = range(_df_i.shape[0])[::-1]
+            # assign k index based on row number
+            _row_split = int(np.ceil(_df_i.shape[0] / k))
+            _df_i['_k_index'] = _df_i[ROW_DUMMY] // _row_split
+            # append to list
+            _df_out.append(_df_i)
+        # - merge
+        _df_out = pd.concat(_df_out).sort_index()
+        # drop row dummy
+        _df_out = _df_out.drop(ROW_DUMMY, axis=1)
+        # drop groupby dummy
+        if GROUPBY_DUMMY in _df_out.columns:
+            _df_out = _df_out.drop(GROUPBY_DUMMY, axis=1)
     # tprint
     if do_print:
         tprint('k_split done')
@@ -2959,6 +2975,6 @@ def reformat_columns(df: pd.DataFrame, printf: Callable = None, **kwargs) -> pd.
     df = assert_df(df)
 
     # -- main
-    df = DFMapping(df, values=False, printf=printf).transform(df)
+    df = DFMapping(df, values=False, printf=printf, **kwargs).transform(df)
 
     return df

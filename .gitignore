@@ -3,6 +3,7 @@
 **.pyc
 **~
 **/__pycache__
+**/.ipython_checkpoints
 sphinx/_build
 sphinx/_templates
 dist
