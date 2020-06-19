@@ -1,5 +1,9 @@
 # Release Notes
 
+## v0.1.7
+- hhpy.ds
+  - k_split now supports splitting timestamps by a pre-defined value
+
 ## v0.1.6
 - hhpy.modelling
   - can now specify multi output postfixes
