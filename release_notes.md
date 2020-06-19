@@ -1,5 +1,8 @@
 # Release Notes
 
+## v0.1.8
+hotfix
+
 ## v0.1.7
 - hhpy.ds
   - k_split now supports splitting timestamps by a pre-defined value

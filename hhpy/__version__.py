@@ -7,7 +7,7 @@ Information about the current version of the py-package-template package.
 
 __title__ = 'hhpy'
 __description__ = 'hhpy - convenient data science'
-__version__ = '0.1.7'  # 2020-06-19
+__version__ = '0.1.8'  # 2020-06-19
 __author__ = 'Henrik Hanssen'
 __author_email__ = 'henrik.hanssen@gmail.com'
 __license__ = 'Apache 2.0'
