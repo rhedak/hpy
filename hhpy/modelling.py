@@ -408,7 +408,8 @@ class Models(BaseClass):
     # --- globals
     __name__ = 'Models'
     __attributes__ = ['models', 'fit_type', 'df', 'X_ref', 'y_ref', 'groupby', 'scaler_X', 'scaler_y', 'model_names',
-                      'df_score', 'k_tests']
+                      'df_score', 'k_tests', 'printf']
+    __dependent_classes__ = [Model]
 
     # --- functions
     def __init__(self, *args: Any, df: pd.DataFrame = None, X_ref: SequenceOrScalar = None,
@@ -432,6 +433,8 @@ class Models(BaseClass):
         _model_names = []
         # ensure hhpy.modelling.Model
         _it = -1
+        if len(args) == 0:
+            warnings.warn('No Models passed')
         for _arg in args:
             for _model in assert_list(_arg):
 

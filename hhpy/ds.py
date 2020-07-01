@@ -1437,6 +1437,27 @@ def medae(*args, **kwargs) -> Union[pd.DataFrame, float]:
 
 
 @export
+def mpae(*args, times_hundred: bool = True, pmax: int = 999, **kwargs) -> Union[pd.DataFrame, float]:
+    """
+    Wrapper for f_score using mean absolute error over mean.
+
+    :param args: passed to f_score
+    :param times_hundred: Whether to multiply by 100 for human readable percentages
+    :param pmax: Max value for the percentage absolute error, used as a fallback because pae can go to infinity as
+        y_true approaches zero
+    :param kwargs: passed to f_score
+    :return: if groupby is supplied: pandas DataFrame, else: scalar value
+    """
+    def _mpae(y_true, y_pred):
+
+        _score = np.abs(y_true - y_pred) / np.mean(y_true)
+        if times_hundred:
+            _score *= 100
+        return _score
+    return f_score(*args, f=_mpae, **kwargs)
+
+
+@export
 def pae(*args, times_hundred: bool = True, pmax: int = 999, **kwargs) -> Union[pd.DataFrame, float]:
     """
     Wrapper for f_score using percentage absolute error. Does NOT work if y_true is 0 (returns np.nan in this case)
@@ -1504,7 +1525,7 @@ def df_score(df: pd.DataFrame, y_true: SequenceOrScalar, y_pred: SequenceOrScala
     if pred_suffix is None:
         pred_suffix = ['pred']
     if scores is None:
-        scores = [r2, rmse, mae, pae, corr]
+        scores = [r2, rmse, mae, pae, mpae, corr]
     else:
         scores = assert_list(scores)
     df = assert_df(df)
@@ -2809,7 +2830,7 @@ def k_split(df: pd.DataFrame, k: Union[int, str] = 5, groupby: Union[Sequence, s
     # -- main
     if isinstance(k, str):
         if sortby is None:
-            raise ValueError(f"k={k} (string) required sortby")
+            raise ValueError(f"k={k} (string) requires sortby")
         _df_out = df.copy()
         _df_out['_k_index'] = np.where(_df_out[sortby] < k, 1, 0)
         # set k to 1 because the df is split in only 2 parts

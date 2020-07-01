@@ -15,10 +15,11 @@ import os
 import sys
 import datetime
 import h5py
+import pickle
 import re
 import functools
 # --- third party imports
-from typing import Any, Callable, Union, Sequence, Mapping, List, Optional, Iterable, AbstractSet, ValuesView
+from typing import Any, Callable, Union, Sequence, Mapping, List, Optional, Iterable, AbstractSet, ValuesView, Dict
 from types import FunctionType
 from docrep import DocstringProcessor
 from collections import defaultdict
@@ -100,46 +101,93 @@ class BaseClass:
     __name__ = 'BaseClass'
     __attributes__ = []
     __attributes_no_repr__ = []
+    __dependent_classes__ = []
 
     # --- functions
     def __repr__(self):
         return get_repr(self)
 
-    def to_dict(self) -> dict:
+    @property
+    def __dict___(self) -> dict:
+        return self.to_dict()
+
+    def __getstate__(self):
+        return self.__dict___
+
+    def __setstate__(self, dct):
+        self.from_dict(dct=dct)
+
+    def to_dict(self, recursive: bool = False):
         """
         Converts self to a dictionary
 
+        :recursive: Whether to recursively propagate to_dict to children
         :return: Dictionary
         """
+
         if len(self.__attributes__) == 0:
             warnings.warn('self.__attributes__ has length zero, did you declare it?')
 
         _dict = {}
         for _attr_name in list_merge('__name__', self.__attributes__):
             _attr = self.__getattribute__(_attr_name)
-            if 'to_dict' in dir(_attr):
-                _attr = _attr.to_dict()
-            elif is_list_like(_attr):
-                if isinstance(_attr, Mapping):
-                    for _key, _value in _attr.items():
-                        if 'to_dict' in dir(_value):
-                            # noinspection PyUnresolvedReferences
-                            _attr[_key] = _value.to_dict()
-                else:
-                    for _i in range(len(_attr)):
-                        if 'to_dict' in dir(_attr[_i]):
-                            _attr[_i] = _attr[_i].to_dict()
+
+            # - call to children's to_dict
+            if recursive:
+                if not isinstance(_attr, pd.DataFrame) and hasattr(_attr, 'to_dict'):
+                    _attr = _attr.to_dict()
+                elif is_list_like(_attr):
+                    if isinstance(_attr, Mapping):
+                        for _key, _value in _attr.items():
+                            if hasattr(_value, 'to_dict'):
+                                # noinspection PyUnresolvedReferences
+                                _attr[_key] = _value.to_dict()
+                    else:
+                        for _i in range(len(_attr)):
+                            if hasattr(_attr[_i], 'to_dict'):
+                                print(_attr[_i])
+                                _attr[_i] = _attr[_i].to_dict()
+
             _dict[_attr_name] = _attr
 
         return _dict
 
-    def from_dict(self, dct: Mapping):
+    def from_dict(self, dct: Mapping, recursive: bool = False, classes: Any = None):
         """
         Restores self from a dictionary
 
         :param dct: Dictionary created from :meth:`~BaseClass.to_dict`
+        :param recursive: Whether to recursively call from_dict of children
+        :param classes: Classes required to load objects
         :return: None
         """
+        # -- functions
+        def _f_eval(attr, attr_value):
+
+            # check for passed classes
+            _attr_evaluated = None
+            for _cla in _classes:
+                if hasattr(_cla, '__name__') and attr == _cla.__name__:
+                    _attr_evaluated = _cla()
+            # if no passed class fits the name assume a default name
+            if _attr_evaluated is None:
+                _attr_evaluated = eval(attr + '()')
+            # check if the evaluated object has a from dict function
+            if hasattr(_attr_evaluated, 'from_dict'):
+                # check if we can pass classes to the sub-function
+                _varnames = _attr_evaluated.from_dict.__code__.co_varnames
+                _kws = {}
+                if 'classes' in _varnames:
+                    _kws['classes'] = _classes
+                # call sub-function
+                _attr_evaluated.from_dict(attr_value, **_kws)
+
+            return _attr_evaluated
+
+        # -- init
+        _classes = assert_list(self.__dependent_classes__, default=[]) + assert_list(classes, default=[])
+
+        # -- main
         if len(self.__attributes__) == 0:
             warnings.warn('self.__attributes__ has length zero, did you declare it?')
 
@@ -147,101 +195,35 @@ class BaseClass:
             if _attr_name not in dct.keys():
                 continue
             _attr = dct[_attr_name]
-            if is_list_like(_attr):
-                if isinstance(_attr, Mapping):
 
-                    if '__name__' in _attr.keys():
-
-                        _name = _attr['__name__']
-                        # remnant of a time when this was a file called cf.py
-                        # if _name[:3] == 'cf.':
-                        #     _name = _name[3:]
-                        # evaluate, i.e. instantiate
-                        _attr_eval = eval(_name + '()')
-                        if 'from_dict' in dir(_attr_eval):
-                            _attr_eval.from_dict(_attr)
-                        _attr = _attr_eval
-
-                    else:
-
-                        for _attr_key, _attr_value in _attr.items():
-
-                            if isinstance(_attr_value, Mapping):
-
-                                if '__name__' in _attr_value.keys():
-
-                                    _name = _attr_value['__name__']
-                                    if _name[:3] == 'cf.':
-                                        _name = _name[3:]
-                                    _attr_eval = eval(_name + '()')
-                                    if 'from_dict' in dir(_attr_eval):
-                                        _attr_eval.from_dict(_attr_value)
-                                    # noinspection PyUnresolvedReferences
-                                    _attr[_attr_key] = _attr_eval
-
-                else:
-                    for _i in range(len(_attr)):
-
-                        _attr_value = _attr[_i]
-
-                        if isinstance(_attr_value, Mapping):
-
-                            if '__name__' in _attr_value.keys():
-
-                                _name = _attr_value['__name__']
-                                if _name[:3] == 'cf.':
-                                    _name = _name[3:]
-                                _attr_eval = eval(_name + '()')
-                                if 'from_dict' in dir(_attr_eval):
-                                    _attr_eval.from_dict(_attr_value)
-                                _attr[_i] = _attr_eval
+            # - call to children's from_dict
+            if recursive:
+                if is_list_like(_attr):
+                    if isinstance(_attr, Dict):  # Dict
+                        if '__name__' in _attr.keys():
+                            _attr = _f_eval(_attr['__name__'], _attr)  # eval
+                        else:
+                            for _attr_key, _attr_value in _attr.items():
+                                if isinstance(_attr_value, Dict) and '__name__' in _attr_value.keys():
+                                    _attr[_attr_key] = _f_eval(_attr_value['__name__'], _attr_value)  # eval
+                    else:  # List
+                        for _i in range(len(_attr)):
+                            _attr_value = _attr[_i]
+                            if isinstance(_attr_value, Mapping) and '__name__' in _attr_value.keys():
+                                _attr[_i] = _f_eval(_attr_value['__name__'], _attr_value)  # eval
 
             self.__setattr__(_attr_name, _attr)
+        # -- return
+        return self
 
-    def save(self, filename: str, f: Callable = pd.to_pickle):
+    def to_pickle(self, filename: str):
         """
-        Save self to file using an arbitrary function that supports saving dictionaries. Note that the object
-        is implicitly converted to a dictionary before saving.
+        Save self to pickle file
 
         :param filename: filename (path) to be used
-        :param f: function to be used [optional]
         :return: None
         """
-        _dict = self.copy().to_dict()
-        f(_dict, filename)
-
-    def load(self, filename: str, f: Callable = pd.read_pickle):
-        """
-        Load self from file saved with :meth:`~BaseClass.save` using an arbitrary function that supports loading
-        dictionaries.
-
-        :param filename: filename (path) of the file
-        :param f: function to be used [optional]
-        :return: None
-        """
-        self.from_dict(f(filename))
-
-    def to_pickle(self, *args, **kwargs):
-        """
-        Wrapper for :meth:`~BaseClass.save` using f =
-        `pandas.to_pickle <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.DataFrame.to_pickle.html>`_
-
-        :param args: passed to save [optional]
-        :param kwargs: passed to save [optional]
-        :return: see save
-        """
-        self.save(*args, f=pd.to_pickle, **kwargs)
-
-    def read_pickle(self, *args, **kwargs):
-        """
-        Wrapper for :meth:`BaseClass.load` using f =
-        `pandas.read_pickle <https://pandas.pydata.org/pandas-docs/stable/reference/api/pandas.read_pickle.html>`_
-
-        :param args: passed to load [optional]
-        :param kwargs: passed to load [optional]
-        :return: see load
-        """
-        self.load(*args, f=pd.read_pickle, **kwargs)
+        pickle.dump(self, open(filename, 'wb'))
 
     def copy(self):
         """
@@ -261,6 +243,7 @@ def get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = T
     :param obj: Any instance of a custom class implementing .__name__ (str) and .__attributes__ (List[str])
     :param rules: Rules as dictionary of types and callables. Callable argument will be attribute value
     :param map_list: Whether to map the rules to list elements
+    :param map_dict: Whether to map the rules to dictionary elements
     :return: str
     """
     def _get_repr_i(value: Any) -> str:
