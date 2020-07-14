@@ -1,5 +1,18 @@
 # Release Notes
 
+## v0.2.0
+hhpy.modelling
+-- Can now pass kwargs to fit
+hhpy.ds
+-- mpae: bugfix, now returns scalar value (as intended)
+-- df_score: bugfix
+
+## v0.1.9
+hhpy.main
+-- BaseClass and it's derived classes now support pickling
+hhpy.ds
+-- New scoring function mpae: mean absolute error over mean absolute value
+
 ## v0.1.8
 hotfix
 
