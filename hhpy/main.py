@@ -115,7 +115,7 @@ class BaseClass:
         return self.__dict___
 
     def __setstate__(self, dct):
-        self.from_dict(dct=dct)
+        return self.from_dict(dct=dct)
 
     def to_dict(self, recursive: bool = False):
         """

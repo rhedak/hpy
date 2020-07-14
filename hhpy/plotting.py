@@ -44,12 +44,13 @@ except ImportError:
 try:
     # noinspection PyPackageRequirements
     from plotly import graph_objects as go
+    go_figure = go.Figure
 except ImportError:
     logger.warning('Missing optional dependency plotly')
     go = None
+    go_figure = None
 
 # --- constants
-
 rcParams = {
     'palette': [
         'xkcd:blue', 'xkcd:red', 'xkcd:green', 'xkcd:cyan', 'xkcd:magenta',
@@ -3704,8 +3705,8 @@ def plotly_aggplot(data: pd.DataFrame, x: Scalar, y: Scalar, hue: Scalar = None,
                    x_max: Scalar = None, y_min: Scalar = None, y_max: Scalar = None, mode: str = 'lines+markers',
                    title: str = None, xaxis_title: str = None, yaxis_title: str = None, label_maxchar: int = 15,
                    direction: str = 'up', showactive: bool = True, dropdown_x: float = 0, dropdown_y: float = -.1,
-                   fig: go.Figure = None, do_print: bool = True, kws_dropdown: Mapping = None, kws_fig: Mapping = None,
-                   **kwargs) -> go.Figure:
+                   fig: go_figure = None, do_print: bool = True, kws_dropdown: Mapping = None, kws_fig: Mapping = None,
+                   **kwargs) -> go_figure:
     """
     create a (grouped) plotly aggplot that let's you select the groupby categories
 

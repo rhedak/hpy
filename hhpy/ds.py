@@ -20,6 +20,7 @@ from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, m
 from sklearn.preprocessing import StandardScaler
 from typing import Mapping, Sequence, Callable, Union, List, Optional, Tuple, Any
 from io import StringIO
+from datetime import datetime
 
 # --- local imports
 from hhpy.main import export, BaseClass, assert_list, tprint, progressbar, qformat, list_intersection, round_signif, \
@@ -1450,7 +1451,7 @@ def mpae(*args, times_hundred: bool = True, pmax: int = 999, **kwargs) -> Union[
     """
     def _mpae(y_true, y_pred):
 
-        _score = np.abs(y_true - y_pred) / np.mean(y_true)
+        _score = np.mean(np.abs(y_true - y_pred)) / np.mean(y_true)
         if times_hundred:
             _score *= 100
         return _score
@@ -2800,7 +2801,7 @@ def top_n_coding(s: Sequence, n: int, other_name: str = 'other', na_to_other: bo
 
 
 @export
-def k_split(df: pd.DataFrame, k: Union[int, str] = 5, groupby: Union[Sequence, str] = None,
+def k_split(df: pd.DataFrame, k: SequenceOrScalar = 5, groupby: Union[Sequence, str] = None,
             sortby: Union[Sequence, str] = None, random_state: int = None, do_print: bool = True,
             return_type: Union[str, int] = 0) -> Union[pd.Series, tuple]:
     """
@@ -2828,12 +2829,27 @@ def k_split(df: pd.DataFrame, k: Union[int, str] = 5, groupby: Union[Sequence, s
     df, groupby = assert_df(df=df, groupby=groupby)
 
     # -- main
-    if isinstance(k, str):
+    if is_list_like(k):
+        # if k is list like then assume it is a lift of values to split at
+        # check for sortby
         if sortby is None:
-            raise ValueError(f"k={k} (string) requires sortby")
+            raise ValueError(f"k={k} (string, datetime) requires sortby")
+        # prepare output df
+        _df_out = df.copy()
+        # init k index on first k value
+        _df_out['_k_index'] = np.where(_df_out[sortby] < k[0], len(k)+1, len(k))
+        # compare with the others
+        for _k_index in range(1, len(k), 1):
+            # the value has to be between the previous and this value
+            _df_out['_k_index'] = np.where((_df_out[sortby] < k[_k_index]) & (_df_out[sortby] >= k[_k_index - 1]),
+                                           _k_index+1, _df_out['_k_index'])
+    elif isinstance(k, (str, datetime)):
+        # check for sortby
+
+        if sortby is None:
+            raise ValueError(f"k={k} (string, datetime) requires sortby")
         _df_out = df.copy()
         _df_out['_k_index'] = np.where(_df_out[sortby] < k, 1, 0)
-        # set k to 1 because the df is split in only 2 parts
         k = 1
     else:
         _df_out = []

@@ -137,7 +137,7 @@ class Model(BaseClass):
     def fit(self, X: Union[DFOrArray, SequenceOrScalar] = None, y: Union[DFOrArray, SequenceOrScalar] = None,
             df: pd.DataFrame = None, dropna: bool = True, X_test: Union[DFOrArray, SequenceOrScalar] = None,
             y_test: Union[DFOrArray, SequenceOrScalar] = None, df_test: pd.DataFrame = None,
-            groupby: SequenceOrScalar = None, k: int = 0) -> None:
+            groupby: SequenceOrScalar = None, k: int = 0, **kwargs) -> None:
         """
         generalized fit method extending on model.fit
         
@@ -149,7 +149,8 @@ class Model(BaseClass):
         :param y_test: %(y_test)s
         :param df_test: %(df_test)s
         :param groupby: %(groupby)s
-        :param k: index of the model to fit
+        :param k: index of the model to fit [optional]
+        :param kwargs: additional keyword arguments to pass to model.fit [optional]
         :return: None
         """
 
@@ -214,28 +215,27 @@ class Model(BaseClass):
         # get model by index
         _model = self.model[k]
         _varnames = _model.fit.__code__.co_varnames
-        _kwargs = {}
 
         # pass X / y test only if fit can handle it
-        if 'groupby' in _varnames and groupby not in [None, []]:
+        if 'groupby' not in kwargs.keys() and 'groupby' in _varnames and groupby not in [None, []]:
             _X = pd.concat([_X, df[groupby]], axis=1)
             if _X_test is not None:
                 _X_test = pd.concat([_X_test, df_test[groupby]], axis=1)
-            _kwargs['groupby'] = groupby
-        if 'X_test' in _varnames:
-            _kwargs['X_test'] = _X_test
-        if 'y_test' in _varnames:
-            _kwargs['y_test'] = _y_test
+            kwargs['groupby'] = groupby
+        if 'X_test' not in kwargs.keys() and 'X_test' in _varnames:
+            kwargs['X_test'] = _X_test
+        if 'y_test' not in kwargs.keys() and 'y_test' in _varnames:
+            kwargs['y_test'] = _y_test
 
         warnings.simplefilter('ignore', (FutureWarning, DataConversionWarning))
-        _model.fit(X=_X, y=_y, **_kwargs)
+        _model.fit(X=_X, y=_y, **kwargs)
         warnings.simplefilter('default', (FutureWarning, DataConversionWarning))
         self.is_fit = True
 
     @docstr
     def predict(self, X: Union[DFOrArray, SequenceOrScalar] = None, y: Union[DFOrArray, SequenceOrScalar] = None,
                 df: pd.DataFrame = None, return_type: str = 'y', k_index: pd.Series = None,
-                groupby: SequenceOrScalar = None, handle_na: bool = True, multi: SequenceOrScalar = None
+                groupby: SequenceOrScalar = None, handle_na: bool = True, multi: SequenceOrScalar = None, **kwargs
                 ) -> Union[pd.Series, pd.DataFrame]:
         """
         Generalized predict method based on model.predict
@@ -249,6 +249,7 @@ class Model(BaseClass):
         :param groupby: %(groupby)s
         :param handle_na: Whether to handle NaN values (prediction will be NaN) [optional]
         :param multi: Postfixes to use for multi output models [optional]
+        :param kwargs: additional keyword arguments passed to child model's predict [optional]
         :return: see return_type
         """
 
@@ -292,36 +293,37 @@ class Model(BaseClass):
                     _y_labs = [_y_ref_pred]
 
             # - handle kwargs
-            _kwargs = {}
             _varnames = _model.predict.__code__.co_varnames
             # groupby
-            if 'groupby' in _varnames:
+            if 'groupby' not in kwargs.keys() and 'groupby' in _varnames:
                 _X = df[self.X_ref + groupby]  # .dropna()
-                _kwargs['groupby'] = groupby
+                kwargs['groupby'] = groupby
             else:
                 _X = df[self.X_ref]
             # noinspection PyUnresolvedReferences
             _na_indices = _X[_X.isna().any(axis=1)].index.tolist()
             # y
-            if 'y' in _varnames:
+            if 'y' not in kwargs.keys() and 'y' in _varnames:
                 _y = df[self.y_ref]
                 # noinspection PyUnresolvedReferences
                 _na_indices = list_merge(_na_indices, _X[_X.isna().any(axis=1)].index.tolist())
                 if handle_na:  # drop na
                     _y = _y.drop(_na_indices)
-                _kwargs['y'] = _y
+                kwargs['y'] = _y
             if handle_na:  # drop na (has to be here so y na indices have been handled)
                 _X = _X.drop(_na_indices)
             # - predict
             try:
-                _y_pred = _model.predict(_X, **_kwargs)
+                _y_pred = _model.predict(_X, **kwargs)
             except TypeError:
                 # sometimes the model accepts y as keyword argument but cannot actually handle it
                 # I'm looking at you sklearn.multioutput
-                _kwargs.pop('y')
-                _y_pred = _model.predict(_X, **_kwargs)
+                kwargs.pop('y')
+                _y_pred = _model.predict(_X, **kwargs)
 
             # cast to pandas
+            if len(_y_pred) != len(_X):
+                raise ValueError(f"The lengths of y_pred ({len(_y_pred)}) and X ({len(_X)}) do not match")
             _y_pred = pd.DataFrame(_y_pred, index=_X.index)
             # bring back dropped nans
             if handle_na:
@@ -407,8 +409,8 @@ class Models(BaseClass):
 
     # --- globals
     __name__ = 'Models'
-    __attributes__ = ['models', 'fit_type', 'df', 'X_ref', 'y_ref', 'groupby', 'scaler_X', 'scaler_y', 'model_names',
-                      'df_score', 'k_tests', 'printf']
+    __attributes__ = ['models', 'fit_type', 'df', 'X_ref', 'y_ref', 'y_pred', 'groupby', 'scaler_X', 'scaler_y',
+                      'model_names', 'df_score', 'k_tests', 'printf']
     __dependent_classes__ = [Model]
 
     # --- functions
@@ -610,7 +612,7 @@ class Models(BaseClass):
     def predict(
             self, X: Union[DFOrArray, SequenceOrScalar] = None, y: Union[DFOrArray, SequenceOrScalar] = None,
             df: pd.DataFrame = None, return_type: str = 'self', ensemble: bool = False, k_predict_type: str = 'test',
-            groupby: SequenceOrScalar = None, multi: SequenceOrScalar = None, do_print: bool = True
+            groupby: SequenceOrScalar = None, multi: SequenceOrScalar = None, do_print: bool = True, **kwargs
     ) -> Optional[Union[pd.Series, pd.DataFrame]]:
         """
         predict with all models in collection
@@ -624,13 +626,14 @@ class Models(BaseClass):
         :param groupby: %(groupby)s
         :param multi: postfixes to use for multi output [optional]
         :param do_print: %(do_print)s
+        :param kwargs: other keyword arguments passed to Model.predict [optional]
         :return: if return_type is self: None, else see Model.predict
         """
 
         # -- assert
         # return_type
-        _valid_return_types = ['self', 'df', 'DataFrame']
-        assert(return_type in _valid_return_types), 'return_type must be one of {}'.format(_valid_return_types)
+        _valid_return_types = ['self', 'df', 'df_full', 'DataFrame']
+        assert(return_type in _valid_return_types), f"return_type must be one of {_valid_return_types}"
         # fit_type
         if not self.fit_type:
             raise ValueError('Model is not fit yet')
@@ -676,7 +679,7 @@ class Models(BaseClass):
             else:
                 _y_ref_preds += [f"{_}_{_model.name}" for _ in _model.y_ref]
 
-            _y_pred_scaled = _model.predict(df=df, groupby=groupby, k_index=_k_index)
+            _y_pred_scaled = _model.predict(df=df, groupby=groupby, k_index=_k_index, **kwargs)
 
             # - handle scaler inverse transformation
             if self.scaler_y is None:
@@ -743,6 +746,10 @@ class Models(BaseClass):
                     self.y_pred.append(_col)
         elif return_type in ['df', 'DataFrame']:
             return _df
+        elif return_type in ['df_full']:
+            for _col in list_intersection(df.columns, _df.columns):
+                df = df.drop(_col, axis=1)
+            return pd.concat([df, _df], axis=1)
 
     @docstr
     def score(
@@ -763,9 +770,9 @@ class Models(BaseClass):
         """
 
         # -- assert
-        _valid_return_types = ['self', 'df', 'DataFrame']
+        _valid_return_types = ['self', 'df', 'df_full', 'DataFrame']
         assert(return_type in _valid_return_types),\
-            'return_type must be one of {}'.format(_valid_return_types)
+            f"return_type must be one of {_valid_return_types}"
         groupby = assert_list(groupby)
         _df = self.df.copy()
 
@@ -802,7 +809,8 @@ class Models(BaseClass):
             k_test: Optional[int] = 0, ensemble: bool = False, scores: Union[Sequence, str, Callable] = None,
             multi: SequenceOrScalar = None,
             scale: float = None, do_predict: bool = True, do_score: bool = True, do_split: bool = True,
-            do_fit: bool = True, do_print: bool = True, display_score: bool = True
+            do_fit: bool = True, do_print: bool = True, display_score: bool = True, kws_fit: dict = None,
+            kws_pred: dict = None, kws_score: dict = None
     ) -> None:
         """
         wrapper method that combined k_split, train, predict and score
@@ -824,20 +832,30 @@ class Models(BaseClass):
         :param do_fit: whether to fit the Models [optional]
         :param do_predict: whether to add predictions to DataFrame [optional]
         :param do_score: whether to create self.df_score [optional]
+        :param kws_fit: additional keyword arguments passed to fit [optional]
+        :param kws_pred: additional keyword arguments passed to pred [optional]
+        :param kws_score: additional keyword arguments passed to score [optional]
         :return: None
         """
+        # -- defaults
         if df is not None:
             self.df = df
+        if kws_fit is None:
+            kws_fit = {}
+        if kws_pred is None:
+            kws_pred = {}
+        if kws_score is None:
+            kws_score = {}
 
         # -- main
         if do_split:
             self.k_split(k=k, groupby=groupby, sortby=sortby, random_state=random_state, do_print=do_print)
         if do_fit:
-            self.fit(fit_type=fit_type, k_test=k_test, do_print=do_print, groupby=groupby)
+            self.fit(fit_type=fit_type, k_test=k_test, do_print=do_print, groupby=groupby, **kws_fit)
         if do_predict:
-            self.predict(ensemble=ensemble, do_print=do_print, groupby=groupby, multi=multi)
+            self.predict(ensemble=ensemble, do_print=do_print, groupby=groupby, multi=multi, **kws_pred)
         if do_score:
-            self.score(scores=scores, scale=scale, do_print=do_print, display_score=display_score)
+            self.score(scores=scores, scale=scale, do_print=do_print, display_score=display_score, **kws_score)
         if do_print:
             self.printf('training done')
 
