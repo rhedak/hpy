@@ -19,7 +19,7 @@ import pickle
 import re
 import functools
 # --- third party imports
-from typing import Any, Callable, Union, Sequence, Mapping, List, Optional, Iterable, AbstractSet, ValuesView, Dict
+from typing import Any, Callable, Union, Sequence, Mapping, List, Optional, Iterable, AbstractSet, ValuesView, Dict, Set
 from types import FunctionType
 from docrep import DocstringProcessor
 from collections import defaultdict
@@ -865,7 +865,10 @@ def list_unique(lst: Any) -> list:
     :param lst: any list like object
     :return: list containing each element only once
     """
-    return list(dict.fromkeys(assert_list(lst)))
+    _lst = assert_list(lst)
+    _dct = dict.fromkeys(_lst)
+    _lst = list(_dct)
+    return _lst
 
 
 @export
@@ -1150,7 +1153,7 @@ def assert_list(*args: Any, default: SequenceOrScalar = None) -> list:
     for _it, _arg in enumerate(args):
         if is_list_like(_arg):
             # require direct casts
-            if isinstance(_arg, (Sequence, {}.keys().__class__, {}.values().__class__, pd.Index)):
+            if isinstance(_arg, (Sequence, Set, {}.keys().__class__, {}.values().__class__, pd.Index)):
                 _arg = list(_arg)
             elif isinstance(_arg, Iterable):
                 # not all iterables implement list() in the same way -> cast to np.array and flatten
