@@ -1,5 +1,9 @@
 # Release Notes
 
+## v0.2.1
+hhpy.main
+-- Bugfix: assert_list can now handle Set
+
 ## v0.2.0
 hhpy.modelling
 -- Can now pass kwargs to fit
