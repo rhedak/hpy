@@ -19,6 +19,7 @@
       <w>btype</w>
       <w>bubblecountplot</w>
       <w>bubbleplot</w>
+      <w>bugfix</w>
       <w>bugfixes</w>
       <w>callables</w>
       <w>castable</w>
@@ -80,6 +81,7 @@
       <w>hhpy</w>
       <w>highpass</w>
       <w>histplot</w>
+      <w>hotfix</w>
       <w>hpy</w>
       <w>hspace</w>
       <w>iint</w>
@@ -118,6 +120,7 @@
       <w>medae</w>
       <w>meth</w>
       <w>mins</w>
+      <w>mpae</w>
       <w>multioutput</w>
       <w>nbviewer</w>
       <w>ncol</w>

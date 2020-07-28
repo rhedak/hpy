@@ -1,5 +1,10 @@
 # Release Notes
 
+## v0.2.2
+hhpy.modelling
+-- Models, Model can now handle split_groupby
+-- removed unnecessary k split functionality
+
 ## v0.2.1
 hhpy.main
 -- Bugfix: assert_list can now handle Set

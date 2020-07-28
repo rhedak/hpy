@@ -333,6 +333,8 @@ def get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = T
             continue
     # close brace
     _repr += ')'
+    # remove all \
+    _reprs = _repr.replace('\\', '')
     # -- return
     return _repr
 

@@ -21,7 +21,6 @@ from copy import deepcopy
 from typing import Sequence, Mapping, Union, Callable, Optional, Any, Tuple, List
 
 from sklearn.exceptions import DataConversionWarning
-from sklearn.base import clone
 
 # ---- optional imports
 try:
@@ -32,7 +31,7 @@ except ImportError:
 # --- local imports
 from hhpy.main import GROUPBY_DUMMY, export, BaseClass, is_list_like, assert_list, tprint, DocstringProcessor, \
     SequenceOrScalar, DFOrArray, list_exclude, list_merge, list_intersection
-from hhpy.ds import docstr as docstr_ds, assert_df, k_split, df_score, drop_duplicate_cols
+from hhpy.ds import docstr as docstr_ds, assert_df, k_split, df_score, drop_duplicate_cols, top_n, concat_cols
 from hhpy.plotting import ax_as_list, legend_outside, rcParams as hpt_rcParams, docstr as docstr_hpt
 from hhpy.ipython import display_df
 
@@ -75,8 +74,11 @@ docstr = DocstringProcessor(
              'mean of individual predictions. If median calculate median of individual predictions. [optional]',
     printf='print function to use for logging [optional]',
     groupby=docstr_ds.params['groupby'],
+    split_groupby='Whether to train one model for each groupby level [optional]',
+    groupby_levels='The levels to use for split groupby, if None will be inferred [optional]',
     key='key of attribute to set',
     value='value of attribute to set',
+    multi='postfixes to use for multi output [deprecated]',
     **validations
 )
 
@@ -94,34 +96,46 @@ class Model(BaseClass):
     :param X_ref: %(X_ref)s
     :param y_ref: %(y_ref)s
     :param groupby: %(groupby)s
+    :param split_groupby: %(split_groupby)s
+    :param groupby_levels: %(groupby_levels)s
     """
 
     # --- globals
     __name__ = 'Model'
-    __attributes__ = ['name', 'model', 'X_ref', 'y_ref', 'groupby', 'is_fit']
+    __attributes__ = ['name', 'base_model', 'model', 'X_ref', 'y_ref', 'groupby', 'split_groupby', 'groupby_levels',
+                      'is_fit']
 
     # --- functions
     def __init__(self, model: Any = None, name: str = 'pred', X_ref: SequenceOrScalar = None,
-                 y_ref: SequenceOrScalar = None, groupby: SequenceOrScalar = None) -> None:
+                 y_ref: SequenceOrScalar = None, groupby: SequenceOrScalar = None, split_groupby: bool = None,
+                 groupby_levels: SequenceOrScalar = None) -> None:
 
         # -- assert
         if X_ref is not None:
             X_ref = assert_list(X_ref)
         if y_ref is not None:
             y_ref = assert_list(y_ref)
-        # _intersection_X_y = list_intersection(X_ref, y_ref)
-        # if len(_intersection_X_y) > 0:
-        #     raise ValueError(f"{_intersection_X_y} are in both X_ref and y_ref")
+        if groupby is not None:
+            groupby = assert_list(groupby)
+        if groupby_levels is not None:
+            groupby_levels = assert_list(groupby_levels)
 
         # -- assign
         self.name = name
+        # set values
         if isinstance(model, str):
             model = eval(model)
-        self.model = [model]
+        self.base_model = deepcopy(model)
+        self.model = {}
         self.X_ref = X_ref
         self.y_ref = y_ref
         self.groupby = groupby
+        self.split_groupby = split_groupby
+        self.groupby_levels = groupby_levels
+
+        # non set values
         self.is_fit = False
+        self.reset()
 
     def reset(self) -> None:
         """
@@ -131,13 +145,13 @@ class Model(BaseClass):
         """
 
         self.is_fit = False
-        self.model = [clone(self.model[0])]
+        self.model = {}
 
     @docstr
     def fit(self, X: Union[DFOrArray, SequenceOrScalar] = None, y: Union[DFOrArray, SequenceOrScalar] = None,
             df: pd.DataFrame = None, dropna: bool = True, X_test: Union[DFOrArray, SequenceOrScalar] = None,
             y_test: Union[DFOrArray, SequenceOrScalar] = None, df_test: pd.DataFrame = None,
-            groupby: SequenceOrScalar = None, k: int = 0, **kwargs) -> None:
+            groupby: SequenceOrScalar = None, split_groupby: bool = None, k: int = 0, **kwargs) -> None:
         """
         generalized fit method extending on model.fit
         
@@ -149,6 +163,7 @@ class Model(BaseClass):
         :param y_test: %(y_test)s
         :param df_test: %(df_test)s
         :param groupby: %(groupby)s
+        :param split_groupby: %(split_groupby)s
         :param k: index of the model to fit [optional]
         :param kwargs: additional keyword arguments to pass to model.fit [optional]
         :return: None
@@ -160,7 +175,17 @@ class Model(BaseClass):
             groupby = self.groupby
         groupby = assert_list(groupby)
         self.groupby = groupby
-        # - df
+        # - split groupby
+        if split_groupby is None:
+            split_groupby = self.split_groupby
+        else:
+            self.split_groupby = split_groupby
+        # - k
+        k = assert_list(k)
+        if split_groupby and k != [0]:
+            raise ValueError(f"k split is not supported for split_groupby==True")
+        # - check for groupby in kwargs
+
         # if X and y are passed separately: concat them to a DataFrame
         if df is None:
 
@@ -196,46 +221,76 @@ class Model(BaseClass):
                 df_test = df_test.dropna(subset=_dropna_cols)
 
         # -- init
-        # - X / y train
-        _X = df[self.X_ref]
-        _y = df[self.y_ref]
-
-        # - X / y test
-        if df_test is None:
-            _X_test = X_test
-            _y_test = y_test
+        if split_groupby:
+            df['_groupby'] = concat_cols(df, groupby)
+            if df_test is not None:
+                df_test['_groupby'] = concat_cols(df_test, groupby)
+            if self.groupby_levels is None:
+                self.groupby_levels = top_n(df['_groupby'])
+            _indices = self.groupby_levels + []
         else:
-            _X_test = df_test[self.X_ref]
-            _y_test = df_test[self.y_ref]
+            _indices = k
 
         # -- fit
-        # append a copy of the model if needed
-        while k >= len(self.model):
-            self.model.append(deepcopy(self.model[0]))
-        # get model by index
-        _model = self.model[k]
-        _varnames = _model.fit.__code__.co_varnames
-
-        # pass X / y test only if fit can handle it
-        if 'groupby' not in kwargs.keys() and 'groupby' in _varnames and groupby not in [None, []]:
-            _X = pd.concat([_X, df[groupby]], axis=1)
-            if _X_test is not None:
-                _X_test = pd.concat([_X_test, df_test[groupby]], axis=1)
-            kwargs['groupby'] = groupby
-        if 'X_test' not in kwargs.keys() and 'X_test' in _varnames:
-            kwargs['X_test'] = _X_test
-        if 'y_test' not in kwargs.keys() and 'y_test' in _varnames:
-            kwargs['y_test'] = _y_test
-
         warnings.simplefilter('ignore', (FutureWarning, DataConversionWarning))
-        _model.fit(X=_X, y=_y, **kwargs)
+        # get model by index
+        for _index in _indices:
+            _model = deepcopy(self.base_model)
+            _varnames = _model.fit.__code__.co_varnames
+            _kwargs = kwargs.copy()
+
+            # handle split groupby
+            if split_groupby:
+                # add _groupby column
+                _df = df[lambda _: _['_groupby'] == _index]
+                if df_test is None:
+                    _df_test = None
+                else:
+                    _df_test = df_test[lambda _: _['_groupby'] == _index]
+                # check if groupby variables in X_ref and clean
+                for _X_ref in self.X_ref:
+                    for _groupby in groupby:
+                        if _groupby in _X_ref:
+                            self.X_ref = list_exclude(self.X_ref, _X_ref)
+            else:
+                _df = df
+                _df_test = df_test
+
+            # - X / y train
+            _X = _df[self.X_ref]
+            _y = _df[self.y_ref]
+
+            # - X / y test
+            if _df_test is None:
+                _X_test = X_test
+                _y_test = y_test
+            else:
+                _X_test = _df_test[self.X_ref]
+                _y_test = _df_test[self.y_ref]
+
+            # pass X / y test only if fit can handle it
+            if 'groupby' not in _kwargs.keys() and 'groupby' in _varnames and groupby not in [None, []]:
+                _X = pd.concat([_X, _df[groupby]], axis=1)
+                if _X_test is not None:
+                    _X_test = pd.concat([_X_test, _df_test[groupby]], axis=1)
+                _kwargs['groupby'] = groupby
+            if 'X_test' not in _kwargs.keys() and 'X_test' in _varnames:
+                _kwargs['X_test'] = _X_test
+            if 'y_test' not in _kwargs.keys() and 'y_test' in _varnames:
+                _kwargs['y_test'] = _y_test
+
+            _model.fit(X=_X, y=_y, **kwargs)
+            self.model[_index] = _model
+            del _model
+
         warnings.simplefilter('default', (FutureWarning, DataConversionWarning))
         self.is_fit = True
 
     @docstr
     def predict(self, X: Union[DFOrArray, SequenceOrScalar] = None, y: Union[DFOrArray, SequenceOrScalar] = None,
                 df: pd.DataFrame = None, return_type: str = 'y', k_index: pd.Series = None,
-                groupby: SequenceOrScalar = None, handle_na: bool = True, multi: SequenceOrScalar = None, **kwargs
+                groupby: SequenceOrScalar = None, split_groupby: bool = None,
+                handle_na: bool = True, multi: SequenceOrScalar = None, **kwargs
                 ) -> Union[pd.Series, pd.DataFrame]:
         """
         Generalized predict method based on model.predict
@@ -247,8 +302,9 @@ class Model(BaseClass):
             with only the predictions, if one of 'df','DataFrame' returns the full DataFrame with predictions added
         :param k_index: If specified and model is k_cross split: return only the predictions for each test subset
         :param groupby: %(groupby)s
+        :param split_groupby: %(split_groupby)s
         :param handle_na: Whether to handle NaN values (prediction will be NaN) [optional]
-        :param multi: Postfixes to use for multi output models [optional]
+        :param multi: %(multi)s
         :param kwargs: additional keyword arguments passed to child model's predict [optional]
         :return: see return_type
         """
@@ -269,97 +325,123 @@ class Model(BaseClass):
         if groupby in [None, []]:
             groupby = self.groupby
         groupby = assert_list(groupby)
+        # - split_groupby
+        if split_groupby is None:
+            split_groupby = self.split_groupby
+        if split_groupby is not None:
+            df['_groupby'] = concat_cols(df, groupby)
+        # backwards compatibility
+        _ = k_index
+        _ = multi
 
-        _y_ref_pred = ['{}_pred'.format(_) for _ in self.y_ref]
-
-        # special case if there is only one target (most algorithms support only one)
-        if len(self.y_ref) == 1:
-            _y_ref_pred = _y_ref_pred[0]
+        _y_ref_pred = [f"{_}_{self.name}" for _ in self.y_ref]
 
         # - predict using sklearn api
         _ks = len(self.model)
-        _y_labs = []
-        for _k, _model in enumerate(self.model):
+        _df_out = []
 
-            # get y lab
-            if _ks == 1:
-                _y_lab = _y_ref_pred
-                _y_labs = [_y_ref_pred]
+        # loop model dictionary
+        for _k, (_key, _model) in enumerate(self.model.items()):
+
+            # init
+            _kwargs = kwargs.copy()
+
+            # get _df and handle split_groupby
+            if split_groupby:
+                _df: pd.DataFrame = df[lambda _: _['_groupby'] == _key]
             else:
-                if k_index is None:
-                    _y_lab = [f"{_}_{_k}" for _ in assert_list(_y_ref_pred)]
-                    _y_labs += _y_lab
-                else:
-                    _y_labs = [_y_ref_pred]
+                _df = df.copy()
+                _df['_k_model'] = _k
 
             # - handle kwargs
             _varnames = _model.predict.__code__.co_varnames
             # groupby
-            if 'groupby' not in kwargs.keys() and 'groupby' in _varnames:
-                _X = df[self.X_ref + groupby]  # .dropna()
-                kwargs['groupby'] = groupby
+            if 'groupby' not in _kwargs.keys() and 'groupby' in _varnames:
+                _X = _df[self.X_ref + groupby]  # .dropna()
+                _kwargs['groupby'] = groupby
             else:
-                _X = df[self.X_ref]
+                _X = _df[self.X_ref]
             # noinspection PyUnresolvedReferences
             _na_indices = _X[_X.isna().any(axis=1)].index.tolist()
             # y
-            if 'y' not in kwargs.keys() and 'y' in _varnames:
-                _y = df[self.y_ref]
+            if 'y' not in _kwargs.keys() and 'y' in _varnames:
+                _y = _df[self.y_ref]
                 # noinspection PyUnresolvedReferences
                 _na_indices = list_merge(_na_indices, _X[_X.isna().any(axis=1)].index.tolist())
                 if handle_na:  # drop na
                     _y = _y.drop(_na_indices)
-                kwargs['y'] = _y
+                _kwargs['y'] = _y
             if handle_na:  # drop na (has to be here so y na indices have been handled)
                 _X = _X.drop(_na_indices)
             # - predict
             try:
-                _y_pred = _model.predict(_X, **kwargs)
+                _y_pred = _model.predict(_X, **_kwargs)
             except TypeError:
                 # sometimes the model accepts y as keyword argument but cannot actually handle it
                 # I'm looking at you sklearn.multioutput
                 kwargs.pop('y')
-                _y_pred = _model.predict(_X, **kwargs)
+                _y_pred = _model.predict(_X, **_kwargs)
 
             # cast to pandas
             if len(_y_pred) != len(_X):
                 raise ValueError(f"The lengths of y_pred ({len(_y_pred)}) and X ({len(_X)}) do not match")
             _y_pred = pd.DataFrame(_y_pred, index=_X.index)
+            _y_pred.columns = _y_ref_pred
             # bring back dropped nans
             if handle_na:
                 _y_pred = pd.concat([_y_pred, pd.DataFrame(np.nan, index=_na_indices, columns=_y_pred.columns)])\
                     .sort_index()
 
             # feed back to df
-            if len(_y_labs) < _y_pred.shape[1]:  # some regressors (TimeSeriesRegressors)
-                # might return multi output
-                _y_labs_new = []
-                if multi is None:
-                    multi = _y_pred.shape[1] // len(_y_labs)
-                for _y_lab in _y_labs:
-                    for _it in range(multi):
-                        _y_labs_new.append(f"{_y_lab}_{_it}")
-                _y_labs = _y_labs_new + []
+            _df = pd.concat([_df, _y_pred], axis=1)
+            _df_out.append(_df)
 
-            if k_index is None:  # all
-                for _it, _y_lab in enumerate(_y_labs):
-                    df[_y_lab] = _y_pred[_y_pred.columns[_it]]
-            else:
-                # during first iteration: assert output columns are available
-                if _k == 0:
-                    for __y_ref_pred in assert_list(_y_ref_pred):
-                        if __y_ref_pred not in df.columns:
-                            df[__y_ref_pred] = np.nan
-                # write output
-                # we loop the columns because _y is possible to be multi output or single output while _y_pred is a DF
-                # and np where does weird stuff if you pass a single column on the left and a DF of the right of the ==
-                for _col, __y_ref_pred in enumerate(assert_list(_y_ref_pred)):
-                    df[__y_ref_pred] = np.where(k_index == _k, _y_pred[_y_pred.columns[_col]], df[__y_ref_pred])
+            # # for k stuff (potentially unneeded as of 2020-07-28, to be verified)
+            # # get y lab
+            # if _ks == 1:
+            #     _y_lab = _y_ref_pred
+            #     _y_labs = [_y_ref_pred]
+            # else:
+            #     if k_index is None:
+            #         _y_lab = [f"{_}_{_k}" for _ in assert_list(_y_ref_pred)]
+            #         _y_labs += _y_lab
+            #     else:
+            #         _y_labs = [_y_ref_pred]
+            # if len(_y_labs) < _y_pred.shape[1]:  # some regressors (TimeSeriesRegressors)
+            #     # might return multi output
+            #     _y_labs_new = []
+            #     if multi is None:
+            #         multi = _y_pred.shape[1] // len(_y_labs)
+            #     for _y_lab in _y_labs:
+            #         for _it in range(multi):
+            #             _y_labs_new.append(f"{_y_lab}_{_it}")
+            #     _y_labs = _y_labs_new + []
+            #
+            # if k_index is None:  # all
+            #     for _it, _y_lab in enumerate(_y_labs):
+            #         _df[_y_lab] = _y_pred[_y_pred.columns[_it]]
+            # else:
+            #     # during first iteration: assert output columns are available
+            #     if _k == 0:
+            #         for __y_ref_pred in assert_list(_y_ref_pred):
+            #             if __y_ref_pred not in _df.columns:
+            #                 _df[__y_ref_pred] = np.nan
+            #     # write output
+            #     # we loop the columns because _y is possible to be multi output or single output while _y_pred is a DF
+            #     # and np where does weird stuff if you pass a single column on the left and a DF of the right of ==
+            #     for _col, __y_ref_pred in enumerate(assert_list(_y_ref_pred)):
+            #         _df[__y_ref_pred] = np.where(k_index == _k, _y_pred[_y_pred.columns[_col]], _df[__y_ref_pred])
+        # concat
+        _df_out = pd.concat(_df_out)
+
+        # special case if there is only one target (most algorithms support only one)
+        if len(self.y_ref) == 1:
+            _y_ref_pred = _y_ref_pred[0]
 
         if return_type == 'y':
-            return df[_y_labs]
+            return _df_out[_y_ref_pred]
         else:
-            return df
+            return _df_out
 
     @docstr
     def setattr(self, key: str, value: Any, target: str = 'all') -> None:
@@ -402,6 +484,9 @@ class Models(BaseClass):
     :param df: %(df)s
     :param X_ref: %(X_ref)s
     :param y_ref: %(y_ref)s
+    :param groupby: %(groupby)s
+    :param split_groupby: %(split_groupby)s
+    :param groupby_levels: %(groupby_levels)s
     :param scaler_X: %(scaler_X)s
     :param scaler_y: %(scaler_y)s
     :param printf: %(printf)s
@@ -409,14 +494,15 @@ class Models(BaseClass):
 
     # --- globals
     __name__ = 'Models'
-    __attributes__ = ['models', 'fit_type', 'df', 'X_ref', 'y_ref', 'y_pred', 'groupby', 'scaler_X', 'scaler_y',
-                      'model_names', 'df_score', 'k_tests', 'printf']
+    __attributes__ = ['models', 'fit_type', 'df', 'X_ref', 'y_ref', 'y_pred', 'groupby', 'split_groupby',
+                      'groupby_levels', 'scaler_X', 'scaler_y', 'model_names', 'df_score', 'k_tests', 'printf']
     __dependent_classes__ = [Model]
 
     # --- functions
     def __init__(self, *args: Any, df: pd.DataFrame = None, X_ref: SequenceOrScalar = None,
-                 y_ref: SequenceOrScalar = None, groupby: SequenceOrScalar = None, scaler_X: Any = None,
-                 scaler_y: Any = None, printf: Callable = tprint) -> None:
+                 y_ref: SequenceOrScalar = None, groupby: SequenceOrScalar = None, split_groupby: bool = False,
+                 groupby_levels: SequenceOrScalar = None, scaler_X: Any = None, scaler_y: Any = None,
+                 printf: Callable = tprint) -> None:
 
         # -- assert
         if isinstance(scaler_X, type):
@@ -429,6 +515,8 @@ class Models(BaseClass):
             y_ref = assert_list(y_ref)
         if groupby is not None:
             groupby = assert_list(groupby)
+        if groupby_levels is not None:
+            groupby_levels = assert_list(groupby_levels)
 
         # -- init
         _models = []
@@ -449,7 +537,8 @@ class Models(BaseClass):
                         _name = f"{_model.__name__}_{_it}"
                     else:
                         _name = f"model_{_it}"
-                    _model = Model(_model, name=_name, X_ref=X_ref, y_ref=y_ref, groupby=groupby)
+                    _model = Model(_model, name=_name, X_ref=X_ref, y_ref=y_ref, groupby=groupby,
+                                   split_groupby=split_groupby, groupby_levels=groupby_levels)
                 _models.append(deepcopy(_model))
                 if _model.name not in _model_names:
                     _model_names.append(_model.name)
@@ -624,13 +713,15 @@ class Models(BaseClass):
         :param ensemble: %(ensemble)s
         :param k_predict_type: 'test' or 'all'
         :param groupby: %(groupby)s
-        :param multi: postfixes to use for multi output [optional]
+        :param multi: %(multi)s
         :param do_print: %(do_print)s
         :param kwargs: other keyword arguments passed to Model.predict [optional]
         :return: if return_type is self: None, else see Model.predict
         """
 
         # -- assert
+        # backwards compatibility
+        _ = multi
         # return_type
         _valid_return_types = ['self', 'df', 'df_full', 'DataFrame']
         assert(return_type in _valid_return_types), f"return_type must be one of {_valid_return_types}"
@@ -704,24 +795,25 @@ class Models(BaseClass):
 
         _df = pd.concat(_y_preds, axis=1, sort=False)
 
-        # feed back to df
-        if len(_y_ref_preds) < _df.shape[1]:  # some regressors (TimeSeriesRegressors)
-            # might return multi output
-            _y_ref_preds_new = []
-            if multi is None:
-                multi = range(_df.shape[1] // len(_y_ref_preds))
-            for _y_ref_pred in _y_ref_preds:
-                for _multi in multi:
-                    _y_ref_preds_new.append(f"{_y_ref_pred}_{_multi}")
-            _y_ref_preds = _y_ref_preds_new + []
-        else:
-            multi = None
+        # potentially unneeded as of 2017-07-28
+        # # feed back to df
+        # if len(_y_ref_preds) < _df.shape[1]:  # some regressors (TimeSeriesRegressors)
+        #     # might return multi output
+        #     _y_ref_preds_new = []
+        #     if multi is None:
+        #         multi = range(_df.shape[1] // len(_y_ref_preds))
+        #     for _y_ref_pred in _y_ref_preds:
+        #         for _multi in multi:
+        #             _y_ref_preds_new.append(f"{_y_ref_pred}_{_multi}")
+        #     _y_ref_preds = _y_ref_preds_new + []
+        # else:
+        #     multi = None
+        #
+        # # save
+        # self.multi = multi
+        # _df.columns = _y_ref_preds
 
-        # save
-        self.multi = multi
-
-        # to df
-        _df.columns = _y_ref_preds
+        # adjust index
         _df.index = df.index
 
         if ensemble:  # supports up to 3 model ensembles (does not support multi regression)
@@ -824,7 +916,7 @@ class Models(BaseClass):
         :param k_test: see .fit
         :param ensemble: %(ensemble)s
         :param scores: see .score [optional]
-        :param multi: postfixes to use for multi output [optional]
+        :param multi: %(multi)s
         :param scale: see .score
         :param do_print: %(do_print)s
         :param display_score: %(display_score)s

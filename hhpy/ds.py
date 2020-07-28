@@ -2719,7 +2719,7 @@ def numeric_to_group(pd_series, step=None, outer_limit=4, suffix=None, use_abs=F
 
 
 @export
-def top_n(s: Sequence, n: Union[int, str], w: Optional[Sequence] = None, n_max: int = 20) -> list:
+def top_n(s: Sequence, n: Union[int, str] = None, w: Optional[Sequence] = None, n_max: int = 20) -> list:
     """
     Select n elements form a categorical pandas series with the highest counts. Ties are broken by sorting
         s ascending
@@ -2732,10 +2732,13 @@ def top_n(s: Sequence, n: Union[int, str], w: Optional[Sequence] = None, n_max: 
     """
 
     # -- case int:
+    if n is None:
+        n = len(pd.Series(s).unique())
     if isinstance(n, int) or str(n).isnumeric():
         n = int(n)
         if w is None:
-            return list(pd.Series(s).value_counts().reset_index()['index'][:n])
+            _df_count = pd.Series(s).value_counts().reset_index()
+            return list(_df_count.sort_values(by=[_df_count.columns[1], 'index'], ascending=[False, True])['index'][:n])
         else:
             return pd.DataFrame({'s': s, 'w': w}).groupby('s').agg({'w': 'sum'}) \
                        .sort_values(by='w', ascending=False).index.tolist()[:n]
