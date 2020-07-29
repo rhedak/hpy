@@ -1,5 +1,9 @@
 # Release Notes
 
+## v0.2.5
+hhpy.modelling
+-- bugfix update
+
 ## v0.2.4
 hhpy.modelling
 -- bugfix update
