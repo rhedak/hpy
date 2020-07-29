@@ -813,7 +813,9 @@ class Models(BaseClass):
         #
         # # save
         # self.multi = multi
-        # _df.columns = _y_ref_preds
+
+        # adjust column names
+        _df.columns = _y_ref_preds
 
         # adjust index
         _df.index = df.index
