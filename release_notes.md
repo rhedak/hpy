@@ -1,5 +1,9 @@
 # Release Notes
 
+## v0.2.3
+hhpy.modelling
+-- bugifx update
+
 ## v0.2.2
 hhpy.modelling
 -- Models, Model can now handle split_groupby
