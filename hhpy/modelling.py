@@ -559,6 +559,8 @@ class Models(BaseClass):
         else:
             self.X_ref = []
         self.groupby = groupby
+        self.split_groupby = split_groupby
+        self.groupby_levels = groupby_levels
         self.scaler_X = scaler_X
         self.scaler_y = scaler_y
         self.model_names = _model_names
