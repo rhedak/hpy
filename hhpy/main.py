@@ -18,6 +18,7 @@ import h5py
 import pickle
 import re
 import functools
+import contextlib
 # --- third party imports
 from typing import Any, Callable, Union, Sequence, Mapping, List, Optional, Iterable, AbstractSet, ValuesView, Dict, Set
 from types import FunctionType
@@ -1634,3 +1635,16 @@ def get_else_key(dct: Mapping, key: Any, exclude: SequenceOrScalar = None) -> An
         return dct[key]
     else:
         return key
+
+@export
+def silentcopy(o: Any) -> Any:
+    """
+    silently copies an object, some objects print messages during deepcopy. E.g. LightGBMRegressor
+
+    :param o: object
+    :return: copied object
+    """
+
+    with open(os.devnull, "w") as f, contextlib.redirect_stdout(f):
+        _o = deepcopy(o)
+    return _o

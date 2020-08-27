@@ -180,6 +180,7 @@
       <w>showactive</w>
       <w>showarrow</w>
       <w>signif</w>
+      <w>silentcopy</w>
       <w>sklearn</w>
       <w>sortby</w>
       <w>stdae</w>

@@ -17,7 +17,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # --- third party imports
-from copy import deepcopy
 from typing import Sequence, Mapping, Union, Callable, Optional, Any, Tuple, List
 
 from sklearn.exceptions import DataConversionWarning
@@ -30,7 +29,7 @@ except ImportError:
 
 # --- local imports
 from hhpy.main import GROUPBY_DUMMY, export, BaseClass, is_list_like, assert_list, tprint, DocstringProcessor, \
-    SequenceOrScalar, DFOrArray, list_exclude, list_merge, list_intersection
+    SequenceOrScalar, DFOrArray, list_exclude, list_merge, list_intersection, silentcopy
 from hhpy.ds import docstr as docstr_ds, assert_df, k_split, df_score, drop_duplicate_cols, top_n, concat_cols
 from hhpy.plotting import ax_as_list, legend_outside, rcParams as hpt_rcParams, docstr as docstr_hpt
 from hhpy.ipython import display_df
@@ -125,7 +124,7 @@ class Model(BaseClass):
         # set values
         if isinstance(model, str):
             model = eval(model)
-        self.base_model = deepcopy(model)
+        self.base_model = silentcopy(model)
         self.model = {}
         self.X_ref = X_ref
         self.y_ref = y_ref
@@ -235,7 +234,7 @@ class Model(BaseClass):
         warnings.simplefilter('ignore', (FutureWarning, DataConversionWarning))
         # get model by index
         for _index in _indices:
-            _model = deepcopy(self.base_model)
+            _model = silentcopy(self.base_model)
             _varnames = _model.fit.__code__.co_varnames
             _kwargs = kwargs.copy()
 
@@ -539,7 +538,7 @@ class Models(BaseClass):
                         _name = f"model_{_it}"
                     _model = Model(_model, name=_name, X_ref=X_ref, y_ref=y_ref, groupby=groupby,
                                    split_groupby=split_groupby, groupby_levels=groupby_levels)
-                _models.append(deepcopy(_model))
+                _models.append(silentcopy(_model))
                 if _model.name not in _model_names:
                     _model_names.append(_model.name)
 
@@ -776,7 +775,7 @@ class Models(BaseClass):
 
             # - handle scaler inverse transformation
             if self.scaler_y is None:
-                _y_pred = deepcopy(_y_pred_scaled)
+                _y_pred = silentcopy(_y_pred_scaled)
             else:
                 _df_y_pred_scaled = pd.DataFrame(_y_pred_scaled)
                 _df_y_pred_scaled.columns = _model.y_ref
@@ -1373,7 +1372,7 @@ def to_keras_3d(x: DFOrArray, window: int, y: DFOrArray = None, groupby: Sequenc
 #         _it_df = pd.DataFrame({'it': [_i]})
 #         _i += 1
 #
-#         _model = deepcopy(model)
+#         _model = silentcopy(model)
 #         _string = ''
 #
 #         for _key in _row.keys():
@@ -1528,8 +1527,8 @@ def to_keras_3d(x: DFOrArray, window: int, y: DFOrArray = None, groupby: Sequenc
 #     if cutoff is None: cutoff = - np.inf
 #
 #     # init
-#     _predictors_fix = deepcopy(predictors_fix)
-#     _predictors_it = deepcopy(predictors_it)
+#     _predictors_fix = silentcopy(predictors_fix)
+#     _predictors_it = silentcopy(predictors_it)
 #     if not is_list_like(_predictors_fix): _predictors_fix = [_predictors_fix]
 #     _predictors_fix = list(_predictors_fix)
 #     if max_depth > len(predictors_it): max_depth = len(predictors_it)
@@ -1573,7 +1572,7 @@ def to_keras_3d(x: DFOrArray, window: int, y: DFOrArray = None, groupby: Sequenc
 #                     else:
 #                         if not _best['predictor'] in _predictor.keys(): _predictors_it_new.append(_predictor)
 #
-#                 _predictors_it = deepcopy(_predictors_it_new)
+#                 _predictors_it = silentcopy(_predictors_it_new)
 #                 _predictors_fix += _best_predictor
 #
 #         else:
@@ -1598,8 +1597,8 @@ def to_keras_3d(x: DFOrArray, window: int, y: DFOrArray = None, groupby: Sequenc
 # # (faster than iter_reg)
 # def forward_reg(df_train, df_test, predictors_it, predictors_fix, max_depth=10, cutoff=.001, do_print=True, f=reg,
 #                 **kwargs):
-#     _predictors_fix = deepcopy(predictors_fix)
-#     _predictors_it = deepcopy(predictors_it)
+#     _predictors_fix = silentcopy(predictors_fix)
+#     _predictors_it = silentcopy(predictors_it)
 #     if not is_list_like(_predictors_fix): _predictors_fix = [_predictors_fix]
 #     _predictors_fix = list(_predictors_fix)
 #     _predictors_final = [] + _predictors_fix
@@ -1669,10 +1668,10 @@ def to_keras_3d(x: DFOrArray, window: int, y: DFOrArray = None, groupby: Sequenc
 #         # new rmse
 #         if _prev_rmse - _base_new['rmse_test_scaled'] > cutoff:
 #
-#             _prev_rmse = deepcopy(_base_new['rmse_test_scaled'])
+#             _prev_rmse = silentcopy(_base_new['rmse_test_scaled'])
 #             _base = _base_new.copy()
-#             _dict = deepcopy(_dict_new)
-#             _predictors_fix = deepcopy(_predictors_fix_new)
+#             _dict = silentcopy(_dict_new)
+#             _predictors_fix = silentcopy(_predictors_fix_new)
 #             _predictors_final += _predictors_pos_name
 #
 #             # update predictors
@@ -1693,7 +1692,7 @@ def to_keras_3d(x: DFOrArray, window: int, y: DFOrArray = None, groupby: Sequenc
 #                         else:
 #                             if not _new_predictor_name in _predictor.keys(): _predictors_it_new.append(_predictor)
 #
-#                     _predictors_it = deepcopy(_predictors_it_new)
+#                     _predictors_it = silentcopy(_predictors_it_new)
 #         else:
 #             print('{}overall score improvement below cutoff {}, quitting'.format(_print_prefix, cutoff))
 #             break
@@ -1718,8 +1717,8 @@ def to_keras_3d(x: DFOrArray, window: int, y: DFOrArray = None, groupby: Sequenc
 #     # -- init --
 #     if predictors_fix is None:
 #         predictors_fix = []
-#     _predictors_fix = deepcopy(predictors_fix)
-#     _predictors_it = deepcopy(predictors_it)
+#     _predictors_fix = silentcopy(predictors_fix)
+#     _predictors_it = silentcopy(predictors_it)
 #     if not is_list_like(_predictors_fix): _predictors_fix = [_predictors_fix]
 #     _predictors_fix = list(_predictors_fix)
 #     _predictors_final = [] + _predictors_fix
@@ -1758,7 +1757,7 @@ def to_keras_3d(x: DFOrArray, window: int, y: DFOrArray = None, groupby: Sequenc
 #
 #         _i = 0
 #         _i_max = len(_predictors_it)
-#         _predictors_it_new = deepcopy(_predictors_it)
+#         _predictors_it_new = silentcopy(_predictors_it)
 #         _removed = 0
 #
 #         # loop all remaining predictors
@@ -1804,13 +1803,13 @@ def to_keras_3d(x: DFOrArray, window: int, y: DFOrArray = None, groupby: Sequenc
 #
 #                 if _goal_diff <= cutoff:
 #
-#                     _predictors_all = deepcopy(_predictors)
+#                     _predictors_all = silentcopy(_predictors)
 #                     _predictors_it_new.remove(_predictor)
 #                     _removed += 1
-#                     _dict = deepcopy(_dict_new)
+#                     _dict = silentcopy(_dict_new)
 #
 #                     # if the diff is below 0 a new best score was reached
-#                     if _goal_diff < 0: _best_goal = deepcopy(_new_score)
+#                     if _goal_diff < 0: _best_goal = silentcopy(_new_score)
 #
 #             # except:
 #             #    print('')
@@ -1822,7 +1821,7 @@ def to_keras_3d(x: DFOrArray, window: int, y: DFOrArray = None, groupby: Sequenc
 #             print('no improvements possible, quitting')
 #             break
 #
-#         _predictors_it = deepcopy(_predictors_it_new)
+#         _predictors_it = silentcopy(_predictors_it_new)
 #
 #         tprint('')
 #         print('{}predictors {} ; {}'.format(_print_prefix, _predictors_all, _full_score))

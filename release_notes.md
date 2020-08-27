@@ -1,5 +1,12 @@
 # Release Notes
 
+## v0.2.7
+2020-08-27
+hhpy.main
+-- added silentcopy
+hhpy.modelling
+-- switched deepcopy to silentcopy
+
 ## v0.2.5
 hhpy.modelling
 -- bugfix update
