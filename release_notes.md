@@ -1,5 +1,9 @@
 # Release Notes
 
+## v0.2.9
+2020-01-01
+fixed version number problem on pypi
+
 ## v0.2.8
 2020-09-01
 hhpy.main
