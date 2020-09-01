@@ -1,5 +1,12 @@
 # Release Notes
 
+## v0.2.8
+2020-09-01
+hhpy.main
+- bugfix: calling get_repr of BaseClass instances does not lead to permanently converting objects to string
+hhpy.modelling
+- bugfix: already having a pred column in your df doesn't lead to duplicate columns and thus errors when predicting
+
 ## v0.2.7
 2020-08-27
 hhpy.main

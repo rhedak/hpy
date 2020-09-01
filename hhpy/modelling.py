@@ -231,6 +231,7 @@ class Model(BaseClass):
             _indices = k
 
         # -- fit
+        # noinspection PyTypeChecker
         warnings.simplefilter('ignore', (FutureWarning, DataConversionWarning))
         # get model by index
         for _index in _indices:
@@ -282,6 +283,7 @@ class Model(BaseClass):
             self.model[_index] = _model
             del _model
 
+        # noinspection PyTypeChecker
         warnings.simplefilter('default', (FutureWarning, DataConversionWarning))
         self.is_fit = True
 
@@ -392,7 +394,8 @@ class Model(BaseClass):
                     .sort_index()
 
             # feed back to df
-            _df = pd.concat([_df, _y_pred], axis=1)
+            for _y_pred_i in _y_pred.columns:
+                _df[_y_pred_i] = _y_pred[_y_pred_i]
             _df_out.append(_df)
 
             # # for k stuff (potentially unneeded as of 2020-07-28, to be verified)

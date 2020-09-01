@@ -312,7 +312,7 @@ def get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = T
         # check if _attr exists
         if hasattr(obj, _attribute):
             # get value
-            _value = obj.__getattribute__(_attribute)
+            _value = silentcopy(obj.__getattribute__(_attribute))
             if _value is None:
                 continue
             if map_list and isinstance(_value, list):
@@ -335,7 +335,7 @@ def get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = T
     # close brace
     _repr += ')'
     # remove all \
-    _reprs = _repr.replace('\\', '')
+    _reprs = _repr.replace('\\', '').replace('\'', '')
     # -- return
     return _repr
 
