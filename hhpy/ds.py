@@ -474,6 +474,7 @@ def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_ca
     if convert_dtypes:
         # scalar object to str (doesn't seem to work automatically as of 1.0.0)
         for _col in df.select_dtypes('object').columns:
+            # noinspection PyTypeChecker
             df[_col] = df[_col].apply(lambda _: str(_) if is_scalar(_) else _)
         # df.convert_dtypes will be called after downcasting since it is not supported for some dtypes
 
@@ -1033,6 +1034,7 @@ def quantile_split(s: pd.Series, n: int, signif: int = 2, na_to_med: bool = Fals
     _s = np.where(~np.isfinite(_s), np.nan, _s)
     _s = pd.Series(_s)
 
+    # noinspection PyTypeChecker
     _s_out = _s.apply(lambda _: np.nan)
 
     if na_to_med:
@@ -1438,48 +1440,65 @@ def medae(*args, **kwargs) -> Union[pd.DataFrame, float]:
 
 
 @export
-def mpae(*args, times_hundred: bool = True, pmax: int = 999, **kwargs) -> Union[pd.DataFrame, float]:
+def maep(*args, times_hundred: bool = True, **kwargs) -> Union[pd.DataFrame, float]:
     """
-    Wrapper for f_score using mean absolute error over mean.
+    Wrapper for f_score using mean absolute error over mean (mean absolute error in percent).
 
     :param args: passed to f_score
     :param times_hundred: Whether to multiply by 100 for human readable percentages
-    :param pmax: Max value for the percentage absolute error, used as a fallback because pae can go to infinity as
-        y_true approaches zero
     :param kwargs: passed to f_score
     :return: if groupby is supplied: pandas DataFrame, else: scalar value
     """
-    def _mpae(y_true, y_pred):
+    def _maep(y_true, y_pred):
 
         _score = np.mean(np.abs(y_true - y_pred)) / np.mean(y_true)
         if times_hundred:
             _score *= 100
         return _score
-    return f_score(*args, f=_mpae, **kwargs)
+    return f_score(*args, f=_maep, **kwargs)
 
 
 @export
-def pae(*args, times_hundred: bool = True, pmax: int = 999, **kwargs) -> Union[pd.DataFrame, float]:
+def mpae(*args, times_hundred: bool = True, pmax: int = 999, epsilon: float = None,
+         **kwargs) -> Union[pd.DataFrame, float]:
     """
-    Wrapper for f_score using percentage absolute error. Does NOT work if y_true is 0 (returns np.nan in this case)
+    Wrapper for f_score using mean percentage absolute error. Does NOT work if y_true is 0 (returns np.nan in this case
+      if epsilon is not specified)
 
     :param args: passed to f_score
     :param times_hundred: Whether to multiply by 100 for human readable percentages
     :param pmax: Max value for the percentage absolute error, used as a fallback because pae can go to infinity as
         y_true approaches zero
+    :param epsilon: A small value to prevent infinite values, if specified this is used instead of zero. If not
+        specified np.nan is returned [optional]
     :param kwargs: passed to f_score
     :return: if groupby is supplied: pandas DataFrame, else: scalar value
     """
-    def _pae(y_true, y_pred):
+    def _mpae(y_true, y_pred):
 
-        _y_true = np.where(y_true == 0, np.nan, y_true)
+        # check for epsilon
+        if epsilon:
+            _y_true = np.where(y_true < epsilon, epsilon, y_true)
+        else:
+            _y_true = np.where(y_true == 0, np.nan, y_true)
+        # calculate fractional
         _frac = np.abs((y_pred / _y_true - 1))
+        # calculate nanmean
         _score = np.nanmean(_frac)
+        # apply pmax
         _score = np.where(_score > pmax, pmax, _score)
+        # apply times hundred (if applicable)
         if times_hundred:
             _score *= 100
+        # return
         return _score
-    return f_score(*args, f=_pae, **kwargs)
+    # return f_score
+    return f_score(*args, f=_mpae, **kwargs)
+
+
+def pae(*args, **kwargs):
+    warnings.warn('pae is deprecated, please use mpae instead', DeprecationWarning)
+    return mpae(*args, **kwargs)
 
 
 @export
@@ -1518,6 +1537,15 @@ def df_score(df: pd.DataFrame, y_true: SequenceOrScalar, y_pred: SequenceOrScala
     :param dropna: whether to drop na [optional]
     :return: pandas DataFrame containing al the scores
     """
+    # -- config
+    _score_dict = {
+        'mae': mae,
+        'r2': r2,
+        'rmse': rmse,
+        'mpae': mpae,
+        'maep': maep,
+        'corr': corr
+    }
     # -- assert
     if multi is None:
         multi = ['']
@@ -1526,9 +1554,16 @@ def df_score(df: pd.DataFrame, y_true: SequenceOrScalar, y_pred: SequenceOrScala
     if pred_suffix is None:
         pred_suffix = ['pred']
     if scores is None:
-        scores = [r2, rmse, mae, pae, mpae, corr]
+        scores = [r2, rmse, mae, mpae, maep, corr]
     else:
         scores = assert_list(scores)
+        # str to function
+        for _score in scores:
+            if isinstance(_score, str):
+                if _score in _score_dict.keys():
+                    _score = _score_dict[_score]
+                else:
+                    raise ValueError(f"Unknown score label: '{_score}', please pass a function instead")
     df = assert_df(df)
 
     if groupby:
@@ -2710,6 +2745,7 @@ def numeric_to_group(pd_series, step=None, outer_limit=4, suffix=None, use_abs=F
         _series = np.where(_series < -outer_limit, -outer_limit, _series)
 
     # make a pretty string
+    # noinspection PyTypeChecker
     _series = pd.Series(_series).apply(lambda x: '{0:n}'.format(x)).astype('str') + suffix
 
     # to cat

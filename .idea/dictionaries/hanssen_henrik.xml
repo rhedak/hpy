@@ -107,6 +107,7 @@
       <w>locs</w>
       <w>lowpass</w>
       <w>lstrip</w>
+      <w>maep</w>
       <w>mahalanobis</w>
       <w>markeredgecolor</w>
       <w>markeredgewidth</w>
@@ -122,6 +123,7 @@
       <w>mins</w>
       <w>mpae</w>
       <w>multioutput</w>
+      <w>nanmean</w>
       <w>nbviewer</w>
       <w>ncol</w>
       <w>ncols</w>
