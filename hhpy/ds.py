@@ -1386,7 +1386,7 @@ def r2(*args, **kwargs) -> Union[pd.DataFrame, float]:
 @export
 def rmse(*args, **kwargs) -> Union[pd.DataFrame, float]:
     """
-    wrapper for f_score using numpy.sqrt(skearn.metrics.mean_squared_error)
+    wrapper for f_score using numpy.sqrt(sklearn.metrics.mean_squared_error)
 
     :param args: passed to f_score
     :param kwargs: passed to f_score
@@ -1402,7 +1402,7 @@ def rmse(*args, **kwargs) -> Union[pd.DataFrame, float]:
 @export
 def mae(*args, **kwargs) -> Union[pd.DataFrame, float]:
     """
-    wrapper for f_score using skearn.metrics.mean_absolute_error
+    wrapper for f_score using sklearn.metrics.mean_absolute_error
 
     :param args: passed to f_score
     :param kwargs: passed to f_score
@@ -1430,7 +1430,7 @@ def stdae(*args, **kwargs) -> Union[pd.DataFrame, float]:
 @export
 def medae(*args, **kwargs) -> Union[pd.DataFrame, float]:
     """
-    wrapper for f_score using skearn.metrics.median_absolute_error
+    wrapper for f_score using sklearn.metrics.median_absolute_error
 
     :param args: passed to f_score
     :param kwargs: passed to f_score

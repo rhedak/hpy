@@ -243,7 +243,7 @@ def corrplot(data: pd.DataFrame, annotations: bool = True, number_format: str = 
     """
     function to create a correlation plot using a seaborn heatmap
     based on: https://www.linkedin.com/pulse/generating-correlation-heatmaps-seaborn-python-andrew-holt
-        
+
     :param number_format: %(number_format)s
     :param data: %(data_novec)s
     :param annotations: %(annotations)s
@@ -281,7 +281,7 @@ def corrplot_bar(data: pd.DataFrame, target: str = None, columns: List[str] = No
                  xlim: tuple = (-1, 1), ax: plt.Axes = None):
     """
     Correlation plot as barchart based on :func:`~hhpy.ds.get_df_corr`
-    
+
     :param data: %(data)s
     :param target: %(corr_target)s
     :param columns: Columns for which to calculate the correlations, defaults to all numeric columns [optional]
@@ -354,7 +354,7 @@ def pairwise_corrplot(data: pd.DataFrame, corr_cutoff: float = rcParams['corr_cu
     """
     print a pairwise_corrplot to for all variables in the df, by default only plots those with a correlation
     coefficient of >= corr_cutoff
-    
+
     :param data: %(data_novec)s
     :param corr_cutoff: %(corr_cutoff)s
     :param col_wrap: %(col_wrap)s
@@ -529,7 +529,7 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
     """
     Similar to seaborn.distplot but supports hues and some other things. Plots a combination of a histogram and
     a kernel density estimation.
-    
+
     :param x: the name of the variable(s) in data or vector data, if data is provided and x is a list of columns
         the DataFrame is automatically melted and the newly generated column used as hue. i.e. you plot
         the distributions of multiple columns on the same axis
@@ -948,7 +948,7 @@ def hist_2d(x: str, y: str, data: pd.DataFrame, bins: int = 100, std_cutoff: int
     """
     generic 2d histogram created by splitting the 2d area into equal sized cells, counting data points in them and
     drawn using pyplot.pcolormesh
-    
+
     :param x: %(x)s
     :param y: %(y)s
     :param data: %(data)s
@@ -958,7 +958,7 @@ def hist_2d(x: str, y: str, data: pd.DataFrame, bins: int = 100, std_cutoff: int
     :param cutoff_abs: if less than this amount of data points is in the cell then the data is ignored [optional]
     :param cmap: %(cmap)s
     :param ax: %(ax_in)s
-    :param color_sigma: color to highlight the sigma range in, must be a valid pyplot.plot color [optional] 
+    :param color_sigma: color to highlight the sigma range in, must be a valid pyplot.plot color [optional]
     :param draw_sigma: whether to highlight the sigma range [optional]
     :param kwargs: other keyword arguments passed to pyplot.pcolormesh [optional]
     :return: %(ax_out)s
@@ -1019,7 +1019,7 @@ def paired_plot(data: pd.DataFrame, cols: Sequence, color: str = None, cmap: str
                 **kwargs) -> sns.FacetGrid:
     """
     create a facet grid to analyze various aspects of correlation between two variables using seaborn.PairGrid
-    
+
     :param data: %(data)s
     :param cols: list of exactly two variables to be compared
     :param color: %(color)s
@@ -1065,7 +1065,7 @@ def q_plim(s: pd.Series, q_min: float = .1, q_max: float = .9, offset_perc: floa
            offset=True) -> tuple:
     """
     returns quick x limits for plotting (cut off data not in q_min to q_max quantile)
-    
+
     :param s: pandas Series to truncate
     :param q_min: lower bound quantile [optional]
     :param q_max: upper bound quantile [optional]
@@ -1108,10 +1108,10 @@ def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str =
               **kwargs) -> Union[None, tuple]:
     """
     Plots a plot for each specified column for each level of a certain column plus a summary plot
-    
+
     :param data: %(data)s
     :param level: the name of the column to split the plots by, must be in data
-    :param cols: the columns to create plots for, defaults to all numeric columns [optional]  
+    :param cols: the columns to create plots for, defaults to all numeric columns [optional]
     :param hue: %(hue)s
     :param order: %(order)s
     :param hue_order: %(order)s
@@ -1203,7 +1203,7 @@ def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str =
 def get_legends(ax: plt.Axes = None) -> list:
     """
     returns all legends on a given axis, useful if you have a secaxis
-    
+
     :param ax: %(ax_in)s
     :return: list of legends
     """
@@ -1340,22 +1340,22 @@ def facet_wrap(func: Callable, data: pd.DataFrame, facet: Union[list, str], *arg
     :param data: %(data)s
     :param facet: The column / list of columns to facet over.
     :param args: passed to func
-    :param facet_type: one of ['group', 'cols', None]. 
-        If group facet is treated as the column creating the facet levels and a subplot is created for each level. 
-        If cols each facet is in turn passed as the first positional argument to the plot function func. 
+    :param facet_type: one of ['group', 'cols', None].
+        If group facet is treated as the column creating the facet levels and a subplot is created for each level.
+        If cols each facet is in turn passed as the first positional argument to the plot function func.
         If None then the facet_type is inferred: a single facet value will be treated as group and multiple
-        facet values will be treated as cols. 
+        facet values will be treated as cols.
     :param col_wrap: %(col_wrap)s
     :param width: %(subplot_width)s
     :param height: %(subplot_height)s
-    :param catch_error: whether to keep going in case of an error being encountered in the plot function [optional] 
+    :param catch_error: whether to keep going in case of an error being encountered in the plot function [optional]
     :param return_fig_ax: %(return_fig_ax)s
     :param sharex: %(sharex)s
     :param sharey: %(sharey)s
     :param show_xlabel: whether to show the x label for each subplot
     :param x_tick_rotation: x tick rotation for each subplot
     :param y_tick_rotation: y tick rotation for each subplot
-    :param ax_title: one of ['set','hide'], if set sets axis title to facet name, if hide forcefully hids axis title
+    :param ax_title: one of ['set','hide'], if set sets axis title to facet name, if hide forcefully hides axis title
     :param order: %(order)s
     :param subplots_kws: other keyword arguments passed to pyplot.subplots
     :param kwargs: other keyword arguments passed to func
@@ -1473,7 +1473,7 @@ def facet_wrap(func: Callable, data: pd.DataFrame, facet: Union[list, str], *arg
 def get_subax(ax: Union[plt.Axes, np.ndarray], row: int = None, col: int = None, rows_prio: bool = True) -> plt.Axes:
     """
     shorthand to get around the fact that ax can be a 1D array or a 2D array (for subplots that can be 1x1,1xn,nx1)
-    
+
     :param ax: %(ax_in)s
     :param row: %(row)s
     :param col: %(col)s
@@ -1504,11 +1504,11 @@ def get_subax(ax: Union[plt.Axes, np.ndarray], row: int = None, col: int = None,
 def ax_as_list(ax: Union[plt.Axes, np.ndarray]) -> list:
     """
     takes any Axes and turns them into a list
-    
+
     :param ax: %(ax_in)s
     :return: List containing the subaxes
     """
-    
+
     if isinstance(ax, np.ndarray):
         _dims = len(ax.shape)
     else:
@@ -1726,12 +1726,12 @@ def rmsdplot(x: str, data: pd.DataFrame, groups: Union[Sequence, str] = None, hu
              sort_by_hue: bool = False, palette=None, barh_kws=None, **kwargs):
     """
     creates a seaborn.barplot showing the rmsd calculating :func:`~hhpy.ds.df_rmsd`
-    
+
     :param x: %(x)s
     :param data: %(data)s
     :param groups: the columns to calculate the rmsd for, defaults to all columns [optional]
     :param hue: %(hue)s
-    :param hue_order: %(order)s 
+    :param hue_order: %(order)s
     :param cutoff: drop rmsd values smaller than cutoff [optional]
     :param ax: %(ax_in)s
     :param color_as_balance: Whether to color the bars based on how balanced (based on maxperc values) the levels are
@@ -2175,7 +2175,7 @@ def insert_linebreak(s: str, pos: int = None, frac: float = None, max_breaks: in
 def ax_tick_linebreaks(ax: plt.Axes = None, x: bool = True, y: bool = True, **kwargs) -> None:
     """
     uses insert_linebreaks to insert linebreaks into the axes ticklabels
-    
+
     :param ax: %(ax_in)s
     :param x: whether to insert linebreaks into the x axis label [optional]
     :param y: whether to insert linebreaks into the y axis label [optional]
@@ -2193,18 +2193,18 @@ def ax_tick_linebreaks(ax: plt.Axes = None, x: bool = True, y: bool = True, **kw
 
 @docstr
 @export
-def annotate_barplot(ax: plt.Axes = None, x: Sequence = None, y: Sequence = None, ci: bool = True, 
+def annotate_barplot(ax: plt.Axes = None, x: Sequence = None, y: Sequence = None, ci: bool = True,
                      ci_newline: bool = True, adj_ylim: float = .05, nr_format: str = None,
                      ha: str = 'center', va: str = 'center', offset: int = None,
                      **kwargs) -> plt.Axes:
     """
     automatically annotates a barplot with bar values and error bars (if present). Currently does not work with ticks!
-    
-    :param ax: %(ax_in)s 
+
+    :param ax: %(ax_in)s
     :param x: %(x)s
     :param y: %(y)s
     :param ci: whether to annotate error bars [optional]
-    :param ci_newline: whether to add a newline between values and error bar values [optional] 
+    :param ci_newline: whether to add a newline between values and error bar values [optional]
     :param adj_ylim: whether to automatically adjust the plot y limits to fit the annotations [optional]
     :param nr_format: %(number_format)s
     :param ha: horizontal alignment [optional]
@@ -2308,6 +2308,7 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
              ax: plt.Axes = None, color: str = None, label: str = None, legend: bool = False, legend_out: bool = False,
              legend_kws: Mapping = None, xlim: tuple = None, ylim: tuple = None,
              ax_facecolor: Union[str, Mapping] = None, grid: bool = False, vline: Union[Sequence, float] = None,
+             hue: str = None, hue_order: Sequence = None, palette: Union[Mapping, Sequence] = None,
              **kwargs) -> Union[HTML, FuncAnimation]:
     """
     wrapper for FuncAnimation to be used with pandas DataFrames. Assumes that you have a DataFrame containing
@@ -2316,7 +2317,7 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
     If mode is set to jshtml the function is optimized for use with Jupyter Notebook and returns an
     Interactive JavaScript Widget.
 
-    :param data: %(data)s 
+    :param data: %(data)s
     :param x: %(x_novec)s
     :param y: %(y_novec)s
     :param t: %(t_novec)s
@@ -2347,6 +2348,9 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
         specific timepoints t [optional]
     :param grid: %(grid)s
     :param vline: %(vline)s
+    :param hue: %(hue)s
+    :param hue_order: %(order)s
+    :param palette: %(palette)s
     :param kwargs: other keyword arguments passed to pyplot.plot
     :return: see mode
 
@@ -2367,6 +2371,8 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
         ax = plt.gca()
     if legend_kws is None:
         legend_kws = {}
+    if palette is None:
+        palette = rcParams['palette']
     # - handle no inplace
     data = pd.DataFrame(data).copy()
     # - preprocessing
@@ -2377,6 +2383,12 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
     _args = {'data': data, 'x': x, 'y': y, 't': t}
 
     _ax_list = ax_as_list(ax)
+
+    if hue:
+        if hue_order is None:
+            hue_order = sorted(data[hue].unique())
+    else:
+        hue_order = [None]
 
     # init lines
     if lines is None:
@@ -2438,17 +2450,20 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
             else:
                 _label = label
 
-            lines += [{
-                'line': _ax.plot([], [], label=_label, color=_color, **_kwargs)[0],
-                'ax': _ax,
-                'data': data,
-                'x': _x,
-                'y': _y,
-                't': t,
-                'vline': _vline,
-                'title': title,
-                'title_prefix': title_prefix,
-            }]
+            for _hue in hue_order:
+                if hue:
+                    _label = _hue
+                lines += [{
+                    'line': _ax.plot([], [], label=_label, color=_color, **_kwargs)[0],
+                    'ax': _ax,
+                    'data': data,
+                    'x': _x,
+                    'y': _y,
+                    't': t,
+                    'vline': _vline,
+                    'title': title,
+                    'title_prefix': title_prefix,
+                }]
 
         _ts = pd.Series(data[t].unique()).sort_values()
 
@@ -2591,19 +2606,29 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
 
         _t = _ts[_i]
 
-        for _line_i in lines:
+        for __it, _line_i in enumerate(lines):
 
             _line_keys_i = list(_line_i.keys())
-
-            _data = _line_i['data'].copy()
-            _data = _data[_data[_line_i['t']] == _t]
-
-            _line_i['line'].set_data(_data[_line_i['x']], _data[_line_i['y']])
 
             if 'ax' in _line_keys_i:
                 _ax_i = _line_i['ax']
             else:
                 _ax_i = plt.gca()
+
+            _data = _line_i['data'].copy()
+            _data = _data[_data[_line_i['t']] == _t]
+
+            if hue:
+                __hue = hue_order[__it]
+                _data = _data[_data[hue] == __hue]
+                if isinstance(palette, Mapping):
+                    __color = palette[__hue]
+                elif is_list_like(palette):
+                    __color = palette[__it]
+                else:
+                    __color = palette
+                _line_i['line'].set_markerfacecolor(_color)
+            _line_i['line'].set_data(_data[_line_i['x']], _data[_line_i['y']])
 
             # -- title --
             _title = title
@@ -2662,7 +2687,7 @@ def legend_outside(ax: plt.Axes = None, width: float = .85, loc: str = 'right',
                    offset_y: float = 0, loc_warn: bool = True, **kwargs):
     """
     draws a legend outside of the subplot
-    
+
     :param ax: %(ax_in)s
     :param width: how far to shrink down the subplot if loc=='right'
     :param loc: one of ['right','bottom'], where to put the legend
@@ -2715,7 +2740,7 @@ def legend_outside(ax: plt.Axes = None, width: float = .85, loc: str = 'right',
 def set_ax_sym(ax: plt.Axes, x: bool = True, y: bool = True):
     """
     automatically sets the select axes to be symmetrical
-    
+
     :param ax: %(ax_in)s
     :param x: whether to set x axis to be symmetrical
     :param y: whether to set y axis to be symmetrical
@@ -2816,7 +2841,7 @@ def dic_to_lcurveplot(dic, width=16, height=9 / 2, **kwargs):
 def stemplot(x, y, data=None, ax=None, color=rcParams['palette'][0], baseline=0, kwline=None, **kwargs):
     """
     modeled after pyplot.stemplot but more customizeable
-    
+
     :param x: %(x)s
     :param y: %(y)s
     :param data: %(data)s
@@ -2953,7 +2978,7 @@ def show_ax_ticklabels(ax, x=None, y=None):
 def get_twin(ax: plt.Axes) -> Union[plt.Axes, None]:
     """
     get the twin axis from an Axes object
-    
+
     :param ax: %(ax_in)s
     :return: the twin axis if it exists, else None
     """
@@ -2970,7 +2995,7 @@ def get_twin(ax: plt.Axes) -> Union[plt.Axes, None]:
 def get_axlim(ax: plt.Axes, xy: Union[str, None] = None) -> Union[tuple, Mapping]:
     """
     Wrapper function to get x limits, y limits or both with one function call
-    
+
     :param ax: %(ax_in)s
     :param xy: one of ['x', 'y', 'xy', None]
     :return: if xy is 'xy' or None returns a dictionary else returns x or y lims as tuple
@@ -2988,7 +3013,7 @@ def get_axlim(ax: plt.Axes, xy: Union[str, None] = None) -> Union[tuple, Mapping
 def set_axlim(ax: plt.Axes, lim: Union[Sequence, Mapping], xy: Union[str, None] = None):
     """
     Wrapper function to set both x and y limits with one call
-    
+
     :param ax: %(ax_in)s
     :param lim: axes limits as tuple or Mapping
     :param xy: one of ['x', 'y', 'xy', None]
@@ -3014,7 +3039,7 @@ def share_xy(ax: plt.Axes, x: bool = True, y: bool = True, mode: str = 'all', ad
     """
     set the subplots on the Axes to share x and/or y limits WITHOUT sharing x and y legends.
     If you want that please use pyplot.subplots(share_x=True,share_y=True) when creating the plots.
-    
+
     :param ax: %(ax_in)s
     :param x: whether to share x limits [optional]
     :param y: whether to share y limits [optional]
@@ -3504,7 +3529,7 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
               barplot_kws: Mapping = None, count_twinx_kws: Mapping = None, **kwargs):
     """
     Based on seaborn barplot but with a few more options, uses :func:`~hhpy.ds.df_count`
-    
+
     :param x: %(x)s
     :param data: %(data)s
     :param hue: %(hue)s
@@ -3633,13 +3658,13 @@ def quantile_plot(x: Union[Sequence, str], data: pd.DataFrame = None, qs: Union[
                   **kwargs) -> plt.Axes:
     """
     plots the specified quantiles of a Series using seaborn.barplot
-    
+
     :param x: %(x)s
     :param data: %(data)s
     :param qs: Quantile levels [optional]
     :param x2: if specified: subtracts x2 from x before calculating quantiles [optional]
     :param hue: %(hue)s
-    :param hue_order: %(order)s 
+    :param hue_order: %(order)s
     :param to_abs: %(to_abs)s
     :param ax: %(ax_in)s
     :param kwargs: other keyword arguments passed to seaborn.barplot

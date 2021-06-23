@@ -131,8 +131,3 @@ class Conv1DNN(BaseClass):
         _y = self.model.predict(x=_X)
 
         return _y
-
-        # # check if data was lost -> append NaN
-        # _X_shape_diff = X.shape[0] - _X.shape[0]
-        # if _X.shape[0] != X.shape[0]:
-
