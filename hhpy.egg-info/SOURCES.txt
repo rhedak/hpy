@@ -167,7 +167,6 @@ sphinx/api/hhpy.plotting.share_legend.rst
 sphinx/api/hhpy.plotting.share_xy.rst
 sphinx/api/hhpy.plotting.stemplot.rst
 tests/__init__.py
-tests/conftest.py
 tests/test_ds.py
 tests/files/testdata_jp.xlsx
 tests/files/testdata_jp_dfmapping.xlsx
