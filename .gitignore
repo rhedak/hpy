@@ -225,3 +225,4 @@ dist
 .pytest_cache
 tests/tmp
 .python_version
+/.autoenv.zsh

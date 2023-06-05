@@ -4,6 +4,7 @@ Pipfile
 Pipfile.lock
 README.md
 _config.yml
+pyproject.toml
 release_notes.md
 setup.cfg
 setup.py

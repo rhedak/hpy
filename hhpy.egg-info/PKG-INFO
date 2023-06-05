@@ -1,15 +1,16 @@
 Metadata-Version: 2.1
 Name: hhpy
 Version: 0.3.1
-Summary: hhpy - convenient data science
+Summary: Convenient Data Science
 Home-page: https://github.com/rhedak/hhpy
 Author: Henrik Hanssen
-Author-email: henrik.hanssen@gmail.com
+Author-email: Henrik Hanssen <rhedak00@yahoo.de>
 License: Apache 2.0
+Project-URL: Homepage, https://github.com/rhedak/hhpy
 Keywords: package development template
-Classifier: Development Status :: 4 - Beta
-Classifier: Intended Audience :: Developers
-Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
 Requires-Python: >=3.8
 Description-Content-Type: text/markdown
 License-File: LICENSE.txt

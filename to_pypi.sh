@@ -1,1 +1,1 @@
-python -m twine upload --repository-url https://github.com/rhedak/hhpy dist/*
+python -m twine upload --repository-url https://upload.pypi.org/legacy/ dist/*
