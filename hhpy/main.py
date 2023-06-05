@@ -127,7 +127,8 @@ class BaseClass:
         """
 
         if len(self.__attributes__) == 0:
-            warnings.warn('self.__attributes__ has length zero, did you declare it?')
+            warnings.warn(
+                'self.__attributes__ has length zero, did you declare it?')
 
         _dict = {}
         for _attr_name in list_merge('__name__', self.__attributes__):
@@ -186,11 +187,13 @@ class BaseClass:
             return _attr_evaluated
 
         # -- init
-        _classes = assert_list(self.__dependent_classes__, default=[]) + assert_list(classes, default=[])
+        _classes = assert_list(self.__dependent_classes__, default=[
+        ]) + assert_list(classes, default=[])
 
         # -- main
         if len(self.__attributes__) == 0:
-            warnings.warn('self.__attributes__ has length zero, did you declare it?')
+            warnings.warn(
+                'self.__attributes__ has length zero, did you declare it?')
 
         for _attr_name in list_merge('__name__', self.__attributes__):
             if _attr_name not in dct.keys():
@@ -206,12 +209,14 @@ class BaseClass:
                         else:
                             for _attr_key, _attr_value in _attr.items():
                                 if isinstance(_attr_value, Dict) and '__name__' in _attr_value.keys():
-                                    _attr[_attr_key] = _f_eval(_attr_value['__name__'], _attr_value)  # eval
+                                    _attr[_attr_key] = _f_eval(
+                                        _attr_value['__name__'], _attr_value)  # eval
                     else:  # List
                         for _i in range(len(_attr)):
                             _attr_value = _attr[_i]
                             if isinstance(_attr_value, Mapping) and '__name__' in _attr_value.keys():
-                                _attr[_i] = _f_eval(_attr_value['__name__'], _attr_value)  # eval
+                                _attr[_i] = _f_eval(
+                                    _attr_value['__name__'], _attr_value)  # eval
 
             self.__setattr__(_attr_name, _attr)
         # -- return
@@ -270,7 +275,8 @@ def get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = T
                     try:
                         __repr_i = _callable(value)
                     except Exception as _e:
-                        print(f"{_e.__class__.__name__}: {_e} handled for {value}")
+                        print(
+                            f"{_e.__class__.__name__}: {_e} handled for {value}")
 
         return __repr_i
 
@@ -292,10 +298,12 @@ def get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = T
         if hasattr(obj, '__attributes_no_repr__'):
             _attributes = list_exclude(_attributes, obj.__attributes_no_repr__)
     else:
-        warnings.warn('Object has no __attributes__ attribute, did you declare it?')
+        warnings.warn(
+            'Object has no __attributes__ attribute, did you declare it?')
         _attributes = []
     if len(obj.__attributes__) == 0:
-        warnings.warn('self.__attributes__ has length zero, did you declare it?')
+        warnings.warn(
+            'self.__attributes__ has length zero, did you declare it?')
     # - rules
     if rules is not None and not isinstance(rules, Mapping):
         raise ValueError('rules should be a dictionary of types and callables')
@@ -330,12 +338,13 @@ def get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = T
             # add to repr string
             _repr += f"{_attribute}={_repr_i}"
         else:
-            warnings.warn(f"{_attribute} is specified in self.__attributes__ but does not exist. Skipping...")
+            warnings.warn(
+                f"{_attribute} is specified in self.__attributes__ but does not exist. Skipping...")
             continue
     # close brace
     _repr += ')'
     # remove all \
-    _reprs = _repr.replace('\\', '').replace('\'', '')
+    _repr = _repr.replace('\\', '').replace('\'', '')
     # -- return
     return _repr
 
@@ -444,7 +453,8 @@ def tprint(*args, sep: str = ' ', r_loc: str = rcParams['tprint.r_loc'], **kwarg
     _allowed_r_locs = ['front', 'end']
 
     if r_loc not in _allowed_r_locs:
-        warnings.warn(f'r_loc not in {_allowed_r_locs}, defaulting to {rcParams["tprint.r_loc"]}')
+        warnings.warn(
+            f'r_loc not in {_allowed_r_locs}, defaulting to {rcParams["tprint.r_loc"]}')
         r_loc = rcParams['tprint.r_loc']
 
     _string = ''
@@ -648,11 +658,11 @@ def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', empty_symbol: str
     """
     # -- assert
     if mode not in validations['progressbar__mode']:
-        raise ValueError(f"mode must be one of {validations['progressbar__mode']}")
+        raise ValueError(
+            f"mode must be one of {validations['progressbar__mode']}")
     # -- init
     _perc_f = i / i_max * 100
     _perc = int(np.floor(_perc_f))
-    _rem = 100 - _perc
     if len(print_prefix) > 0 and (print_prefix[-2:] != ': ') and (print_prefix[-1:] not in [':', '\n']):
         print_prefix += ": "
 
@@ -660,12 +670,14 @@ def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', empty_symbol: str
     if _perc <= 50:
 
         _right = empty_symbol * (50 // p_step)
-        _left = symbol * int(np.ceil(_perc / p_step)) + empty_symbol * ((50 - _perc) // p_step)
+        _left = symbol * int(np.ceil(_perc / p_step)) + \
+            empty_symbol * ((50 - _perc) // p_step)
 
     else:
 
         _left = symbol * (50 // p_step)
-        _right = symbol * int(np.ceil(((50 - (100 - _perc)) / p_step))) + empty_symbol * ((100 - _perc) // p_step)
+        _right = symbol * int(np.ceil(((50 - (100 - _perc)) / p_step))
+                              ) + empty_symbol * ((100 - _perc) // p_step)
 
     if mid is not None:
         _mid = mid
@@ -690,7 +702,8 @@ def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', empty_symbol: str
                 if mode == 'remaining':
                     _mid = '-{}'.format(str(_remaining_time)[:-5])
                 else:
-                    _mid = '{} / {}'.format(str(_elapsed_time)[:-5], str(_total_time)[:-5])
+                    _mid = '{} / {}'.format(str(_elapsed_time)
+                                            [:-5], str(_total_time)[:-5])
 
             else:
                 _mid = '{}'.format(str(_elapsed_time)[:-5])
@@ -1057,7 +1070,8 @@ def append_to_dict_list(dct: Union[dict, defaultdict], append: Union[dict, list]
             _append = [append]
 
         if len(_append) > len(dct):
-            warnings.warn('list is longer than dict, trailing entries will be lost')
+            warnings.warn(
+                'list is longer than dict, trailing entries will be lost')
         _append = dict(zip(dct.keys(), _append))
 
     else:
@@ -1190,7 +1204,8 @@ def assert_tuple(*args: Any, **kwargs) -> tuple:
 
 
 def force_list(*args, **kwargs):
-    warnings.warn('force_list is deprecated, please use assert_list instead', DeprecationWarning)
+    warnings.warn(
+        'force_list is deprecated, please use assert_list instead', DeprecationWarning)
     return assert_list(*args, **kwargs)
 
 
@@ -1213,13 +1228,15 @@ def assert_scalar(obj: Any, warn: bool = True, default: Scalar = None) -> Scalar
         warnings.warn("empty list cannot be cast to scalar, returning None")
         return None
     if warn and _len > 1:
-        warnings.warn(f"assert_scalar: object {obj} has length {_len}, retaining only first entry")
+        warnings.warn(
+            f"assert_scalar: object {obj} has length {_len}, retaining only first entry")
 
     return _lst[0]
 
 
 def force_scalar(*args, **kwargs):
-    warnings.warn('force_scalar is deprecated, please use assert_list instead', DeprecationWarning)
+    warnings.warn(
+        'force_scalar is deprecated, please use assert_list instead', DeprecationWarning)
     return assert_scalar(*args, **kwargs)
 
 
@@ -1309,7 +1326,8 @@ def to_hdf(df: pd.DataFrame, file: str, groupby: Union[str, List[str]] = None, w
     :param kwargs: Other keyword arguments passed to pandas.DataFrame.to_hdf [optional]
     :return: None
     """
-    assert (groupby is not None) or (key is not None), "You must supply either groupby or key"
+    assert (groupby is not None) or (
+        key is not None), "You must supply either groupby or key"
 
     # -- init
     # - no inplace
@@ -1338,7 +1356,8 @@ def to_hdf(df: pd.DataFrame, file: str, groupby: Union[str, List[str]] = None, w
             _key = str(key)
 
         if do_print:
-            progressbar(_it, _i_max, print_prefix=f"writing key {_key:<30}: ", p_step=2)
+            progressbar(
+                _it, _i_max, print_prefix=f"writing key {_key:<30}: ", p_step=2)
 
         if write_groupby:
             if GROUPBY_DUMMY in _df_i.columns:
@@ -1387,7 +1406,7 @@ def read_hdf(file: str, key: Union[str, List[str]] = None, sample: int = None, r
     :return: pandas DataFrame
     """
 
-    if not os.path.exists(file): 
+    if not os.path.exists(file):
         raise ValueError('{} does not exist'.format(file))
 
     # if key was not specified: read all keys
@@ -1410,7 +1429,8 @@ def read_hdf(file: str, key: Union[str, List[str]] = None, sample: int = None, r
     for _it, _key in enumerate(_keys):
 
         if do_print:
-            tprint('reading {} - key {} / {} : {}...'.format(file, _it+1, len(_keys), _key))
+            tprint('reading {} - key {} / {} : {}...'.format(file,
+                   _it + 1, len(_keys), _key))
         if catch_error:
             try:
                 _df_i = pd.read_hdf(file, key=_key, **kwargs)
@@ -1518,12 +1538,14 @@ def reformat_string(string: str, case: Optional[str] = 'lower', replace: Optiona
         if emoji:
             string = emoji.demojize(string)
         else:
-            warnings.warn('Missing optional dependency emoji, skipping demojize')
+            warnings.warn(
+                'Missing optional dependency emoji, skipping demojize')
 
     # -- trans: (needs to come after demojize but before the rest)
     if trans:
         if Translator is None:
-            raise ModuleNotFoundError('Missing optional dependency googletrans, please install it to use trans=True')
+            raise ModuleNotFoundError(
+                'Missing optional dependency googletrans, please install it to use trans=True')
 
         _translator = Translator()
         try:
@@ -1531,7 +1553,8 @@ def reformat_string(string: str, case: Optional[str] = 'lower', replace: Optiona
             if trans_sleep:
                 sleep(trans_sleep)
             # translate
-            string = _translator.translate(string, dest=trans_dest, src=trans_src).text
+            string = _translator.translate(
+                string, dest=trans_dest, src=trans_src).text
         except JSONDecodeError:
             if warn:
                 warnings.warn(f'handled JSONDecodeError at {string}, this probably means that you exceeded the '
@@ -1579,21 +1602,24 @@ def dict_inv(dct: Mapping, key_as_str: bool = False, duplicates: str = 'keep') -
 
     # -- assert
     if duplicates not in validations['dict_inv__duplicates']:
-        raise ValueError(f"duplicates must be one of {validations['dict_inv__duplicates']}")
+        raise ValueError(
+            f"duplicates must be one of {validations['dict_inv__duplicates']}")
     # -- init
     _dct_inv = {}
     # -- main
     for _key, _value in dct.items():
         # assert scalar
         if not is_scalar(_value):
-            raise ValueError(f'A non-scalar dictionary value is not invertible, found at key {_key}')
+            raise ValueError(
+                f'A non-scalar dictionary value is not invertible, found at key {_key}')
         # assert non-duplicate value
         if duplicates == 'adjust':
             _warn = True
             while _value in _dct_inv.keys():
                 if _warn:
                     _warn = False
-                    warnings.warn(f'duplicate value found at "{_key}: {_value}", appending _')
+                    warnings.warn(
+                        f'duplicate value found at "{_key}: {_value}", appending _')
                 _value = str(_value) + '_'
         elif (duplicates == 'drop') and (_value in _dct_inv.keys()):
             continue
@@ -1615,7 +1641,8 @@ def copy_function(f: FunctionType) -> FunctionType:
     :param f: a function
     :return: copy of function
     """
-    _f = FunctionType(f.__code__, f.__globals__, name=f.__name__, argdefs=f.__defaults__, closure=f.__closure__)
+    _f = FunctionType(f.__code__, f.__globals__, name=f.__name__,
+                      argdefs=f.__defaults__, closure=f.__closure__)
     _f = functools.update_wrapper(_f, f)
     _f.__kwdefaults__ = f.__kwdefaults__
     return _f

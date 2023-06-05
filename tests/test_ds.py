@@ -3,7 +3,6 @@ tests for hhpy.ds
 """
 
 import pytest
-import hhpy.main as hmn
 import hhpy.ds as hds
 import pandas as pd
 import os

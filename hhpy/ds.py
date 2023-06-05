@@ -21,10 +21,11 @@ from sklearn.preprocessing import StandardScaler
 from typing import Mapping, Sequence, Callable, Union, List, Optional, Tuple, Any
 from io import StringIO
 from datetime import datetime
+from docrep import DocstringProcessor
 
 # --- local imports
 from hhpy.main import export, BaseClass, assert_list, tprint, progressbar, qformat, list_intersection, round_signif, \
-    is_list_like, dict_list, append_to_dict_list, concat_cols, DocstringProcessor, reformat_string, dict_inv, \
+    is_list_like, dict_list, append_to_dict_list, concat_cols, reformat_string, dict_inv, \
     list_exclude, docstr as docstr_main, SequenceOfScalars, SequenceOrScalar, STRING_NAN, is_scalar, GROUPBY_DUMMY, \
     assert_scalar, list_merge
 
@@ -83,7 +84,7 @@ dtypes['datetime64'] = dtypes['datetime']
 class DFMapping(BaseClass):
     """
         Mapping object bound to a pandas DataFrame that standardizes column names and values according to the chosen
-        conventions. Also implements google translation. Can be used like an sklearn scalar object.
+        conventions. Also implements google translation. Can be used like a sklearn scalar object.
         The mapping can be saved and later used to restore the original shape of the DataFrame.
         Note that the index is exempt.
 
@@ -103,7 +104,7 @@ class DFMapping(BaseClass):
         self.value_mapping = {}
 
         # -- defaults
-        # - if the function is called with only one argument attempt to parse it's type and act accordingly
+        # - if the function is called with only one argument attempt to parse its type and act accordingly
         # DataFrame is passed: init from it
         if isinstance(df, pd.DataFrame):
             self.from_df(df, **kwargs)
@@ -131,7 +132,7 @@ class DFMapping(BaseClass):
         :param return_type: if 'self': writes to self, 'tuple' returns (col_mapping, value_mapping) [optional]
         :param printf: %(printf)s
         :param duplicate_limit: allowed number of reformated duplicates per column, each duplicate is suffixed with '_'
-            but if you have too many you likely have a column of non allowed character strings and the mapping
+            but if you have too many you likely have a column of non-allowed character strings and the mapping
             would take a very long time. The duplicate handling therefore stops and a warning is triggered
             since the transformation is no longer invertible. Consider excluding the column or using cat codes
             [optional]
@@ -147,7 +148,8 @@ class DFMapping(BaseClass):
         # assert
         if return_type not in validations['DFMapping__from_df__return_type']:
             if warn:
-                warnings.warn(f'Unknown return_type {return_type}, falling back to self')
+                warnings.warn(
+                    f'Unknown return_type {return_type}, falling back to self')
             return_type = 'self'
 
         # -- main
@@ -166,7 +168,8 @@ class DFMapping(BaseClass):
         for _it, _column in enumerate(_columns):
             # progressbar
             if printf:
-                progressbar(_it, len(_columns), printf=printf, print_prefix=f'{_column}: ')
+                progressbar(_it, len(_columns), printf=printf,
+                            print_prefix=f'{_column}: ')
             # map col name
             if col_names:
                 _reformated_column = reformat_string(_column, **kwargs)
@@ -178,7 +181,8 @@ class DFMapping(BaseClass):
                     _it_ += 1
                     if _it_ == duplicate_limit:
                         if warn:
-                            warnings.warn(f'too many reformated duplicates in column names')
+                            warnings.warn(
+                                'too many reformated duplicates in column names')
                         break
                 # assign to dict
                 _col_mapping[_column] = _reformated_column
@@ -205,7 +209,8 @@ class DFMapping(BaseClass):
                             _it_ += 1
                             if _it_ == duplicate_limit:
                                 if warn:
-                                    warnings.warn(f'too many reformated duplicates in column {_column}')
+                                    warnings.warn(
+                                        f'too many reformated duplicates in column {_column}')
                                 break
                         # assign to dict
                         _value_mapping[_column][_unique] = _reformated_unique
@@ -321,7 +326,8 @@ class DFMapping(BaseClass):
         """
         if kwargs_fit is None:
             kwargs_fit = {}
-        self.fit(df=df, col_names=col_names, values=values, columns=columns, **kwargs_fit)
+        self.fit(df=df, col_names=col_names, values=values,
+                 columns=columns, **kwargs_fit)
         return self.transform(df=df, col_names=col_names, values=values, columns=columns, **kwargs)
 
     def to_excel(self, path: str, if_exists: str = 'error') -> None:
@@ -348,22 +354,25 @@ class DFMapping(BaseClass):
         # -- init
         # - assert
         if if_exists not in validations['DFMapping__to_excel__if_exists']:
-            raise ValueError(f"if_exists must be one of {validations['DFMapping__to_excel__if_exists']}")
+            raise ValueError(
+                f"if_exists must be one of {validations['DFMapping__to_excel__if_exists']}")
         # - handle if_exists
         _sheet_names = []
         if os.path.exists(path):
             if if_exists == 'error':
-                raise FileExistsError(f"file already exists, please specify if_exists as one of ")
+                raise FileExistsError('file already exists, please specify if_exists as one of')
             elif if_exists == 'append':
                 _sheet_names = pd.ExcelFile(path).sheet_names
         # -- main
         # pandas ExcelWriter object (saves on close)
         with pd.ExcelWriter(path) as _writer:
             # col mapping
-            _write_excel_sheet(writer=_writer, mapping=self.col_mapping, sheet_name='__columns__')
+            _write_excel_sheet(
+                writer=_writer, mapping=self.col_mapping, sheet_name='__columns__')
             # value mappings
             for _key, _mapping in self.value_mapping.items():
-                _write_excel_sheet(writer=_writer, mapping=_mapping, sheet_name=_key)
+                _write_excel_sheet(
+                    writer=_writer, mapping=_mapping, sheet_name=_key)
 
     def from_excel(self, path: str) -> None:
         """
@@ -383,7 +392,8 @@ class DFMapping(BaseClass):
             self.col_mapping = _read_excel(xls=_xls, sheet_name='__columns__')
             self.value_mapping = {}
             for _sheet_name in list_exclude(_xls.sheet_names, '__columns__'):
-                self.value_mapping[_sheet_name] = _read_excel(xls=_xls, sheet_name=_sheet_name)
+                self.value_mapping[_sheet_name] = _read_excel(
+                    xls=_xls, sheet_name=_sheet_name)
 
 
 # ---- functions
@@ -404,7 +414,8 @@ def assert_df(df: Any, groupby: Union[SequenceOrScalar, bool] = False, name: str
         df = pd.DataFrame(df).copy()
     except Exception as _e:
         print(f"{_e.__class__.__name__}: {_e}")
-        raise ValueError(f"{name} must be a DataFrame or castable to DataFrame")
+        raise ValueError(
+            f"{name} must be a DataFrame or castable to DataFrame")
 
     if isinstance(groupby, bool) and not groupby:
         return df
@@ -497,7 +508,8 @@ def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_ca
             df = _do_downcast(df=df, cols=_col, downcast=_downcast)
 
     if c_float:
-        df = _do_downcast(df=df, cols=df.select_dtypes(include=['float']).columns, downcast='float')
+        df = _do_downcast(df=df, cols=df.select_dtypes(
+            include=['float']).columns, downcast='float')
 
     if c_cat:
         _include = ['object']
@@ -550,12 +562,15 @@ def get_df_corr(df: pd.DataFrame, columns: List[str] = None, target: str = None,
     # loop groups
     for _index, _df_i in df.groupby(groupby):
         # get corr
-        _df_corr_i = _df_i.corr().reset_index().rename({'index': 'col_0'}, axis=1)
+        _df_corr_i = _df_i.corr().reset_index().rename(
+            {'index': 'col_0'}, axis=1)
         # set upper right half to nan
         for _i, _col in enumerate(columns):
-            _df_corr_i[_col] = np.where(_df_corr_i[_col].index <= _i, np.nan, _df_corr_i[_col])
+            _df_corr_i[_col] = np.where(
+                _df_corr_i[_col].index <= _i, np.nan, _df_corr_i[_col])
         # gather / melt
-        _df_corr_i = pd.melt(_df_corr_i, id_vars=['col_0'], var_name='col_1', value_name='corr').dropna()
+        _df_corr_i = pd.melt(_df_corr_i, id_vars=[
+                             'col_0'], var_name='col_1', value_name='corr').dropna()
         # drop self correlation
         _df_corr_i = _df_corr_i[_df_corr_i['col_0'] != _df_corr_i['col_1']]
         # get identifier
@@ -577,15 +592,18 @@ def get_df_corr(df: pd.DataFrame, columns: List[str] = None, target: str = None,
     if target is not None:
         # if the target is col_1: switch it to col_0
         _target_is_col_1 = (_df_corr['col_1'] == target)
-        _df_corr['col_1'] = np.where(_target_is_col_1, _df_corr['col_0'], _df_corr['col_1'])
-        _df_corr['col_0'] = np.where(_target_is_col_1, target, _df_corr['col_0'])
+        _df_corr['col_1'] = np.where(
+            _target_is_col_1, _df_corr['col_0'], _df_corr['col_1'])
+        _df_corr['col_0'] = np.where(
+            _target_is_col_1, target, _df_corr['col_0'])
         # keep only target in col_0
         _df_corr = _df_corr[_df_corr['col_0'] == target]
 
     # get absolute correlation
     _df_corr['corr_abs'] = np.abs(_df_corr['corr'])
     # sort descending
-    _df_corr = _df_corr.sort_values(['corr_abs'], ascending=False).reset_index(drop=True)
+    _df_corr = _df_corr.sort_values(
+        ['corr_abs'], ascending=False).reset_index(drop=True)
 
     return _df_corr
 
@@ -698,11 +716,12 @@ def outlier_to_nan(df: pd.DataFrame, col: str, groupby: Union[list, str] = None,
 
         # calculate delta (mean of diff to previous and next value)
         _delta = .5 * (
-                (df[col] - _df_grouped[col].shift(1).bfill()).abs() +
-                (df[col] - _df_grouped[col].shift(-1).ffill()).abs()
+            (df[col] - _df_grouped[col].shift(1).bfill()).abs() +
+            (df[col] - _df_grouped[col].shift(-1).ffill()).abs()
         )
 
-        df[col] = df[col].where((_delta - _df_grouped[col].mean()).abs() <= (std_cutoff * _df_grouped[col].std()))
+        df[col] = df[col].where(
+            (_delta - _df_grouped[col].mean()).abs() <= (std_cutoff * _df_grouped[col].std()))
 
     if GROUPBY_DUMMY in df.columns:
         df = df.drop(GROUPBY_DUMMY, axis=1)
@@ -729,7 +748,8 @@ def butter_pass_filter(data: pd.Series, cutoff: int, fs: int, order: int, btype:
         _nyq = 0.5 * _f_fs
         _normal_cutoff = _f_cutoff / _nyq
         # noinspection PyTupleAssignmentBalance
-        __b, __a = signal.butter(_f_order, _normal_cutoff, btype=_f_btype, analog=False, output='ba')
+        __b, __a = signal.butter(
+            _f_order, _normal_cutoff, btype=_f_btype, analog=False, output='ba')
 
         return __b, __a
 
@@ -742,7 +762,8 @@ def butter_pass_filter(data: pd.Series, cutoff: int, fs: int, order: int, btype:
 
     _data -= _shift
 
-    _b, _a = _f_butter_pass(_f_cutoff=cutoff, _f_fs=fs, _f_order=order, _f_btype=btype)
+    _b, _a = _f_butter_pass(_f_cutoff=cutoff, _f_fs=fs,
+                            _f_order=order, _f_btype=btype)
 
     _y = signal.lfilter(_b, _a, _data)
 
@@ -862,12 +883,14 @@ def lfit(x: SequenceOrScalar, y: SequenceOrScalar = None, w: SequenceOrScalar = 
 
         if catch_error:
             try:
-                _fit = np.poly1d(np.polyfit(x=_x[_idx], y=_y[_idx], deg=1, w=_w_idx))
+                _fit = np.poly1d(np.polyfit(
+                    x=_x[_idx], y=_y[_idx], deg=1, w=_w_idx))
             except Exception as _exc:
                 warnings.warn('handled exception: {}'.format(_exc))
                 _fit = None
         else:
-            _fit = np.poly1d(np.polyfit(x=_x[_idx], y=_y[_idx], deg=1, w=_w_idx))
+            _fit = np.poly1d(np.polyfit(
+                x=_x[_idx], y=_y[_idx], deg=1, w=_w_idx))
 
         _x_diff = _x.diff().mean()
         _x = list(_x)
@@ -1000,7 +1023,8 @@ def qf(df: pd.DataFrame, fltr: Union[pd.DataFrame, pd.Series, Mapping], rem_unus
 
     # logical and filter for all columns in filter df
     for _col in _filter_df.columns:
-        _filter_condition = _filter_condition & (_df[_col] == _filter_iloc[_col])
+        _filter_condition = _filter_condition & (
+            _df[_col] == _filter_iloc[_col])
 
     # create filtered df
     _df = _df[_filter_condition]
@@ -1069,7 +1093,8 @@ def quantile_split(s: pd.Series, n: int, signif: int = 2, na_to_med: bool = Fals
         _q_name = 'q{}: {}<=_{}{}'.format(_i, round_signif(__q_min, signif), _right_equal_sign,
                                           round_signif(__q_max, signif))
 
-        _s_out = np.where((_s >= __q_min) & (_s < __q_max_adj), _q_name, _s_out)
+        _s_out = np.where((_s >= __q_min) & (
+            _s < __q_max_adj), _q_name, _s_out)
 
     # get back the old properties of the series (or you'll screw the index)
     _s_out = pd.Series(_s_out)
@@ -1190,8 +1215,8 @@ def cm(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.Data
 
 
 @export
-def f1_pr(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None, target: str = None,
-          factor: int = 100) -> pd.DataFrame:
+def f1_pr(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None, target: str = None
+          ) -> pd.DataFrame:
     """
     get f1 score, true positive, true negative, missed positive and missed negative rate
 
@@ -1199,7 +1224,6 @@ def f1_pr(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.D
     :param y_pred: predicted values as name of df or vector data
     :param df: pandas DataFrame containing true and predicted values [optional]
     :param target: level for which to return the rates, by default all levels are returned [optional]
-    :param factor: factor by which to scale results, default 100 [optional]
     :return: pandas DataFrame containing f1 score, true positive, true negative, missed positive
         and missed negative rate
     """
@@ -1248,13 +1272,6 @@ def f1_pr(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.D
 
         _count_true_sum += _count_true
 
-        if _target in _cm.columns:
-            _count_pred = _cm[_target].sum()
-        else:
-            _count_pred = 0
-
-        _perc_pred = _count_pred / _count_true * factor
-
         # true positive: out of predicted as target how many are actually target
         try:
             _tp_i = _cm[_target][_target]
@@ -1296,7 +1313,8 @@ def f1_pr(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.D
         if np.isnan(_precision) or np.isnan(_recall):
             _f1 = np.nan
         else:
-            _f1 = 200 * (_precision / 100. * _recall / 100.) / (_precision / 100. + _recall / 100.)
+            _f1 = 200 * (_precision / 100. * _recall / 100.) / \
+                (_precision / 100. + _recall / 100.)
 
         # to df
         _cm_target = pd.DataFrame({
@@ -1343,7 +1361,8 @@ def f_score(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd
         del df
 
     if dropna:
-        _df = _df.replace(np.inf, np.nan).replace(-np.inf, np.nan).dropna(subset=[_y_true, _y_pred])
+        _df = _df.replace(np.inf, np.nan).replace(-np.inf,
+                                                  np.nan).dropna(subset=[_y_true, _y_pred])
         if groupby is not None:
             _df = _df.dropna(subset=groupby)
     if _df.shape[0] == 0:
@@ -1497,7 +1516,8 @@ def mpae(*args, times_hundred: bool = True, pmax: int = 999, epsilon: float = No
 
 
 def pae(*args, **kwargs):
-    warnings.warn('pae is deprecated, please use mpae instead', DeprecationWarning)
+    warnings.warn('pae is deprecated, please use mpae instead',
+                  DeprecationWarning)
     return mpae(*args, **kwargs)
 
 
@@ -1511,7 +1531,8 @@ def corr(*args, **kwargs) -> Union[pd.DataFrame, float]:
     :return: if groupby is supplied: pandas DataFrame, else: scalar value
     """
 
-    def _f_corr(x, y): return pd.Series(x).corr(other=pd.Series(y))
+    def _f_corr(x, y):
+        return pd.Series(x).corr(other=pd.Series(y))
 
     return f_score(*args, f=_f_corr, **kwargs)
 
@@ -1563,7 +1584,8 @@ def df_score(df: pd.DataFrame, y_true: SequenceOrScalar, y_pred: SequenceOrScala
                 if _score in _score_dict.keys():
                     _score = _score_dict[_score]
                 else:
-                    raise ValueError(f"Unknown score label: '{_score}', please pass a function instead")
+                    raise ValueError(
+                        f"Unknown score label: '{_score}', please pass a function instead")
     df = assert_df(df)
 
     if groupby:
@@ -1591,7 +1613,8 @@ def df_score(df: pd.DataFrame, y_true: SequenceOrScalar, y_pred: SequenceOrScala
             warnings.warn('y_pred is longer than y_true, trailing entries will be dropped. If one y_true belongs'
                           'to multiple y_pred please specify it multiple times')
         elif len(y_true) > len(y_pred):
-            warnings.warn('y_true is longer than y_pred, trailing entries will be dropped.')
+            warnings.warn(
+                'y_true is longer than y_pred, trailing entries will be dropped.')
 
     # -- init
     if dropna:
@@ -1607,7 +1630,6 @@ def df_score(df: pd.DataFrame, y_true: SequenceOrScalar, y_pred: SequenceOrScala
             _y_pred = y_pred[_index]
             df[_y_pred] *= _scale
     elif is_list_like(scale):
-        _i = -1
         for _scale, _y_true, _y_pred in zip(scale, y_true, y_pred):
             df[_y_true] *= _scale
             df[_y_pred] *= _scale
@@ -1618,7 +1640,8 @@ def df_score(df: pd.DataFrame, y_true: SequenceOrScalar, y_pred: SequenceOrScala
             df[_y_pred] *= scale
 
     # -- main
-    _df_score = dict_list(groupby + ['y_true', 'y_pred', 'y_ref', 'model', 'score', 'value'])
+    _df_score = dict_list(
+        groupby + ['y_true', 'y_pred', 'y_ref', 'model', 'score', 'value'])
 
     for _y_true, _y_pred in zip(y_true, y_pred):
 
@@ -1646,7 +1669,8 @@ def df_score(df: pd.DataFrame, y_true: SequenceOrScalar, y_pred: SequenceOrScala
                 append_to_dict_list(_df_score, _append_dict)
 
     _df_score = pd.DataFrame(_df_score)
-    _df_score[['y_true', 'y_pred', 'score']] = _df_score[['y_true', 'y_pred', 'score']].astype(str)
+    _df_score[['y_true', 'y_pred', 'score']] = _df_score[[
+        'y_true', 'y_pred', 'score']].astype(str)
     _df_score['value'] = _df_score['value'].astype(float)
 
     if _df_score.shape[0] == 0:
@@ -1663,7 +1687,8 @@ def df_score(df: pd.DataFrame, y_true: SequenceOrScalar, y_pred: SequenceOrScala
     if pivot:
         _columns = _pivot_index + ['score', 'value']
         _df_score = _df_score[_columns]
-        _df_score = pd.pivot_table(_df_score, index=_pivot_index, columns='score', values='value')
+        _df_score = pd.pivot_table(
+            _df_score, index=_pivot_index, columns='score', values='value')
 
     return _df_score
 
@@ -1705,8 +1730,10 @@ def rmsd(x: str, df: pd.DataFrame, group: str, return_df_paired: bool = False, a
     _df_paired = pd.merge(_df, _df, on='dummy')
     _df_paired = _df_paired[_df_paired['group_x'] != _df_paired['group_y']]
     _df_paired['weight'] = _df_paired['count_x'] * _df_paired['count_y']
-    _df_paired['difference'] = _df_paired[_agg_by_group + '_x'] - _df_paired[_agg_by_group + '_y']
-    _df_paired['weighted_squared_difference'] = _df_paired['weight'] * _df_paired['difference'] ** 2
+    _df_paired['difference'] = _df_paired[_agg_by_group + '_x'] - \
+        _df_paired[_agg_by_group + '_y']
+    _df_paired['weighted_squared_difference'] = _df_paired['weight'] * \
+        _df_paired['difference'] ** 2
 
     if return_df_paired:
         return _df_paired
@@ -1801,9 +1828,11 @@ def df_rmsd(x: str, df: pd.DataFrame, groups: Union[list, str] = None, hue: str 
                     _rmsd = np.nan
 
                 _count = len(_df_hue['_group'])
-                _maxcount = _df_hue['_group'].value_counts().reset_index()['_group'].iloc[0]
+                _maxcount = _df_hue['_group'].value_counts().reset_index()[
+                    '_group'].iloc[0]
                 _maxperc = _maxcount / _count
-                _maxlevel = _df_hue['_group'].value_counts().reset_index()['index'].iloc[0]
+                _maxlevel = _df_hue['_group'].value_counts().reset_index()[
+                    'index'].iloc[0]
 
                 _df_rmsd_hue = pd.DataFrame(
                     {'x': _x, 'group': _group, 'rmsd': _rmsd, 'maxperc': _maxperc, 'maxlevel': _maxlevel,
@@ -1811,7 +1840,8 @@ def df_rmsd(x: str, df: pd.DataFrame, groups: Union[list, str] = None, hue: str 
                 if hue is not None:
                     _df_rmsd_hue[hue] = _hue
 
-                _df_rmsd = _df_rmsd.append(_df_rmsd_hue, ignore_index=True, sort=False)
+                _df_rmsd = _df_rmsd.append(
+                    _df_rmsd_hue, ignore_index=True, sort=False)
 
     # postprocessing, sorting etc.
     if hue is not None:
@@ -1828,11 +1858,14 @@ def df_rmsd(x: str, df: pd.DataFrame, groups: Union[list, str] = None, hue: str 
         _df_rmsd = pd.merge(_df_rmsd, _df_order)
 
         if sort_by_hue:
-            _df_rmsd = _df_rmsd.sort_values(by=[hue, '_order']).reset_index(drop=True).drop(['_order'], axis=1)
+            _df_rmsd = _df_rmsd.sort_values(by=[hue, '_order']).reset_index(
+                drop=True).drop(['_order'], axis=1)
         else:
-            _df_rmsd = _df_rmsd.sort_values(by=['_order', hue]).reset_index(drop=True).drop(['_order'], axis=1)
+            _df_rmsd = _df_rmsd.sort_values(by=['_order', hue]).reset_index(
+                drop=True).drop(['_order'], axis=1)
     else:
-        _df_rmsd = _df_rmsd.sort_values(by=['rmsd'], ascending=False).reset_index(drop=True)
+        _df_rmsd = _df_rmsd.sort_values(
+            by=['rmsd'], ascending=False).reset_index(drop=True)
 
     return _df_rmsd
 
@@ -1894,7 +1927,8 @@ def df_p(x: str, group: str, df: pd.DataFrame, hue: str = None, agg_func: str = 
 
                 _df_dict['p'] = _p
 
-                _df_p = _df_p.append(pd.DataFrame(_df_dict, index=[0]), ignore_index=True, sort=False)
+                _df_p = _df_p.append(pd.DataFrame(
+                    _df_dict, index=[0]), ignore_index=True, sort=False)
 
     if agg:
         _df_p = _df_p.groupby(_groupby).agg({'p': 'mean'}).reset_index()
@@ -1921,16 +1955,19 @@ def df_agg(x, group, df, hue=None, agg=None, n_quantiles=10, na_to_med=False, p=
         _hue = None
 
     # get agg
-    _df_agg = _df.groupby(_groupby).agg({'_dummy': 'count', x: agg}).reset_index()
+    _df_agg = _df.groupby(_groupby).agg(
+        {'_dummy': 'count', x: agg}).reset_index()
     _df_agg.columns = _groupby + ['count'] + agg
     if sort_by_count:
         _df_agg = _df_agg.sort_values(by=['count'], ascending=False)
 
     if p:
-        _df_p = df_p(x=x, group='_group', hue=_hue, df=_df, agg_func=p_test, agg=True)
+        _df_p = df_p(x=x, group='_group', hue=_hue,
+                     df=_df, agg_func=p_test, agg=True)
         _df_agg = pd.merge(_df_agg, _df_p, on=_groupby)
 
-    _df_agg.columns = _groupby_names + [_col for _col in _df_agg.columns if _col not in _groupby]
+    _df_agg.columns = _groupby_names + \
+        [_col for _col in _df_agg.columns if _col not in _groupby]
 
     return _df_agg
 
@@ -1977,20 +2014,24 @@ def df_group_hue(df, group, hue=None, x=None, n_quantiles=10, na_to_med=False, k
     # - numeric to quantile
     # group
     if _group in list(_df.select_dtypes(include=np.number)):
-        _df[_group] = quantile_split(_df[group], n_quantiles, na_to_med=na_to_med)
+        _df[_group] = quantile_split(
+            _df[group], n_quantiles, na_to_med=na_to_med)
     _df[_group] = _df[_group].astype('category').cat.remove_unused_categories()
 
     # hue
     if hue is not None:
         if _hue in list(_df.select_dtypes(include=np.number)):
-            _df[_hue] = quantile_split(_df[hue], n_quantiles, na_to_med=na_to_med)
+            _df[_hue] = quantile_split(
+                _df[hue], n_quantiles, na_to_med=na_to_med)
         _df[_hue] = _df[_hue].astype('category').cat.remove_unused_categories()
         _df['_label'] = concat_cols(_df, [_group, _hue]).astype('category')
-        _df_levels = _df[[_group, _hue, '_label']].drop_duplicates().reset_index(drop=True)
+        _df_levels = _df[[_group, _hue, '_label']
+                         ].drop_duplicates().reset_index(drop=True)
         _levels = _df_levels['_label']
     else:
         _df['_label'] = _df[_group]
-        _df_levels = _df[[_group, '_label']].drop_duplicates().reset_index(drop=True)
+        _df_levels = _df[[_group, '_label']
+                         ].drop_duplicates().reset_index(drop=True)
         _levels = _df_levels['_label']
 
     return _df, _groupby, _groupby_names, _vars, _df_levels, _levels
@@ -2006,7 +2047,6 @@ def df_precision_filter(df, col, precision):
 
 # grouped iterpolate method (avoids .apply failing if one sub group fails)
 def grouped_interpolate(df, col, groupby, method=None):
-    _df = df.copy()
 
     _dfs_i = []
 
@@ -2128,14 +2168,16 @@ def time_reg(df, t='t', y='y', t_unit='D', window=10, slope_diff_cutoff=.1, int_
         _df_phases[_y_slope][_i] = _y_slope_i
         _df_phases[_y_int][_i] = _y_int_i
         _df_phases[_y_r2][_i] = r2_score(_df_t[y], _df_t[_y_fit])
-        _df_phases[_y_rmse][_i] = np.sqrt(mean_squared_error(_df_t[y], _df_t[_y_fit]))
+        _df_phases[_y_rmse][_i] = np.sqrt(
+            mean_squared_error(_df_t[y], _df_t[_y_fit]))
 
         _dfs.append(_df_t)
 
     _df_fit = pd.concat(_dfs)
 
     # postprocessing
-    _df_phases = _df_phases[_df_phases['_keep']].reset_index(drop=True).drop(['_keep'], axis=1)
+    _df_phases = _df_phases[_df_phases['_keep']].reset_index(
+        drop=True).drop(['_keep'], axis=1)
 
     if return_df_fit:
         return _df_fit
@@ -2279,7 +2321,8 @@ def df_split(df: pd.DataFrame, split_by: Union[List[str], str], return_type: str
         if return_type == 'list':
             _dfs.append(_df)
         else:
-            _key = qformat(pd.DataFrame(_df[_split_by]).head(1), print_key=print_key, sep=sep, key_sep=key_sep)
+            _key = qformat(pd.DataFrame(_df[_split_by]).head(
+                1), print_key=print_key, sep=sep, key_sep=key_sep)
             _dfs[_key] = _df
 
     return _dfs
@@ -2324,7 +2367,8 @@ def rank(df: pd.DataFrame, rankby: SequenceOrScalar, groupby: SequenceOrScalar =
     if sortby_ascending is None:
         _ascending = rank_ascending
     else:
-        _ascending = assert_list(rank_ascending) + [True for _ in groupby] + assert_list(sortby_ascending)
+        _ascending = assert_list(
+            rank_ascending) + [True for _ in groupby] + assert_list(sortby_ascending)
     # sort
     _by = rankby + groupby + sortby
     df = df.sort_values(by=_by, ascending=_ascending).assign(rank=1)
@@ -2345,7 +2389,8 @@ def kde(x, df=None, x_range=None, perc_cutoff=.1, range_cutoff=None, x_steps=100
 
         if x in ['value', 'perc', 'diff', 'sign', 'ex', 'ex_max', 'ex_min', 'mean', 'std', 'range',
                  'value_min', 'value_max', 'range_min', 'range_max']:
-            raise ValueError('x cannot be named {}, please rename your variable'.format(x))
+            raise ValueError(
+                'x cannot be named {}, please rename your variable'.format(x))
     else:
         _df = None
 
@@ -2374,8 +2419,6 @@ def kde(x, df=None, x_range=None, perc_cutoff=.1, range_cutoff=None, x_steps=100
     assert (len(_x) > 0), 'Series {} has zero length'.format(_x_name)
     _x = pd.Series(_x).reset_index(drop=True)
 
-    _x_name_max = f"{_x_name }_max"
-
     if x_range is None:
         x_range = np.linspace(np.nanmin(_x), np.nanmax(_x), x_steps)
 
@@ -2394,11 +2437,13 @@ def kde(x, df=None, x_range=None, perc_cutoff=.1, range_cutoff=None, x_steps=100
     _df_kde['phase'] = _df_kde['ex_min'].astype(int).cumsum()
 
     if perc_cutoff:
-        _df_kde['ex_max'] = _df_kde['ex_max'].where(_df_kde['perc'] > perc_cutoff, False)
+        _df_kde['ex_max'] = _df_kde['ex_max'].where(
+            _df_kde['perc'] > perc_cutoff, False)
 
     # -- get std
     # we get the extrema and do a full merge to find the closest one to each point
-    _df_kde_ex = _df_kde.query('ex_max')[[_x_name, 'value', 'phase']].reset_index()
+    _df_kde_ex = _df_kde.query(
+        'ex_max')[[_x_name, 'value', 'phase']].reset_index()
     _df_kde_ex['mean'] = np.nan
     _df_kde_ex['std'] = np.nan
     _df_kde_ex['range'] = np.nan
@@ -2411,7 +2456,8 @@ def kde(x, df=None, x_range=None, perc_cutoff=.1, range_cutoff=None, x_steps=100
         _df_kde_i = _df_kde[_df_kde['phase'] == _row['phase']]
 
         # Width of Peak range
-        _df_kde_i = _df_kde_i[_df_kde_i['value'] >= _row['value'] * _range_cutoff]
+        _df_kde_i = _df_kde_i[_df_kde_i['value']
+                              >= _row['value'] * _range_cutoff]
 
         _x_min = _df_kde_i[_x_name].iloc[0]
         _x_max = _df_kde_i[_x_name].iloc[-1]
@@ -2440,7 +2486,8 @@ def qagg(df: pd.DataFrame, groupby, columns=None, agg=None, reset_index=True):
         columns = df.select_dtypes(include=np.number).columns
 
     _df_agg = df.groupby(groupby).agg({_: agg for _ in columns})
-    _df_agg = _df_agg.set_axis(flatten([[_ + '_mean', _ + '_std'] for _ in columns]), axis=1, inplace=False)
+    _df_agg = _df_agg.set_axis(
+        flatten([[_ + '_mean', _ + '_std'] for _ in columns]), axis=1, inplace=False)
     if reset_index:
         _df_agg = _df_agg.reset_index()
     return _df_agg
@@ -2512,11 +2559,15 @@ def multi_melt(df, cols, suffixes, id_vars, var_name='variable', sep='_', **kwar
     _df_out = []
 
     for _col in cols:
-        _value_vars = ['{}{}{}'.format(_col, sep, _suffix) for _suffix in suffixes]
+        _value_vars = ['{}{}{}'.format(_col, sep, _suffix)
+                       for _suffix in suffixes]
 
-        _df_out_i = _df.melt(id_vars=id_vars, value_vars=_value_vars, value_name=_col, var_name=var_name, **kwargs)
-        _df_out_i[var_name] = _df_out_i[var_name].str.slice(len(_col) + len(sep))
-        _df_out_i = _df_out_i.sort_values(by=assert_list(id_vars) + [var_name]).reset_index(drop=True)
+        _df_out_i = _df.melt(id_vars=id_vars, value_vars=_value_vars,
+                             value_name=_col, var_name=var_name, **kwargs)
+        _df_out_i[var_name] = _df_out_i[var_name].str.slice(
+            len(_col) + len(sep))
+        _df_out_i = _df_out_i.sort_values(by=assert_list(
+            id_vars) + [var_name]).reset_index(drop=True)
         _df_out.append(_df_out_i)
 
     _df_out = pd.concat(_df_out, axis=1).pipe(drop_duplicate_cols)
@@ -2561,7 +2612,8 @@ def resample(df, rule=1, on=None, groupby=None, agg='mean', columns=None, adj_co
             _adj_column_names = True
 
     # back to int
-    _df.index = ((_df.index - pd.to_datetime('1970-01-01')).total_seconds() / factor)
+    _df.index = ((_df.index - pd.to_datetime('1970-01-01')
+                  ).total_seconds() / factor)
     if _adj_column_names:
         _column_names = []
         for _col in _columns:
@@ -2635,8 +2687,10 @@ def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count:
 
         # init hues
         if hue is not None:
-            _df_hues = df[[hue]].drop_duplicates().reset_index().assign(_dummy=1)
-            _df_xs = pd.merge(_df_xs.assign(_dummy=1), _df_hues, on='_dummy').drop(['_dummy'], axis=1)
+            _df_hues = df[[hue]].drop_duplicates(
+            ).reset_index().assign(_dummy=1)
+            _df_xs = pd.merge(_df_xs.assign(_dummy=1), _df_hues,
+                              on='_dummy').drop(['_dummy'], axis=1)
             _xs_on = _xs_on + [hue]
 
     else:
@@ -2654,9 +2708,11 @@ def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count:
 
     # if applicable: apply top_n_coding (both x and hue)
     if top_nr:
-        df[x] = top_n_coding(s=df[x], n=top_nr, other_name=other_name, other_to_na=other_to_na)
+        df[x] = top_n_coding(
+            s=df[x], n=top_nr, other_name=other_name, other_to_na=other_to_na)
         if hue is not None:
-            df[hue] = top_n_coding(s=df[hue], n=top_nr, other_name=other_name, other_to_na=other_to_na)
+            df[hue] = top_n_coding(
+                s=df[hue], n=top_nr, other_name=other_name, other_to_na=other_to_na)
 
     # init groupby
     _groupby = [x]
@@ -2664,7 +2720,8 @@ def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count:
         _groupby = _groupby + [hue]
 
     # we use a dummy column called count and sum over it by group to retain the original x column values
-    _df_count = df.assign(count=1).groupby(_groupby).agg({'count': 'sum'}).reset_index()
+    _df_count = df.assign(count=1).groupby(
+        _groupby).agg({'count': 'sum'}).reset_index()
 
     # if applicable: append 0 entries for numerical x inside x_range
     if x_base:
@@ -2681,16 +2738,21 @@ def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count:
         _df_count[_count_hue] = _df_count['count'].sum()
         _df_count[_count_x] = _df_count['count']
     else:
-        _df_count[_count_x] = _df_count.groupby(x)['count'].transform(pd.Series.sum)
-        _df_count[_count_hue] = _df_count.groupby(hue)['count'].transform(pd.Series.sum)
+        _df_count[_count_x] = _df_count.groupby(
+            x)['count'].transform(pd.Series.sum)
+        _df_count[_count_hue] = _df_count.groupby(
+            hue)['count'].transform(pd.Series.sum)
 
     # sort
     if sort_by_count:
-        _df_count = _df_count.sort_values([_count_x], ascending=False).reset_index(drop=True)
+        _df_count = _df_count.sort_values(
+            [_count_x], ascending=False).reset_index(drop=True)
 
     # add perc columns
-    _df_count[f"perc_{x}"] = np.round(_df_count['count'] / _df_count[_count_x] * 100, 2)
-    _df_count[f"perc_{hue}"] = np.round(_df_count['count'] / _df_count[_count_hue] * 100, 2)
+    _df_count[f"perc_{x}"] = np.round(
+        _df_count['count'] / _df_count[_count_x] * 100, 2)
+    _df_count[f"perc_{hue}"] = np.round(
+        _df_count['count'] / _df_count[_count_hue] * 100, 2)
 
     return _df_count
 
@@ -2710,7 +2772,9 @@ def numeric_to_group(pd_series, step=None, outer_limit=4, suffix=None, use_abs=F
 
     # use standard scaler to center around mean with std +- 1
     if use_standard_scaler:
-        _series = StandardScaler().fit(_series.values.reshape(-1, 1)).transform(_series.values.reshape(-1, 1)).flatten()
+        # noinspection PyUnresolvedReferences
+        _series = StandardScaler().fit(_series.values.reshape(-1, 1)
+                                       ).transform(_series.values.reshape(-1, 1)).flatten()
 
     # if step is none: use 1 as step
     if step is None:
@@ -2732,12 +2796,9 @@ def numeric_to_group(pd_series, step=None, outer_limit=4, suffix=None, use_abs=F
         _series = np.where(np.abs(_series) < step, 0, _series)
 
     # group
-
-    # get sign
-    _series_sign = np.sign(_series)
-
     # divide by step, floor and integer
-    _series = (np.floor(np.abs(_series) / step)).astype(int) * np.sign(_series).astype(int)
+    _series = (np.floor(np.abs(_series) / step)).astype(int) * \
+        np.sign(_series).astype(int)
 
     # apply outer limit
     if outer_limit is not None:
@@ -2746,7 +2807,8 @@ def numeric_to_group(pd_series, step=None, outer_limit=4, suffix=None, use_abs=F
 
     # make a pretty string
     # noinspection PyTypeChecker
-    _series = pd.Series(_series).apply(lambda x: '{0:n}'.format(x)).astype('str') + suffix
+    _series = pd.Series(_series).apply(
+        lambda x: '{0:n}'.format(x)).astype('str') + suffix
 
     # to cat
     _series = _series.astype('category')
@@ -2777,11 +2839,12 @@ def top_n(s: Sequence, n: Union[int, str] = None, w: Optional[Sequence] = None, 
             return list(_df_count.sort_values(by=[_df_count.columns[1], 'index'], ascending=[False, True])['index'][:n])
         else:
             return pd.DataFrame({'s': s, 'w': w}).groupby('s').agg({'w': 'sum'}) \
-                       .sort_values(by='w', ascending=False).index.tolist()[:n]
+                .sort_values(by='w', ascending=False).index.tolist()[:n]
     # -- case str (percent)
     elif isinstance(n, str):
         if '%' not in n:
-            raise ValueError(f"Please specify n as integer or percent with percentage sign %")
+            raise ValueError(
+                "Please specify n as integer or percent with percentage sign %")
         n = float(n.split('%')[0]) / 100.
         _df = pd.DataFrame({'s': s})
         # get weights
@@ -2790,7 +2853,8 @@ def top_n(s: Sequence, n: Union[int, str] = None, w: Optional[Sequence] = None, 
         else:
             _df['w'] = w
         # sum weights
-        _df = _df.groupby('s').agg({'w': 'sum'}).reset_index().sort_values(by=['w', 's'], ascending=[False, True])
+        _df = _df.groupby('s').agg({'w': 'sum'}).reset_index(
+        ).sort_values(by=['w', 's'], ascending=[False, True])
         # calculate cutoff
         _df['c'] = _df['w'].cumsum() / _df['w'].sum()
         _df = _df[_df['c'].shift(1).fillna(0) <= n]
@@ -2876,12 +2940,13 @@ def k_split(df: pd.DataFrame, k: SequenceOrScalar = 5, groupby: Union[Sequence, 
         # prepare output df
         _df_out = df.copy()
         # init k index on first k value
-        _df_out['_k_index'] = np.where(_df_out[sortby] < k[0], len(k)+1, len(k))
+        _df_out['_k_index'] = np.where(
+            _df_out[sortby] < k[0], len(k) + 1, len(k))
         # compare with the others
         for _k_index in range(1, len(k), 1):
             # the value has to be between the previous and this value
             _df_out['_k_index'] = np.where((_df_out[sortby] < k[_k_index]) & (_df_out[sortby] >= k[_k_index - 1]),
-                                           _k_index+1, _df_out['_k_index'])
+                                           _k_index + 1, _df_out['_k_index'])
     elif isinstance(k, (str, datetime)):
         # check for sortby
 
@@ -2923,8 +2988,10 @@ def k_split(df: pd.DataFrame, k: SequenceOrScalar = 5, groupby: Union[Sequence, 
         tprint('k_split done')
     # -- return
     if return_type in range(k):
-        _df_train = _df_out[_df_out['_k_index'] != return_type].drop('_k_index', axis=1)
-        _df_test = _df_out[_df_out['_k_index'] == return_type].drop('_k_index', axis=1)
+        _df_train = _df_out[_df_out['_k_index'] !=
+                            return_type].drop('_k_index', axis=1)
+        _df_test = _df_out[_df_out['_k_index'] ==
+                           return_type].drop('_k_index', axis=1)
         return _df_train, _df_test
     else:
         return _df_out['_k_index']
@@ -2980,6 +3047,7 @@ def read_csv(path: str, nrows: int = None, encoding: str = None, errors: str = '
             _csv = StringIO(_f.read())
 
     # -- return
+    # noinspection PyTypeChecker
     return pd.read_csv(deepcopy(_csv), nrows=nrows, **kwargs)
 
 

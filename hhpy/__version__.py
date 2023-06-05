@@ -7,7 +7,7 @@ Information about the current version of the hhpy package.
 
 __title__ = 'hhpy'
 __description__ = 'hhpy - convenient data science'
-__version__ = '0.3.0'  # 2020-10-21
+__version__ = '0.3.1'  # 2023-06-05
 __author__ = 'Henrik Hanssen'
 __author_email__ = 'henrik.hanssen@gmail.com'
 __license__ = 'Apache 2.0'

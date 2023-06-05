@@ -96,20 +96,20 @@ docstr = DocstringProcessor(
     data='Pandas DataFrame containing named data, optional if vector data is used',
     data_novec='Pandas DataFrame containing named data',
     hue='Further split the plot by the levels of this variable [optional]',
-    order='Either a string describing how the (hue) levels or to be ordered or an explicit list of levels to be ' 
+    order='Either a string describing how the (hue) levels or to be ordered or an explicit list of levels to be '
     'used for plotting. Accepted strings are: '
     '''
-    
+
         * ``sorted``: following python standard sorting conventions (alphabetical for string, ascending for value)
-        
+
         * ``inv``: following python standard sorting conventions but in inverse order
-        
+
         * ``count``: sorted by value counts
-        
+
         * ``mean``, ``mean_ascending``, ``mean_descending``: sorted by mean value, defaults to descending
-        
+
         * ``median``, ``mean_ascending``, ``median_descending``: sorted by median value, defaults to descending
-        
+
     ''',
     color='Color used for plotting, must be known to matplotlib.pyplot [optional]',
     palette='Collection of colors to be used for plotting. Can be a dictionary for with names for each level or '
@@ -184,17 +184,20 @@ def _get_ordered_levels(data: pd.DataFrame, level: str, order: Union[list, str, 
     elif order == 'inv':
         _hues = data[level].drop_duplicates().sort_values().tolist()[::-1]
     elif order == 'count':
-        _hues = data[level].value_counts().reset_index().sort_values(by=[level, 'index'])['index'].tolist()
+        _hues = data[level].value_counts().reset_index().sort_values(
+            by=[level, 'index'])['index'].tolist()
     elif order in ['mean', 'mean_descending']:
         _hues = data.groupby(level)[x].mean().reset_index().sort_values(by=[x, level], ascending=[False, True]
                                                                         )[level].tolist()
     elif order == 'mean_ascending':
-        _hues = data.groupby(level)[x].mean().reset_index().sort_values(by=[x, level])[level].tolist()
+        _hues = data.groupby(level)[x].mean().reset_index(
+        ).sort_values(by=[x, level])[level].tolist()
     elif order in ['median', 'median_descending']:
         _hues = data.groupby(level)[x].median().reset_index().sort_values(by=[x, level], ascending=[False, True]
                                                                           )[level].tolist()
     elif order == 'median_ascending':
-        _hues = data.groupby(level)[x].median().reset_index().sort_values(by=[x, level])[level].tolist()
+        _hues = data.groupby(level)[x].median().reset_index(
+        ).sort_values(by=[x, level])[level].tolist()
     else:
         _hues = order
 
@@ -263,7 +266,8 @@ def corrplot(data: pd.DataFrame, annotations: bool = True, number_format: str = 
     _mask[np.triu_indices_from(_mask)] = True
 
     # Generate Heat Map, allow annotations and place floats in map
-    sns.heatmap(_corr, cmap=_colormap, annot=annotations, fmt=number_format, mask=_mask, ax=ax)
+    sns.heatmap(_corr, cmap=_colormap, annot=annotations,
+                fmt=number_format, mask=_mask, ax=ax)
 
     # Adjust tick labels
     ax.set_xticks(ax.get_xticks()[:-1])
@@ -296,7 +300,8 @@ def corrplot_bar(data: pd.DataFrame, target: str = None, columns: List[str] = No
     _df_corr = _df_corr[_df_corr['corr_abs'] >= corr_cutoff]
 
     if target is None:
-        _df_corr['label'] = concat_cols(_df_corr, ['col_0', 'col_1'], sep=' X ')
+        _df_corr['label'] = concat_cols(
+            _df_corr, ['col_0', 'col_1'], sep=' X ')
     else:
         _df_corr['label'] = _df_corr['col_1']
 
@@ -305,7 +310,8 @@ def corrplot_bar(data: pd.DataFrame, target: str = None, columns: List[str] = No
         _columns = columns + []
         if target is not None and target not in _columns:
             _columns.append(target)
-        _df_corr = _df_corr[(_df_corr['col_0'].isin(_columns)) & (_df_corr['col_1'].isin(_columns))]
+        _df_corr = _df_corr[(_df_corr['col_0'].isin(_columns))
+                            & (_df_corr['col_1'].isin(_columns))]
 
     # get colors
     _rgba_colors = np.zeros((len(_df_corr), 4))
@@ -325,7 +331,7 @@ def corrplot_bar(data: pd.DataFrame, target: str = None, columns: List[str] = No
 
     _rgba_colors = np.round(_rgba_colors, 2)
 
-    _plot = ax.barh(_df_corr['label'], _df_corr['corr'], color=_rgba_colors)
+    ax.barh(_df_corr['label'], _df_corr['corr'], color=_rgba_colors)
     ax.invert_yaxis()
 
     if xlim:
@@ -390,10 +396,12 @@ def pairwise_corrplot(data: pd.DataFrame, corr_cutoff: float = rcParams['corr_cu
                             max_n))
                 _data = _data.sample(max_n, random_state=random_state)
 
-        _f_ax.scatter(_f_x, _f_y, data=_data, alpha=alpha, color=_f_color, label=_f_label)
+        _f_ax.scatter(_f_x, _f_y, data=_data, alpha=alpha,
+                      color=_f_color, label=_f_label)
 
         if trendline:
-            _f_ax.plot(_f_data[_f_x], lfit(_f_data[_f_x], _f_data[_f_y]), color=_f_color_trendline, linestyle=':')
+            _f_ax.plot(_f_data[_f_x], lfit(
+                _f_data[_f_x], _f_data[_f_y]), color=_f_color_trendline, linestyle=':')
 
         return _f_ax
 
@@ -423,7 +431,8 @@ def pairwise_corrplot(data: pd.DataFrame, corr_cutoff: float = rcParams['corr_cu
 
     # warning for empty df
     if len(_df_corr) == 0:
-        warnings.warn('Correlation DataFrame is Empty. Do you need a lower corr_cutoff?')
+        warnings.warn(
+            'Correlation DataFrame is Empty. Do you need a lower corr_cutoff?')
         return None
 
     # edge case for less plots than ncols
@@ -438,7 +447,8 @@ def pairwise_corrplot(data: pd.DataFrame, corr_cutoff: float = rcParams['corr_cu
     _figsize = (width * col_wrap, height * _nrows)
 
     if ax is None:
-        fig, ax = plt.subplots(nrows=_nrows, ncols=_ncols, figsize=_figsize, **kwargs)
+        fig, ax = plt.subplots(nrows=_nrows, ncols=_ncols,
+                               figsize=_figsize, **kwargs)
     else:
         fig = plt.gcf()
 
@@ -451,7 +461,8 @@ def pairwise_corrplot(data: pd.DataFrame, corr_cutoff: float = rcParams['corr_cu
         _row = _it // _ncols
 
         _x = _df_corr.iloc[_it]['col_1']
-        _y = _df_corr.iloc[_it]['col_0']  # so that target (if available) becomes y
+        # so that target (if available) becomes y
+        _y = _df_corr.iloc[_it]['col_0']
         _corr = _df_corr.iloc[_it]['corr']
 
         if _ncols == 1:
@@ -469,7 +480,8 @@ def pairwise_corrplot(data: pd.DataFrame, corr_cutoff: float = rcParams['corr_cu
         if hue is None:
 
             # actual plot
-            _f_plot(_f_x=_x, _f_y=_y, _f_data=_df, _f_color=None, _f_color_trendline='k', _f_label=None, _f_ax=_ax)
+            _f_plot(_f_x=_x, _f_y=_y, _f_data=_df, _f_color=None,
+                    _f_color_trendline='k', _f_label=None, _f_ax=_ax)
 
         else:
 
@@ -574,7 +586,8 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
     """
     # -- asserts
     if distfit not in validations['distplot__distfit']:
-        raise ValueError(f"distfit must be one of {validations['distplot__distfit']}")
+        raise ValueError(
+            f"distfit must be one of {validations['distplot__distfit']}")
     # -- defaults
     if palette is None:
         palette = rcParams['palette']
@@ -662,7 +675,7 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
             _df_i = _df_i[
                 (_df_i[_f_x] >= __x_min) &
                 (_df_i[_f_x] <= __x_max)
-                ]
+            ]
 
         # for plot trimming
         _x_mins.append(_df_i[x].min())
@@ -685,7 +698,8 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
             _mu_symbol = r'\ \nu'
 
         if label_style == 'mu_sigma':
-            _label = r'{}: $ {}={},\ \sigma={}$'.format(_f_x_label, _mu_symbol, _mu_label, _sigma_label)
+            _label = r'{}: $ {}={},\ \sigma={}$'.format(
+                _f_x_label, _mu_symbol, _mu_label, _sigma_label)
         else:
             _label = _f_x_label
 
@@ -699,7 +713,6 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
                 _f_distfit_line = '--'
         else:
             _hist_n = None
-            _hist_bins = None
             _label_2 = _label + ''
             if _f_distfit_line is None:
                 _f_distfit_line = '-'
@@ -746,7 +759,8 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
             _factor = _y_max / np.nanmax(_y_ticklabels)
             if np.isnan(_factor):
                 _factor = 1
-            _y_ticklabels = [format(int(_ * _factor), ',') for _ in _y_ticklabels]
+            _y_ticklabels = [format(int(_ * _factor), ',')
+                             for _ in _y_ticklabels]
             _f_ax.set_yticklabels(_y_ticklabels)
             _f_ax.set_ylabel('%')
 
@@ -834,8 +848,10 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
 
         # group values outside of top_n to other_name
         if top_nr is not None:
-            _hues = _df[hue].value_counts().reset_index().sort_values(by=[hue, 'index'])['index'].tolist()
-            if (top_nr + 1) < len(_hues):  # the plus 1 is there to avoid the other group having exactly 1 entry
+            _hues = _df[hue].value_counts().reset_index().sort_values(
+                by=[hue, 'index'])['index'].tolist()
+            # the plus 1 is there to avoid the other group having exactly 1 entry
+            if (top_nr + 1) < len(_hues):
                 _hues = pd.Series(_hues)[0:top_nr]
                 _df[hue] = np.where(_df[hue].isin(_hues), _df[hue], other_name)
                 _df[hue] = _df[hue].astype('str')
@@ -908,8 +924,10 @@ def distplot(x: Union[Sequence, str], data: pd.DataFrame = None, hue: str = None
     # handle legend
     if legend:
         if legend_loc in ['bottom', 'right']:
-            legend_outside(ax, loc=legend_loc, legend_space=legend_space, ncol=legend_ncol)
-            legend_outside(ax2, loc=legend_loc, legend_space=legend_space, ncol=legend_ncol)
+            legend_outside(ax, loc=legend_loc,
+                           legend_space=legend_space, ncol=legend_ncol)
+            legend_outside(ax2, loc=legend_loc,
+                           legend_space=legend_space, ncol=legend_ncol)
         else:
             _, _labels = ax.get_legend_handles_labels()
             if len(_labels) > 0:
@@ -1036,7 +1054,8 @@ def paired_plot(data: pd.DataFrame, cols: Sequence, color: str = None, cmap: str
 
         # Add the label to the plot
         _ax = plt.gca()
-        _ax.annotate(_label, xy=(0.2, 0.95 - (_f_s - 10.) / 10.), size=20, xycoords=_ax.transAxes, **_f_kwargs)
+        _ax.annotate(_label, xy=(0.2, 0.95 - (_f_s - 10.) / 10.),
+                     size=20, xycoords=_ax.transAxes, **_f_kwargs)
 
     # Create an instance of the PairGrid class.
     _grid = sns.PairGrid(data=data,
@@ -1049,7 +1068,8 @@ def paired_plot(data: pd.DataFrame, cols: Sequence, color: str = None, cmap: str
     _grid = _grid.map_upper(_f_corr)
 
     # density = True might not be supported in older versions of seaborn / matplotlib
-    _grid = _grid.map_diag(plt.hist, bins=30, color=color, alpha=alpha, edgecolor='k', density=True)
+    _grid = _grid.map_diag(plt.hist, bins=30, color=color,
+                           alpha=alpha, edgecolor='k', density=True)
 
     # Map a density plot to the lower triangle
     _grid = _grid.map_lower(sns.kdeplot, cmap=cmap, alpha=alpha)
@@ -1147,7 +1167,6 @@ def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str =
     _levels = _get_ordered_levels(data=data, level=level, order=order)
 
     if hue is not None:
-        _hues = _get_ordered_levels(data=data, level=hue, order=hue_order)
         _hue_str = ' by {}'.format(hue)
     else:
         _hue_str = ''
@@ -1157,13 +1176,15 @@ def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str =
 
     _it_max = _nrows * _ncols
 
-    fig, ax = plt.subplots(nrows=_nrows, ncols=_ncols, figsize=(_ncols * width, _nrows * height))
+    fig, ax = plt.subplots(nrows=_nrows, ncols=_ncols,
+                           figsize=(_ncols * width, _nrows * height))
 
     _it = -1
 
     for _col_i, _col in enumerate(cols):
 
-        _ax_summary = get_subax(ax, _col_i, 0, rows_prio=False)  # always plot to col 0 of current row
+        # always plot to col 0 of current row
+        _ax_summary = get_subax(ax, _col_i, 0, rows_prio=False)
         # summary plot
         func(_col, data=data, hue=level, ax=_ax_summary, **kwargs_summary)
         if summary_title:
@@ -1174,7 +1195,8 @@ def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str =
             _it += 1
 
             if do_print:
-                progressbar(_it, _it_max, print_prefix='{}_{}'.format(_col, _level))
+                progressbar(
+                    _it, _it_max, print_prefix='{}_{}'.format(_col, _level))
 
             _df_level = data[data[level] == _level]
 
@@ -1184,7 +1206,8 @@ def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str =
             func(_col, data=_df_level, hue=hue, ax=_ax, **kwargs)
 
             if level_title:
-                _ax.set_title('{}{} - {}={}'.format(_col, _hue_str, level, _level))
+                _ax.set_title('{}{} - {}={}'.format(_col,
+                              _hue_str, level, _level))
 
     if kwargs_subplots_adjust is not None:
         plt.subplots_adjust(**kwargs_subplots_adjust)
@@ -1221,7 +1244,8 @@ def four_comp_plot(data, x_1, y_1, x_2, y_2, hue_1=None, hue_2=None, lim=None, r
     if return_fig_ax is None:
         return_fig_ax = rcParams['return_fig_ax']
     if lim is None:
-        lim = {'x_1': 'default', 'x_2': 'default', 'y_1': 'default', 'y_2': 'default'}
+        lim = {'x_1': 'default', 'x_2': 'default',
+               'y_1': 'default', 'y_2': 'default'}
     _nrows = 2
     _ncols = 2
 
@@ -1250,10 +1274,14 @@ def four_comp_plot(data, x_1, y_1, x_2, y_2, hue_1=None, hue_2=None, lim=None, r
 
     # type 2: split by plus minus
     if hue_2 is None:
-        _df_plot['plus_minus'] = np.where((_df_plot[x_1] <= 0) & (_df_plot[y_1] <= 0), '- -', 'Null')
-        _df_plot['plus_minus'] = np.where((_df_plot[x_1] <= 0) & (_df_plot[y_1] > 0), '- +', _df_plot['plus_minus'])
-        _df_plot['plus_minus'] = np.where((_df_plot[x_1] > 0) & (_df_plot[y_1] <= 0), '+ -', _df_plot['plus_minus'])
-        _df_plot['plus_minus'] = np.where((_df_plot[x_1] > 0) & (_df_plot[y_1] > 0), '+ +', _df_plot['plus_minus'])
+        _df_plot['plus_minus'] = np.where(
+            (_df_plot[x_1] <= 0) & (_df_plot[y_1] <= 0), '- -', 'Null')
+        _df_plot['plus_minus'] = np.where((_df_plot[x_1] <= 0) & (
+            _df_plot[y_1] > 0), '- +', _df_plot['plus_minus'])
+        _df_plot['plus_minus'] = np.where((_df_plot[x_1] > 0) & (
+            _df_plot[y_1] <= 0), '+ -', _df_plot['plus_minus'])
+        _df_plot['plus_minus'] = np.where((_df_plot[x_1] > 0) & (
+            _df_plot[y_1] > 0), '+ +', _df_plot['plus_minus'])
         _df_plot['plus_minus'] = _df_plot['plus_minus'].astype('category')
 
         hue_2 = 'plus_minus'
@@ -1280,7 +1308,8 @@ def four_comp_plot(data, x_1, y_1, x_2, y_2, hue_1=None, hue_2=None, lim=None, r
             _y = _df_plot[_y_name]
 
             # scatterplot
-            _ax = sns.scatterplot(data=_df_plot, x=_x_name, y=_y_name, hue=_hue, marker='.', ax=_ax, **kwargs)
+            _ax = sns.scatterplot(
+                data=_df_plot, x=_x_name, y=_y_name, hue=_hue, marker='.', ax=_ax, **kwargs)
 
             # grid 0 line
             _ax.axvline(0, color='k', alpha=.5, linestyle=':')
@@ -1406,7 +1435,8 @@ def facet_wrap(func: Callable, data: pd.DataFrame, facet: Union[list, str], *arg
         _ncols = len(_facets)
         _nrows = 1
 
-    fig, ax = plt.subplots(ncols=_ncols, nrows=_nrows, figsize=(width * _ncols, height * _nrows), **subplots_kws)
+    fig, ax = plt.subplots(ncols=_ncols, nrows=_nrows, figsize=(
+        width * _ncols, height * _nrows), **subplots_kws)
     _ax_list = ax_as_list(ax)
 
     # loop facets
@@ -1554,7 +1584,8 @@ def bubbleplot(x, y, hue, s, text=None, text_as_label=False, data=None, s_factor
         ax = plt.gca()
 
     _df = data.copy()
-    _df = _df[~((_df[x].isnull()) | (_df[y].isnull()) | (_df[s].isnull()))].reset_index(drop=True)
+    _df = _df[~((_df[x].isnull()) | (_df[y].isnull()) |
+                (_df[s].isnull()))].reset_index(drop=True)
 
     if hue_order is not None:
         _df['_sort'] = _df[hue].apply(lambda _: hue_order.index(_))
@@ -1616,7 +1647,8 @@ def bubbleplot(x, y, hue, s, text=None, text_as_label=False, data=None, s_factor
 
     else:
         # scatter for bubbles
-        ax.scatter(x=_x, y=_y, s=_s, label='__nolegend__', facecolor=_df['_color'], edgecolor='black', alpha=.75)
+        ax.scatter(x=_x, y=_y, s=_s, label='__nolegend__',
+                   facecolor=_df['_color'], edgecolor='black', alpha=.75)
 
         _x_range = _x.max() - _x.min()
         _x_min = _x.min() - _x_range / x_range_factor
@@ -1693,29 +1725,33 @@ def bubblecountplot(x, y, hue, data, agg_function='median', show_std=True, top_n
 
     # build agg dict
     _df['_count'] = 1
-    _df = _df.groupby([hue]).agg({x: [agg_function, 'std'], y: [agg_function, 'std'], '_count': 'count'}).reset_index()
+    _df = _df.groupby([hue]).agg({x: [agg_function, 'std'], y: [
+        agg_function, 'std'], '_count': 'count'}).reset_index()
     if x != y:
         _columns = [hue, x, x + '_std', y, y + '_std', '_count']
     else:
         _columns = [hue, x, x + '_std', '_count']
     _df.columns = _columns
     _df['_perc'] = _df['_count'] / _df['_count'].sum() * 100
-    _df['_count_text'] = _df.apply(lambda _: "{:,}".format(_['_count']), axis=1)
+    _df['_count_text'] = _df.apply(
+        lambda _: "{:,}".format(_['_count']), axis=1)
     _df['_perc_text'] = np.round(_df['_perc'], 2)
     _df['_perc_text'] = _df['_perc_text'].astype(str) + '%'
 
     if show_std:
         _df['_text'] = _df[hue].astype(str) + '(' + _df['_count_text'] + ')' + '\n' \
-                       + 'x:' + _df[x].apply(lambda _: format(_, float_format)) + r'$\pm$' + _df[x + '_std'].apply(
+            + 'x:' + _df[x].apply(lambda _: format(_, float_format)) + r'$\pm$' + _df[x + '_std'].apply(
             lambda _: format(_, float_format)) + '\n' \
-                       + 'y:' + _df[y].apply(lambda _: format(_, float_format)) + r'$\pm$' + _df[y + '_std'].apply(
+            + 'y:' + _df[y].apply(lambda _: format(_, float_format)) + r'$\pm$' + _df[y + '_std'].apply(
             lambda _: format(_, float_format))
     else:
-        _df['_text'] = _df[hue].astype(str) + '\n' + _df['_count_text'] + '\n' + _df['_perc_text']
+        _df['_text'] = _df[hue].astype(
+            str) + '\n' + _df['_count_text'] + '\n' + _df['_perc_text']
 
     _df['_text'] += text_end
 
-    bubbleplot(x=x, y=y, hue=hue, s='_perc', text='_text', data=_df, show_std=show_std, **kwargs)
+    bubbleplot(x=x, y=y, hue=hue, s='_perc', text='_text',
+               data=_df, show_std=show_std, **kwargs)
 
 
 @docstr
@@ -1759,24 +1795,29 @@ def rmsdplot(x: str, data: pd.DataFrame, groups: Union[Sequence, str] = None, hu
     if hue is not None and hue_order is not None:
         _data = _data.query('{} in @hue_order'.format(hue))
 
-    _df_rmsd = df_rmsd(x=x, df=_data, groups=groups, hue=hue, sort_by_hue=sort_by_hue, **kwargs)
+    _df_rmsd = df_rmsd(x=x, df=_data, groups=groups, hue=hue,
+                       sort_by_hue=sort_by_hue, **kwargs)
     _df_rmsd = _df_rmsd[_df_rmsd['rmsd'] >= cutoff]
 
     if hue is not None:
-        _df_rmsd_no_hue = df_rmsd(x=x, df=_data, groups=groups, include_rmsd=False, **kwargs)
+        _df_rmsd_no_hue = df_rmsd(
+            x=x, df=_data, groups=groups, include_rmsd=False, **kwargs)
     else:
         _df_rmsd_no_hue = pd.DataFrame()
 
     if isinstance(x, list):
         if hue is None:
-            _df_rmsd['label'] = concat_cols(_df_rmsd, ['x', 'group'], sep=' X ')
+            _df_rmsd['label'] = concat_cols(
+                _df_rmsd, ['x', 'group'], sep=' X ')
         else:
-            _df_rmsd['label'] = concat_cols(_df_rmsd, ['x', 'group', hue], sep=' X ')
+            _df_rmsd['label'] = concat_cols(
+                _df_rmsd, ['x', 'group', hue], sep=' X ')
     else:
         if hue is None:
             _df_rmsd['label'] = _df_rmsd['group']
         else:
-            _df_rmsd['label'] = concat_cols(_df_rmsd, ['group', hue], sep=' X ')
+            _df_rmsd['label'] = concat_cols(
+                _df_rmsd, ['group', hue], sep=' X ')
 
     _df_rmsd['rmsd_scaled'] = _df_rmsd['rmsd'] / _df_rmsd['rmsd'].max()
 
@@ -1786,12 +1827,14 @@ def rmsdplot(x: str, data: pd.DataFrame, groups: Union[Sequence, str] = None, hu
 
     if hue is not None:
 
-        _hues = _get_ordered_levels(data=_df_rmsd, level=hue, order=hue_order, x=x)
+        _hues = _get_ordered_levels(
+            data=_df_rmsd, level=hue, order=hue_order, x=x)
 
         if isinstance(palette, Mapping):
             _df_rmsd['_color'] = _df_rmsd[hue].apply(lambda _: palette[_])
         elif is_list_like(palette):
-            _df_rmsd['_color'] = _df_rmsd[hue].apply(lambda _: palette[list(_hues).index(_)])
+            _df_rmsd['_color'] = _df_rmsd[hue].apply(
+                lambda _: palette[list(_hues).index(_)])
         else:
             _df_rmsd['_color'] = palette
 
@@ -1803,13 +1846,17 @@ def rmsdplot(x: str, data: pd.DataFrame, groups: Union[Sequence, str] = None, hu
 
         if balance_cutoff is None:
 
-            _rgba_colors[:, 0] = _df_rmsd['maxperc']  # for red the first column needs to be one
-            _rgba_colors[:, 2] = 1 - _df_rmsd['maxperc']  # for blue the third column needs to be one
+            # for red the first column needs to be one
+            _rgba_colors[:, 0] = _df_rmsd['maxperc']
+            # for blue the third column needs to be one
+            _rgba_colors[:, 2] = 1 - _df_rmsd['maxperc']
 
         else:
 
-            _rgba_colors[:, 0] = np.where(_df_rmsd['maxperc'] >= balance_cutoff, 1, 0)
-            _rgba_colors[:, 2] = np.where(_df_rmsd['maxperc'] < balance_cutoff, 1, 0)
+            _rgba_colors[:, 0] = np.where(
+                _df_rmsd['maxperc'] >= balance_cutoff, 1, 0)
+            _rgba_colors[:, 2] = np.where(
+                _df_rmsd['maxperc'] < balance_cutoff, 1, 0)
 
     else:
         _rgba_colors[:, 2] = 1  # for blue the third column needs to be one
@@ -1839,8 +1886,10 @@ def rmsdplot(x: str, data: pd.DataFrame, groups: Union[Sequence, str] = None, hu
                 _df_rmsd['pos'][_row:] = _df_rmsd['pos'][_row:] + _pos_factor
 
         # make a df of the average positions for each group
-        _df_ticks = _df_rmsd.groupby('group').agg({'pos': 'mean'}).reset_index()  # 'maxperc':'max'
-        _df_ticks = pd.merge(_df_ticks, _df_rmsd_no_hue[['group', 'maxperc']])  # get maxperc from global value
+        _df_ticks = _df_rmsd.groupby('group').agg(
+            {'pos': 'mean'}).reset_index()  # 'maxperc':'max'
+        # get maxperc from global value
+        _df_ticks = pd.merge(_df_ticks, _df_rmsd_no_hue[['group', 'maxperc']])
     else:
         _df_ticks = pd.DataFrame()
 
@@ -1854,7 +1903,8 @@ def rmsdplot(x: str, data: pd.DataFrame, groups: Union[Sequence, str] = None, hu
         _y_lab = _df_ticks['group']
         # color
         if balance_cutoff is not None:
-            _y_colors = np.where(_df_ticks['maxperc'] > balance_cutoff, sns.xkcd_rgb['red'], 'k')
+            _y_colors = np.where(
+                _df_ticks['maxperc'] > balance_cutoff, sns.xkcd_rgb['red'], 'k')
 
     else:
 
@@ -1888,7 +1938,8 @@ def rmsdplot(x: str, data: pd.DataFrame, groups: Union[Sequence, str] = None, hu
 
         _patches = []
         for _hue, _color, _count in _df_rmsd[[hue, '_color', 'count']].drop_duplicates().values:
-            _patches.append(patches.Patch(color=_color, label='{} (n={:,})'.format(_hue, _count)))
+            _patches.append(patches.Patch(
+                color=_color, label='{} (n={:,})'.format(_hue, _count)))
         ax.legend(handles=_patches)
 
     # check if standardized
@@ -1937,7 +1988,8 @@ def aggplot(x, data, group, hue=None, hue_order=None, width=16, height=9 / 2,
     # EITHER x OR group can be a list (hue cannot be a lists)
     if is_list_like(x) and is_list_like(group):
 
-        warnings.warn('both x and group cannot be a list, setting group = {}'.format(group[0]))
+        warnings.warn(
+            'both x and group cannot be a list, setting group = {}'.format(group[0]))
         _x_is_list = True
         _group_is_list = False
         _group = group[0]
@@ -1966,7 +2018,8 @@ def aggplot(x, data, group, hue=None, hue_order=None, width=16, height=9 / 2,
         _ncols = int(np.floor(_len / 2))
         _nrows = int(np.ceil(_len / 2))
 
-    fig, ax = plt.subplots(figsize=(width * _ncols, height * _nrows), nrows=_nrows, ncols=_ncols, **subplots_kws)
+    fig, ax = plt.subplots(figsize=(
+        width * _ncols, height * _nrows), nrows=_nrows, ncols=_ncols, **subplots_kws)
 
     _it = -1
 
@@ -1977,7 +2030,8 @@ def aggplot(x, data, group, hue=None, hue_order=None, width=16, height=9 / 2,
         if _group_is_list:
             _group = group[_col]
 
-        _df_agg = df_agg(x=_x, group=_group, hue=hue, df=data, agg=agg, p=p, **aggkws)
+        _df_agg = df_agg(x=_x, group=_group, hue=hue,
+                         df=data, agg=agg, p=p, **aggkws)
 
         if hue is not None:
             if sort_by_hue:
@@ -1986,13 +2040,16 @@ def aggplot(x, data, group, hue=None, hue_order=None, width=16, height=9 / 2,
                 _sort_by = [_group, hue]
             _df_agg = _df_agg.sort_values(by=_sort_by).reset_index(drop=True)
             _label = '_label'
-            _df_agg[_label] = concat_cols(_df_agg, [_group, hue], sep='_').astype('category')
-            _hues = _get_ordered_levels(data=data, level=hue, order=hue_order, x=x)
+            _df_agg[_label] = concat_cols(
+                _df_agg, [_group, hue], sep='_').astype('category')
+            _hues = _get_ordered_levels(
+                data=data, level=hue, order=hue_order, x=x)
 
             if isinstance(palette, Mapping):
                 _df_agg['_color'] = _df_agg[hue].apply(lambda _: palette[_])
             elif is_list_like(palette):
-                _df_agg['_color'] = _df_agg[hue].apply(lambda _: palette[list(_hues).index(_)])
+                _df_agg['_color'] = _df_agg[hue].apply(
+                    lambda _: palette[list(_hues).index(_)])
             else:
                 _df_agg['_color'] = palette
 
@@ -2032,14 +2089,17 @@ def aggplot(x, data, group, hue=None, hue_order=None, width=16, height=9 / 2,
                 # iterate over rows and add to pos if label changes
                 for _row_2 in range(1, len(_df_agg)):
                     if _df_agg[_group].iloc[_row_2] != _df_agg[_group].iloc[_row_2 - 1]:
-                        _df_agg['pos'][_row_2:] = _df_agg['pos'][_row_2:] + _pos_factor
+                        _df_agg['pos'][_row_2:] = _df_agg['pos'][_row_2:] + \
+                            _pos_factor
 
                 # make a df of the average positions for each group
-                _df_ticks = _df_agg.groupby(_group).agg({'pos': 'mean'}).reset_index()
+                _df_ticks = _df_agg.groupby(_group).agg(
+                    {'pos': 'mean'}).reset_index()
             else:
                 _df_ticks = pd.DataFrame()
 
-            _ax.barh('pos', _agg, color='_color', label=_agg, data=_df_agg, **kwargs)
+            _ax.barh('pos', _agg, color='_color',
+                     label=_agg, data=_df_agg, **kwargs)
 
             if (hue is not None) and (not sort_by_hue):
                 _ax.set_yticks(_df_ticks['pos'])
@@ -2112,13 +2172,15 @@ def aggplot2d(x, y, data, aggfunc='mean', ax=None, x_int=None, time_int=None,
 
     # agg
 
-    data = data.groupby([x]).agg({y: [aggfunc, 'std']}).set_axis([_y_agg, _y_std], axis=1, inplace=False).reset_index()
+    data = data.groupby([x]).agg({y: [aggfunc, 'std']}).set_axis(
+        [_y_agg, _y_std], axis=1, inplace=False).reset_index()
 
     if ax is None:
         ax = plt.gca()
 
     ax.plot(data[x], data[_y_agg], color=color, label=_y_agg)
-    ax.fill_between(data[x], data[_y_agg] + data[_y_std], data[_y_agg] - data[_y_std], color='xkcd:cyan', label=_y_std)
+    ax.fill_between(data[x], data[_y_agg] + data[_y_std],
+                    data[_y_agg] - data[_y_std], color='xkcd:cyan', label=_y_std)
     ax.set_xlabel(x)
     ax.set_ylabel(y)
     ax.legend()
@@ -2186,9 +2248,11 @@ def ax_tick_linebreaks(ax: plt.Axes = None, x: bool = True, y: bool = True, **kw
         ax = plt.gca()
 
     if x:
-        ax.set_xticklabels([insert_linebreak(_item.get_text(), **kwargs) for _item in ax.get_xticklabels()])
+        ax.set_xticklabels([insert_linebreak(_item.get_text(), **kwargs)
+                           for _item in ax.get_xticklabels()])
     if y:
-        ax.set_yticklabels([insert_linebreak(_item.get_text(), **kwargs) for _item in ax.get_yticklabels()])
+        ax.set_yticklabels([insert_linebreak(_item.get_text(), **kwargs)
+                           for _item in ax.get_yticklabels()])
 
 
 @docstr
@@ -2276,7 +2340,8 @@ def annotate_barplot(ax: plt.Axes = None, x: Sequence = None, y: Sequence = None
 
                 if not np.isnan(_ci):
                     _ci_text = format(_ci, nr_format)
-                    _annotate = r'${}$'.format(_val_text) + _ci_sep + r'$\pm{}$'.format(_ci_text)
+                    _annotate = r'${}$'.format(
+                        _val_text) + _ci_sep + r'$\pm{}$'.format(_ci_text)
 
             ax.annotate(_annotate, (_x, _y), ha=ha, va=va, xytext=(0, np.sign(_val) * _offset),
                         textcoords='offset points', **kwargs)
@@ -2487,8 +2552,10 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
 
             # get kws
             _line_kws = {}
-            _line_kw_keys = [_ for _ in _keys if _ not in ['ax', 'line', 'ts', 'data', 'x', 'y', 't']]
-            _kw_keys = [_ for _ in list(kwargs.keys()) if _ not in _line_kw_keys]
+            _line_kw_keys = [_ for _ in _keys if _ not in [
+                'ax', 'line', 'ts', 'data', 'x', 'y', 't']]
+            _kw_keys = [_ for _ in list(
+                kwargs.keys()) if _ not in _line_kw_keys]
 
             for _key in _line_kw_keys:
                 _line_kws[_key] = _line[_key]
@@ -2506,9 +2573,11 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
                 if _arg not in _keys:
                     _line[_arg] = _args[_arg]
 
-            _line['ts'] = _line['data'][_line['t']].drop_duplicates().sort_values().reset_index(drop=True)
+            _line['ts'] = _line['data'][_line['t']].drop_duplicates(
+            ).sort_values().reset_index(drop=True)
 
-            _ts = _ts.append(_line['ts']).drop_duplicates().sort_values().reset_index(drop=True)
+            _ts = _ts.append(_line['ts']).drop_duplicates(
+            ).sort_values().reset_index(drop=True)
 
     # get max interval
     if max_interval is not None:
@@ -2577,7 +2646,8 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
                             if not is_list_like(_vline_i):
                                 _vline_i = [_vline_i]
                             for _vline_j in _vline_i:
-                                __ax.axvline(_vline_j, color='k', linestyle=':')
+                                __ax.axvline(
+                                    _vline_j, color='k', linestyle=':')
 
             # -- lims --
             if xlim is not None:
@@ -2621,12 +2691,6 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
             if hue:
                 __hue = hue_order[__it]
                 _data = _data[_data[hue] == __hue]
-                if isinstance(palette, Mapping):
-                    __color = palette[__hue]
-                elif is_list_like(palette):
-                    __color = palette[__it]
-                else:
-                    __color = palette
                 _line_i['line'].set_markerfacecolor(_color)
             _line_i['line'].set_data(_data[_line_i['x']], _data[_line_i['y']])
 
@@ -2666,7 +2730,8 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
             _ax = plt.gca()
 
     # - create main FuncAnimation object
-    _anim = FuncAnimation(fig, animate, init_func=init, frames=_max_interval, interval=time_per_frame, blit=True)
+    _anim = FuncAnimation(fig, animate, init_func=init,
+                          frames=_max_interval, interval=time_per_frame, blit=True)
     # - close plots
     plt.close('all')
 
@@ -2707,14 +2772,16 @@ def legend_outside(ax: plt.Axes = None, width: float = .85, loc: str = 'right',
     # - check if loc is legend_outside specific, if not treat as inside loc and call regular ax.legend
     if loc not in ['bottom', 'right']:
         if loc_warn:
-            warnings.warn('legend_outside: legend loc not recognized, defaulting to plt.legend')
+            warnings.warn(
+                'legend_outside: legend loc not recognized, defaulting to plt.legend')
         ax.legend(loc=loc, **kwargs)
         return None
 
     # -- main
     # - get loc and bbox
     _loc = {'bottom': 'upper center', 'right': 'center left'}[loc]
-    _bbox_to_anchor = {'bottom': (0.5 + offset_x, - .15 + offset_y), 'right': (1, 0.5)}[loc]
+    _bbox_to_anchor = {'bottom': (
+        0.5 + offset_x, - .15 + offset_y), 'right': (1, 0.5)}[loc]
     # - loop axes
     for _ax in ax_as_list(ax):
 
@@ -2803,7 +2870,8 @@ def lcurveplot(train, test, labels=None, legend='upper right', ax=None):
 
     ax.plot(train, color='xkcd:blue', label=_label_train)
     ax.plot(test, color='xkcd:red', label=_label_test)
-    ax.plot(lfit(test), color='xkcd:red', ls='--', alpha=.75, label=_label_test + '_lfit')
+    ax.plot(lfit(test), color='xkcd:red', ls='--',
+            alpha=.75, label=_label_test + '_lfit')
     ax.axhline(np.min(test), color='xkcd:red', ls=':', alpha=.5)
     ax.axvline(np.argmin(test), color='xkcd:red', ls=':', alpha=.5)
 
@@ -2877,7 +2945,8 @@ def stemplot(x, y, data=None, ax=None, color=rcParams['palette'][0], baseline=0,
 
     # iterate over data so you can draw the lines
     for _it, _row in _data.iterrows():
-        ax.plot([_row[_x], _row[_x]], [baseline, _row[_y]], color=color, label='__nolegend__', **kwline)
+        ax.plot([_row[_x], _row[_x]], [baseline, _row[_y]],
+                color=color, label='__nolegend__', **kwline)
 
     # scatterplot for markers
     ax.scatter(x=_x, y=_y, data=_data, facecolor=color, **kwargs)
@@ -2916,7 +2985,8 @@ def from_to_plot(data: pd.DataFrame, x_from='x_from', x_to='x_to', y_from=0, y_t
         else:
             _color = palette
 
-        ax.fill_betweenx([y_from, y_to], _row[x_from], _row[x_to], label=_label, color=_color, **kwargs)
+        ax.fill_betweenx([y_from, y_to], _row[x_from],
+                         _row[x_to], label=_label, color=_color, **kwargs)
 
     if legend and label:
         ax.legend(loc=legend_loc)
@@ -3219,8 +3289,6 @@ def kdeplot(x, data=None, *args, hue=None, hue_order=None, bins=40, adj_x_range=
     if hue_order is None:
         hue_order = sorted(_df[hue].unique())
 
-    _x = _df[_x_name]
-
     if facecolor is None:
         if show_area:
             facecolor = 'None'
@@ -3269,12 +3337,8 @@ def kdeplot(x, data=None, *args, hue=None, hue_order=None, bins=40, adj_x_range=
             _x_min = _df_kde_ex['range_min'].min()
             _x_max = _df_kde_ex['range_max'].max()
 
-            _x_step = (_x_max - _x_min) / bins
-            _x_range_min = _x_min - _x_step * adj_x_range * bins
-            _x_range_max = _x_max + _x_step * adj_x_range * bins
-
-            _df_hue = _df_hue.query('{}>=@_x_range_min & {}<=@_x_range_max'.format(_x_name, _x_name))
-            _df_kde = _df_kde.query('{}>=@_x_range_min & {}<=@_x_range_max'.format(_x_name, _x_name))
+            _df_hue = _df_hue[lambda _: (_x_min >= _['_x_range_min']) & (_x_max <= _['_x_range_min'])]
+            _df_kde = _df_kde[lambda _: (_x_min >= _['_x_range_min']) & (_x_max <= _['_x_range_min'])]
 
         # -- plot
 
@@ -3294,10 +3358,12 @@ def kdeplot(x, data=None, *args, hue=None, hue_order=None, bins=40, adj_x_range=
         else:
             ax2 = ax
 
-        _kde_label = '{} ; '.format(_x_name) + r'${:,.2f}\pm{:,.2f}$'.format(_df[_x_name].mean(), _df[_x_name].std())
+        _kde_label = '{} ; '.format(
+            _x_name) + r'${:,.2f}\pm{:,.2f}$'.format(_df[_x_name].mean(), _df[_x_name].std())
 
         # kde
-        ax2.plot(_df_kde[_x_name], _df_kde['value'], ls='--', label=_kde_label, color=_kde_color, **kwargs)
+        ax2.plot(_df_kde[_x_name], _df_kde['value'], ls='--',
+                 label=_kde_label, color=_kde_color, **kwargs)
 
         _ylim = list(ax2.get_ylim())
         _ylim[0] = 0
@@ -3309,12 +3375,8 @@ def kdeplot(x, data=None, *args, hue=None, hue_order=None, bins=40, adj_x_range=
 
             # get max
             if area_center == 'max':
-                _area_center = _df_kde[_df_kde['value'] == _df_kde['value'].max()].index[0]
-            else:
-                if area_center == 'mean':
-                    _ref = _df_hue[_x_name].mean()
-                else:
-                    _ref = area_center
+                _area_center = _df_kde[_df_kde['value']
+                                       == _df_kde['value'].max()].index[0]
 
                 _df_area = _df_kde.copy()
                 _df_area['diff'] = (_df_area[_x_name] - area_center).abs()
@@ -3339,11 +3401,11 @@ def kdeplot(x, data=None, *args, hue=None, hue_order=None, bins=40, adj_x_range=
                     _2_sigma = _it + 0
 
             _df_sigma = _df_kde.loc[
-                        np.max([0, _area_center - _sigma]):np.min([_df_kde.shape[0], _area_center + _sigma])]
+                np.max([0, _area_center - _sigma]):np.min([_df_kde.shape[0], _area_center + _sigma])]
             _df_2_sigma_left = _df_kde.loc[
-                               np.max([0, _area_center - _2_sigma]):np.min([_df_kde.shape[0], _area_center - _sigma])]
+                np.max([0, _area_center - _2_sigma]):np.min([_df_kde.shape[0], _area_center - _sigma])]
             _df_2_sigma_right = _df_kde.loc[
-                                np.max([0, _area_center + _sigma]):np.min([_df_kde.shape[0], _area_center + _2_sigma])]
+                np.max([0, _area_center + _sigma]):np.min([_df_kde.shape[0], _area_center + _2_sigma])]
 
             _2_sigma_min = _df_2_sigma_left[_x_name].min()
             _2_sigma_max = _df_2_sigma_right[_x_name].max()
@@ -3352,8 +3414,10 @@ def kdeplot(x, data=None, *args, hue=None, hue_order=None, bins=40, adj_x_range=
             if np.isnan(_2_sigma_max):
                 _2_sigma_max = _df[_x_name].max()
 
-            _sigma_range = ': {:,.2f} to {:,.2f}'.format(_df_sigma[_x_name].min(), _df_sigma[_x_name].max())
-            _2_sigma_range = ': {:,.2f} to {:,.2f}'.format(_2_sigma_min, _2_sigma_max)
+            _sigma_range = ': {:,.2f} to {:,.2f}'.format(
+                _df_sigma[_x_name].min(), _df_sigma[_x_name].max())
+            _2_sigma_range = ': {:,.2f} to {:,.2f}'.format(
+                _2_sigma_min, _2_sigma_max)
 
             ax2.fill_between(_x_name, 'value', data=_df_sigma, color=sigma_color,
                              label=r'$1\sigma(68\%)$' + _sigma_range, alpha=alpha)
@@ -3372,14 +3436,16 @@ def kdeplot(x, data=None, *args, hue=None, hue_order=None, bins=40, adj_x_range=
                 _value_std = np.min([_row['value_min'], _row['value_max']])
 
                 # stem (max)
-                ax2.plot([_mu, _mu], [baseline, _row['value']], color=kde_color, label='__nolegend__', ls=':', **kwline)
+                ax2.plot([_mu, _mu], [baseline, _row['value']],
+                         color=kde_color, label='__nolegend__', ls=':', **kwline)
                 # std
                 if highlight_peaks != 'max':
                     ax2.plot([_row['range_min'], _row['range_max']], [_value_std, _value_std],
                              color=kde_color, label='__nolegend__', ls=':', **kwline)
 
                 # scatterplot for markers
-                ax2.scatter(x=_mu, y=_row['value'], facecolor=kde_color, **kwargs)
+                ax2.scatter(x=_mu, y=_row['value'],
+                            facecolor=kde_color, **kwargs)
 
                 _mean_str = format(_mu, nr_format)
                 _std_str = format(_row['range'] / 2., nr_format)
@@ -3425,7 +3491,8 @@ def barplot_err(x: str, y: str, xerr: str = None, yerr: str = None, data: pd.Dat
     _data = []
     for _it in data.index:
 
-        _data_i = pd.concat([data.loc[_it:_it]] * 3, ignore_index=True, sort=False)
+        _data_i = pd.concat([data.loc[_it:_it]] * 3,
+                            ignore_index=True, sort=False)
         _row = data.loc[_it]
 
         if xerr is not None:
@@ -3487,7 +3554,8 @@ def histplot(x=None, data=None, hue=None, hue_order=None, ax=None, bins=30, use_
     # if applicable: filter data
     if use_q_xlim:
         _x_lim = q_plim(_xs)
-        _df_plot = _df_plot[(_df_plot[_x] >= _x_lim[0]) & (_df_plot[_x] <= _x_lim[1])]
+        _df_plot = _df_plot[(_df_plot[_x] >= _x_lim[0]) &
+                            (_df_plot[_x] <= _x_lim[1])]
         _xs = _df_plot[_x]
 
     # create bins
@@ -3575,7 +3643,6 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
         x = '_dummy'
 
     _count_x = 'count_{}'.format(x)
-    _count_hue = 'count_{}'.format(hue)
 
     # if an axis has not been passed initialize one
     if ax is None:
@@ -3591,14 +3658,12 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
     _df_count = df_count(x=x, df=data, hue=hue, **kwargs)
 
     if order is None or order == 'count':
-        _order = _df_count[[x, _count_x]].drop_duplicates().sort_values(by=[_count_x], ascending=False)[x].tolist()
+        _order = _df_count[[x, _count_x]].drop_duplicates().sort_values(
+            by=[_count_x], ascending=False)[x].tolist()
     elif order == 'sorted':
         _order = _df_count[x].drop_duplicates().sort_values().tolist()
     else:
         _order = order
-
-    if hue is not None:
-        _hues = _get_ordered_levels(data=data, level=hue, order=hue_order, x=x)
 
     if palette is None:
         palette = rcParams['palette'] * 5
@@ -3645,7 +3710,8 @@ def countplot(x: Union[Sequence, str] = None, data: pd.DataFrame = None, hue: st
             count_twinx_kws['color'] = 'k'
         if 'alpha' not in _count_twinx_kws_keys:
             count_twinx_kws['alpha'] = .5
-        _ax.scatter(x, _count_x, data=_df_count[[x, _count_x]].drop_duplicates(), **count_twinx_kws)
+        _ax.scatter(x, _count_x, data=_df_count[[
+                    x, _count_x]].drop_duplicates(), **count_twinx_kws)
         _ax.set_ylabel('count')
 
     return ax
@@ -3765,7 +3831,8 @@ def plotly_aggplot(data: pd.DataFrame, x: Scalar, y: Scalar, hue: Scalar = None,
     """
     # -- assert
     if (y_min is not None and y_max is None) or (y_min is None and y_max is not None):
-        raise ValueError('If you supply y_min or y_max you must also supply the other')
+        raise ValueError(
+            'If you supply y_min or y_max you must also supply the other')
 
     # -- functions
     def _get_xy(fltr: tuple = None, hue_i: Scalar = None) -> tuple:
@@ -3826,7 +3893,8 @@ def plotly_aggplot(data: pd.DataFrame, x: Scalar, y: Scalar, hue: Scalar = None,
     # - concat groupbys
     _groupby_dict = {}
     for _groupby in groupby:
-        _groupby_dict[_groupby] = ['<ALL>'] + data[_groupby].drop_duplicates().sort_values().tolist()
+        _groupby_dict[_groupby] = ['<ALL>'] + \
+            data[_groupby].drop_duplicates().sort_values().tolist()
     _groupby_values = list(itertools.product(*list(_groupby_dict.values())))
     _len_groupby_values = len(_groupby_values)
     # - updatemenus
@@ -3878,7 +3946,8 @@ def plotly_aggplot(data: pd.DataFrame, x: Scalar, y: Scalar, hue: Scalar = None,
     #                          yref="paper", align="left")
     # ])
     # - title / axis titles
-    fig.update_layout(title=title, xaxis_title=xaxis_title, yaxis_title=yaxis_title)
+    fig.update_layout(title=title, xaxis_title=xaxis_title,
+                      yaxis_title=yaxis_title)
     # - y_min / y_max
     if y_min is not None:
         fig.update_yaxes(range=[y_min, y_max])
@@ -3918,7 +3987,8 @@ def cat_to_color(s: pd.Series, palette: SequenceOrScalar = None, out_type: str =
     s = pd.Series(s).copy()
     # - out_type
     if out_type not in validations['cat_to_color__out_type']:
-        raise ValueError(f"out_type must be one of {validations['cat_to_color__out_type']}")
+        raise ValueError(
+            f"out_type must be one of {validations['cat_to_color__out_type']}")
 
     # -- init
     # - defaults

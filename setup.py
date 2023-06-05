@@ -26,7 +26,7 @@ setup(
     url=about['__url__'],
     packages=['hhpy'],
     include_package_data=True,
-    python_requires=">=3.6.*",
+    python_requires=">=3.8",
     install_requires=['numpy', 'pandas', 'scipy', 'matplotlib', 'scikit-learn', 'seaborn', 'colour', 'pytest',
                       'requests', 'IPython', 'docrep', 'h5py', 'openpyxl', 'xlrd'],
     license=about['__license__'],

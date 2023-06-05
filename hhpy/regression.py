@@ -78,7 +78,8 @@ class Conv1DNN(BaseClass):
         # -- add double conv 1d layer
         _model.add(keras.layers.Conv1D(filters=self.filters, kernel_size=self.kernel_size, activation=self.activation,
                                        input_shape=(self.window, self.input_size)))
-        _model.add(keras.layers.Conv1D(filters=self.filters, kernel_size=self.kernel_size, activation=self.activation))
+        _model.add(keras.layers.Conv1D(filters=self.filters,
+                   kernel_size=self.kernel_size, activation=self.activation))
         # -- add dropout layer
         if self.dropout:
             _model.add(keras.layers.Dropout(self.dropout))
@@ -87,7 +88,8 @@ class Conv1DNN(BaseClass):
             _model.add(keras.layers.MaxPooling1D(pool_size=self.pool_size))
         # -- flatten and dense to get to output shape
         _model.add(keras.layers.Flatten())
-        _model.add(keras.layers.Dense(self.output_size, activation=self.activation))
+        _model.add(keras.layers.Dense(
+            self.output_size, activation=self.activation))
         # -- compile
         _model.compile(loss=self.loss, optimizer=self.optimizer)
         # -- return
@@ -118,7 +120,8 @@ class Conv1DNN(BaseClass):
 
         # -- main
         # - call member model fit
-        self.model.fit(x=X, y=y, epochs=epochs, batch_size=self.batch_size, verbose=verbose)
+        self.model.fit(x=X, y=y, epochs=epochs,
+                       batch_size=self.batch_size, verbose=verbose)
         self.epochs_trained += epochs
 
     def predict(self, X, groupby: SequenceOrScalar = None):

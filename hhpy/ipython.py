@@ -27,7 +27,8 @@ def wide_notebook(width: int = 90):
     :return: None
     """
     # noinspection PyTypeChecker
-    display(HTML('<style>.container { width:{}% !important; }</style>'.format(width)))
+    display(
+        HTML(f"<style>.container { width:{width}% !important; }</style>"))
 
 
 @export
@@ -43,7 +44,7 @@ def hide_code():
     # noinspection PyTypeChecker
     display(HTML('''
         <script>
-        code_show=true; 
+        code_show=true;
         function code_toggle() {
          if (code_show){
          $('div.input').hide();
@@ -51,7 +52,7 @@ def hide_code():
          $('div.input').show();
          }
          code_show = !code_show
-        } 
+        }
         $( document ).ready(code_toggle);
         </script>
         The raw code for this IPython notebook is by default hidden for easier reading.
@@ -120,9 +121,11 @@ def display_df(df, int_format=',', float_format=',.2f', exclude=None, full=True,
     _cols_float = list_exclude(df.select_dtypes(float).columns, exclude)
 
     for _col in _cols_int:
-        df[_col] = df[_col].apply(lambda _: format(_, int_format) if not pd.isna(_) else '<NaN>')
+        df[_col] = df[_col].apply(lambda _: format(
+            _, int_format) if not pd.isna(_) else '<NaN>')
     for _col in _cols_float:
-        df[_col] = df[_col].apply(lambda _: format(_, float_format) if not pd.isna(_) else '<NaN>')
+        df[_col] = df[_col].apply(lambda _: format(
+            _, float_format) if not pd.isna(_) else '<NaN>')
 
     if full:
         display_full(df, **kwargs)
