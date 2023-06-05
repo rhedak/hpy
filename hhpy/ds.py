@@ -5,29 +5,34 @@ hhpy.ds.py
 Contains DataScience functions extending on pandas and sklearn
 
 """
+import os
+import warnings
+# --- third party imports
+from copy import deepcopy
+from datetime import datetime
+from io import StringIO
+from typing import (Any, Callable, List, Mapping, Optional, Sequence, Tuple,
+                    Union)
+
 # ---- imports
 # --- standard imports
 import numpy as np
 import pandas as pd
-import warnings
-import os
-
-# --- third party imports
-from copy import deepcopy
-from scipy import stats, signal
-from scipy.spatial import distance
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, median_absolute_error
-from sklearn.preprocessing import StandardScaler
-from typing import Mapping, Sequence, Callable, Union, List, Optional, Tuple, Any
-from io import StringIO
-from datetime import datetime
 from docrep import DocstringProcessor
+from scipy import signal, stats
+from scipy.spatial import distance
+from sklearn.metrics import (mean_absolute_error, mean_squared_error,
+                             median_absolute_error, r2_score)
+from sklearn.preprocessing import StandardScaler
 
 # --- local imports
-from hhpy.main import export, BaseClass, assert_list, tprint, progressbar, qformat, list_intersection, round_signif, \
-    is_list_like, dict_list, append_to_dict_list, concat_cols, reformat_string, dict_inv, \
-    list_exclude, docstr as docstr_main, SequenceOfScalars, SequenceOrScalar, STRING_NAN, is_scalar, GROUPBY_DUMMY, \
-    assert_scalar, list_merge
+from hhpy.main import (GROUPBY_DUMMY, STRING_NAN, BaseClass, SequenceOfScalars,
+                       SequenceOrScalar, append_to_dict_list, assert_list,
+                       assert_scalar, concat_cols, dict_inv, dict_list)
+from hhpy.main import docstr as docstr_main
+from hhpy.main import (export, is_list_like, is_scalar, list_exclude,
+                       list_intersection, list_merge, progressbar, qformat,
+                       reformat_string, round_signif, tprint)
 
 # ---- variables
 # --- constants

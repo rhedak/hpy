@@ -6,27 +6,30 @@ Contains basic calculation functions that are used in the more specialized versi
 on their own
 
 """
+import contextlib
+import datetime
+import functools
+import os
+import pickle
+import re
+import sys
+import warnings
+from collections import defaultdict
+from copy import deepcopy
+from json import JSONDecodeError
+from time import sleep
+from types import FunctionType
+# --- third party imports
+from typing import (AbstractSet, Any, Callable, Dict, Iterable, List, Mapping,
+                    Optional, Sequence, Set, Union, ValuesView)
+
+import h5py
 # ---- imports
 # --- standard imports
 import numpy as np
 import pandas as pd
-import warnings
-import os
-import sys
-import datetime
-import h5py
-import pickle
-import re
-import functools
-import contextlib
-# --- third party imports
-from typing import Any, Callable, Union, Sequence, Mapping, List, Optional, Iterable, AbstractSet, ValuesView, Dict, Set
-from types import FunctionType
 from docrep import DocstringProcessor
-from collections import defaultdict
-from copy import deepcopy
-from time import sleep
-from json import JSONDecodeError
+
 # --- optional imports
 try:
     # noinspection PyPackageRequirements

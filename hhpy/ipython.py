@@ -9,9 +9,10 @@ Contains convenience wrappers for ipython
 # --- standard imports
 import pandas as pd
 # --- third party imports
-from IPython.display import display, HTML
+from IPython.display import HTML, display
+
 # --- local imports
-from hhpy.main import export, assert_list, list_exclude
+from hhpy.main import assert_list, export, list_exclude
 
 
 # ---- functions

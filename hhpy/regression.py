@@ -10,6 +10,7 @@ Contains regression models. Mostly convenience wrappers of other frameworks.
 # --- standard imports
 import os
 import sys
+
 import numpy as np
 
 # --- third party imports
@@ -25,7 +26,7 @@ except ImportError:
     keras = None
 
 # --- local imports
-from hhpy.main import BaseClass, export, SequenceOrScalar
+from hhpy.main import BaseClass, SequenceOrScalar, export
 from hhpy.modelling import to_keras_3d
 
 

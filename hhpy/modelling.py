@@ -11,14 +11,14 @@ to provide convenient train test functions.
 # --- standard imports
 import itertools
 import warnings
+# --- third party imports
+from typing import (Any, Callable, List, Mapping, Optional, Sequence, Tuple,
+                    Union)
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 import seaborn as sns
-
-# --- third party imports
-from typing import Sequence, Mapping, Union, Callable, Optional, Any, Tuple, List
-
 from sklearn.exceptions import DataConversionWarning
 
 # ---- optional imports
@@ -27,12 +27,19 @@ try:
 except ImportError:
     display = print
 
-# --- local imports
-from hhpy.main import GROUPBY_DUMMY, export, BaseClass, is_list_like, assert_list, tprint, DocstringProcessor, \
-    SequenceOrScalar, DFOrArray, list_exclude, list_merge, list_intersection, silentcopy
-from hhpy.ds import docstr as docstr_ds, assert_df, k_split, df_score, drop_duplicate_cols, top_n, concat_cols
-from hhpy.plotting import ax_as_list, legend_outside, rcParams as hpt_rcParams, docstr as docstr_hpt
+from hhpy.ds import assert_df, concat_cols, df_score
+from hhpy.ds import docstr as docstr_ds
+from hhpy.ds import drop_duplicate_cols, k_split, top_n
 from hhpy.ipython import display_df
+# --- local imports
+from hhpy.main import (GROUPBY_DUMMY, BaseClass, DFOrArray, DocstringProcessor,
+                       SequenceOrScalar, assert_list, export, is_list_like,
+                       list_exclude, list_intersection, list_merge, silentcopy,
+                       tprint)
+from hhpy.plotting import ax_as_list
+from hhpy.plotting import docstr as docstr_hpt
+from hhpy.plotting import legend_outside
+from hhpy.plotting import rcParams as hpt_rcParams
 
 # ---- variables
 # --- validations

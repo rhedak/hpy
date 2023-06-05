@@ -6,30 +6,33 @@ Contains plotting functions using matplotlib.pyplot
 
 """
 
+import itertools
+import logging
+import warnings
 # -- imports
 # - standard imports
 from copy import deepcopy
+from typing import Callable, List, Mapping, Sequence, Union
 
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import seaborn as sns
-import logging
-import warnings
-import itertools
-
+from colour import Color
 # - third party imports
-from matplotlib import patches, colors as mpl_colors
+from matplotlib import colors as mpl_colors
+from matplotlib import patches
 from matplotlib.animation import FuncAnimation
 from matplotlib.legend import Legend
-from colour import Color
 from scipy import stats
-from typing import Union, Sequence, Mapping, Callable, List
 
+from hhpy.ds import (df_agg, df_count, df_rmsd, get_df_corr, kde, lfit,
+                     quantile_split, top_n_coding)
 # local imports
-from hhpy.main import export, concat_cols, is_list_like, floor_signif, ceil_signif, list_intersection, \
-    assert_list, progressbar, DocstringProcessor, Scalar, SequenceOrScalar
-from hhpy.ds import get_df_corr, lfit, kde, df_count, quantile_split, top_n_coding, df_rmsd, df_agg
+from hhpy.main import (DocstringProcessor, Scalar, SequenceOrScalar,
+                       assert_list, ceil_signif, concat_cols, export,
+                       floor_signif, is_list_like, list_intersection,
+                       progressbar)
 
 # - optional imports
 logger = logging.getLogger('hhpy.plotting')
