@@ -49,8 +49,8 @@ def install_from_github() -> None:
     # download ZIP archive of GitHub repository
     url = about['__download_url__']
     r = requests.get(url)
-    with open('temp.zip', 'wb') as f:
-        f.write(r.content)
+    with open('temp.zip', 'wb') as f_:
+        f_.write(r.content)
 
     # extract ZIP file into calling directory
     with ZipFile('temp.zip', 'r') as repo_zip:

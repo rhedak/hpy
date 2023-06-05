@@ -1125,7 +1125,7 @@ def q_plim(s: pd.Series, q_min: float = .1, q_max: float = .9, offset_perc: floa
 @docstr
 @export
 def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str = None, order: Union[list, str] = None,
-              hue_order: Union[list, str] = None, func: Callable = distplot, summary_title: bool = True,
+              func: Callable = distplot, summary_title: bool = True,
               level_title: bool = True, do_print: bool = False, width: int = None, height: int = None,
               return_fig_ax: bool = None, kwargs_subplots_adjust: Mapping = None, kwargs_summary: Mapping = None,
               **kwargs) -> Union[None, tuple]:
@@ -1137,7 +1137,6 @@ def levelplot(data: pd.DataFrame, level: str, cols: Union[list, str], hue: str =
     :param cols: the columns to create plots for, defaults to all numeric columns [optional]
     :param hue: %(hue)s
     :param order: %(order)s
-    :param hue_order: %(order)s
     :param func: function to use for plotting, must support 1 positional argument, data, hue, ax and kwargs [optional]
     :param summary_title: whether to automatically set the summary plot title [optional]
     :param level_title: whether to automatically set the level plot title [optional]
@@ -2376,7 +2375,7 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
              ax: plt.Axes = None, color: str = None, label: str = None, legend: bool = False, legend_out: bool = False,
              legend_kws: Mapping = None, xlim: tuple = None, ylim: tuple = None,
              ax_facecolor: Union[str, Mapping] = None, grid: bool = False, vline: Union[Sequence, float] = None,
-             hue: str = None, hue_order: Sequence = None, palette: Union[Mapping, Sequence] = None,
+             hue: str = None, hue_order: Sequence = None,
              **kwargs) -> Union[HTML, FuncAnimation]:
     """
     wrapper for FuncAnimation to be used with pandas DataFrames. Assumes that you have a DataFrame containing
@@ -2418,7 +2417,6 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
     :param vline: %(vline)s
     :param hue: %(hue)s
     :param hue_order: %(order)s
-    :param palette: %(palette)s
     :param kwargs: other keyword arguments passed to pyplot.plot
     :return: see mode
 
@@ -2439,8 +2437,6 @@ def animplot(data: pd.DataFrame = None, x: str = 'x', y: str = 'y', t: str = 't'
         ax = plt.gca()
     if legend_kws is None:
         legend_kws = {}
-    if palette is None:
-        palette = rcParams['palette']
     # - handle no inplace
     data = pd.DataFrame(data).copy()
     # - preprocessing
@@ -3385,6 +3381,8 @@ def kdeplot(x, data=None, *args, hue=None, hue_order=None, bins=40, adj_x_range=
                 _df_area['diff'] = (_df_area[_x_name] - area_center).abs()
                 _df_area = _df_area.sort_values(by='diff', ascending=True)
                 _area_center = _df_area.index[0]
+            else:
+                _area_center = 0
 
             _sigma = None
             _2_sigma = None
@@ -3879,6 +3877,7 @@ def plotly_aggplot(data: pd.DataFrame, x: Scalar, y: Scalar, hue: Scalar = None,
     else:
         _hues = _get_ordered_levels(data, hue, hue_order)
     if fig is None:
+        # noinspection PyUnresolvedReferences
         fig = go.Figure(**kws_fig)
     # - force_list
     groupby = assert_list(groupby)
@@ -3892,6 +3891,7 @@ def plotly_aggplot(data: pd.DataFrame, x: Scalar, y: Scalar, hue: Scalar = None,
     # - scatter
     for _hue in _hues:
         _x, _y = _get_xy(hue_i=_hue)
+        # noinspection PyUnresolvedReferences
         fig.add_trace(go.Scatter(x=_x, y=_y, mode=mode, name=_hue, **kwargs))
     # - concat groupbys
     _groupby_dict = {}

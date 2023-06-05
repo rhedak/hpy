@@ -1459,6 +1459,7 @@ def read_hdf(file: str, key: Union[str, List[str]] = None, sample: int = None, r
     if do_print:
         tprint('concat...')
     try:
+        # noinspection PyTypeChecker
         _df = pd.concat(_df, ignore_index=True, sort=False)
     except Exception as _e:
         tprint('')
@@ -1539,6 +1540,7 @@ def reformat_string(string: str, case: Optional[str] = 'lower', replace: Optiona
     # -- demojize: (needs to come before trans)
     if demojize:
         if emoji:
+            # noinspection PyUnresolvedReferences
             string = emoji.demojize(string)
         else:
             warnings.warn(
@@ -1550,6 +1552,7 @@ def reformat_string(string: str, case: Optional[str] = 'lower', replace: Optiona
             raise ModuleNotFoundError(
                 'Missing optional dependency googletrans, please install it to use trans=True')
 
+        # noinspection PyCallingNonCallable
         _translator = Translator()
         try:
             # avoid rate limits

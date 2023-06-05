@@ -845,6 +845,7 @@ class Models(BaseClass):
             # drop duplicates
             _model_names = list(set(_model_names))
             # get all combinations
+            # noinspection PyTypeChecker
             for _comb in list(itertools.combinations(_model_names, 2)) + list(itertools.combinations(_model_names, 3)):
                 for _y_ref in self.y_ref:
                     _comb_name = '_'.join(_comb)

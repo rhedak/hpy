@@ -147,6 +147,7 @@ def highlight_max(df: pd.DataFrame, color: str = 'xkcd:cyan') -> pd.DataFrame:
     def cond_max(s: pd.Series):
         return ['background-color: {}'.format(color) if v else '' for v in s == s.max()]
 
+    # noinspection PyTypeChecker
     return df.style.apply(cond_max)
 
 
@@ -162,6 +163,7 @@ def highlight_min(df: pd.DataFrame, color: str = 'xkcd:light red') -> pd.DataFra
     def cond_min(s: pd.Series):
         return ['background-color: {}'.format(color) if v else '' for v in s == s.min()]
 
+    # noinspection PyTypeChecker
     return df.style.apply(cond_min)
 
 

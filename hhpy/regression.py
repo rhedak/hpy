@@ -20,6 +20,7 @@ try:
     # suppress 'Using TensorFlow backend.' message
     stderr = sys.stderr
     sys.stderr = open(os.devnull, 'w')
+    # noinspection PyPackageRequirements
     import keras
     sys.stderr = stderr
 except ImportError:
@@ -69,6 +70,7 @@ class Conv1DNN(BaseClass):
         self.input_size = None
         self.output_size = None
 
+    # noinspection PyUnresolvedReferences
     def _init_model(self, X: np.ndarray, y: np.ndarray):
 
         self.input_size = X.shape[2]
