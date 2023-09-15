@@ -7,12 +7,11 @@ that are referenced in setup.py.
 """
 
 import os
-import requests
-
 from os import remove
 from sys import argv
 from zipfile import ZipFile
 
+import requests
 
 # get key package details from py_pkg/__version__.py
 about = {}

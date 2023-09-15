@@ -1,10 +1,12 @@
+# --- main configuration ---
+
 [build-system]
 requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "hhpy"
-version = "0.3.1"
+version = "0.3.2"
 authors = [
   { name="Henrik Hanssen", email="rhedak00@yahoo.de" },
 ]
@@ -19,3 +21,121 @@ classifiers = [
 
 [project.urls]
 "Homepage" = "https://github.com/rhedak/hhpy"
+
+
+
+# --- Ruff configuration ---
+
+# Declare all file extensions that should be checked during linting.
+# Supported extensions: [*.py. *.ipynb].
+[tool.ruff]
+include = [
+    "*.py",     # Python source files
+]
+
+# Declare files and directories to be excluded from linting
+exclude = [
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    # Cache directories of third-party tools:
+    "__pycache__",
+    ".ipynb_checkpoints",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    # Project directories:
+    "build",
+    "docs",
+    "data",
+    "temp",
+]
+
+# Declare the error codes that should be inspected during linting.
+# Each code can either represent a single error, or a group of related errors.
+# Supported error codes: https://beta.ruff.rs/docs/rules/
+select = [
+
+    # FLAKE8-LIKE ERRORS
+    "F",       # [Pyflakes]
+    "E", "W",  # [pycodestyle]
+
+    # NAMING CONVENTION
+    "A",  # Check for names shadowing Python builtins. Set exceptions via "builtins-ignorelist". [flake8-builtins]
+    "N",  # Enforce naming convention. [pep8-naming]
+
+    # BAD PRACTICES
+#    "T20",     # Ban print and pprint statements. [flake8-print]
+    "S101",    # Ban assert statements. To allow in test code, use "per-file-ignores". [flake8-bandit]
+    "SLF001",  # Ban private class member accesses. [flake8-self]
+
+    # COMPLEXITY CHECKING
+#    "C901",     # Limit cyclomatic complexity, set by "max-complexity". [mccabe]
+#    "PLR0913",  # Limit the number of function arguments, set by "max-args". [Pylint]
+#    "PLR0915",  # Limit the number of function statements, set by "max-statements". [Pylint]
+
+    # IMPORTS
+    "I001",  # Check for unsorted imports. [isort]
+    "TID252",  # Ban relative imports from parent. [flake8-tidy-imports]
+
+    # TYPE ANNOTATIONS
+    # "ANN001",  # Enforce adding type annotations to function args. [flake8-annotations]
+    # "ANN2",    # Enforce adding return type annotations to functions. [flake8-annotations]
+
+    # DOCSTRINGS
+#     "D1",              # Enforce 100% docstrings coverage. [pydocstyle]
+#     "D2", "D3", "D4",  # Enforce docstrings style, set by "convention". [pydocstyle]
+
+    # OTHER RECCOMENDED PRACTICES
+    "B007",  # Check for unused loop control variable. [flake8-bugbear]
+    "B015",  # Check for useless comparisons. [flake8-bugbear]
+    "B018",  # Check for useless expressions. [flake8-bugbear]
+    "C4",    # Check for list/set/dict comprehensions bad practices. [flake8-comprehensions]
+    "ISC",   # Check for string concatenation bad practices. [flake8-implicit-str-concat]
+]
+
+# Set the maximum length allowed for each line.
+line-length = 120
+
+ignore = [
+    # N802: Function name should be lowercase.
+    #    "N802",
+]
+
+[tool.ruff.per-file-ignores]
+# F401: Imported but unused.
+"__init__.py" = ["F401"]
+
+# S101: Use of assert detected
+# S101 bans the use of assert statement in all files.
+# Declare test directories here to allow using assert for test code.
+"tests/*" = ["S101"]
+
+[tool.ruff.flake8-builtins]
+# Error code: A.
+# The error group "A" completely bans names that shadow Python builtins.
+# Declare some exeptions here if necessary.
+builtins-ignorelist = []
+
+[tool.ruff.mccabe]
+# Error code: C901.
+# Set the maximum allowed cyclomatic complexity.
+# Recommended value: 10.
+max-complexity = 15
+
+[tool.ruff.pylint]
+# Error code: PLR0913.
+# Set the maximum number of arguments allowed in a function.
+# Recommended value: 10.
+max-args = 12
+
+# Error code: PLR0915.
+# Set the maximum number of statements allowed in a function body.
+# Recommended value: 50.
+max-statements = 60
+
+[tool.ruff.pydocstyle]
+# Error code: D2, D3, D4.
+# Select a docstring convention for checking.
+# Supported conventions: ["numpy", "google"].
+convention = "numpy"

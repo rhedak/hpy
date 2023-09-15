@@ -10,6 +10,7 @@ Contains regression models. Mostly convenience wrappers of other frameworks.
 # --- standard imports
 import os
 import sys
+
 import numpy as np
 
 # --- third party imports
@@ -19,13 +20,14 @@ try:
     # suppress 'Using TensorFlow backend.' message
     stderr = sys.stderr
     sys.stderr = open(os.devnull, 'w')
+    # noinspection PyPackageRequirements
     import keras
     sys.stderr = stderr
 except ImportError:
     keras = None
 
 # --- local imports
-from hhpy.main import BaseClass, export, SequenceOrScalar
+from hhpy.main import BaseClass, SequenceOrScalar, export
 from hhpy.modelling import to_keras_3d
 
 
@@ -35,7 +37,7 @@ from hhpy.modelling import to_keras_3d
 class Conv1DNN(BaseClass):
 
     # --- attributes
-    __name__ = 'Conv1DNN'
+    # __name__ = 'Conv1DNN'
     __attributes__ = ['window', 'epochs', 'batch_size', 'filters', 'kernel_size', 'dropout', 'pool_size', 'optimizer',
                       'epochs_trained', 'input_size', 'output_size']
 
@@ -68,9 +70,9 @@ class Conv1DNN(BaseClass):
         self.input_size = None
         self.output_size = None
 
-    def _init_model(self, X: np.ndarray, y: np.ndarray):
+    def _init_model(self, x: np.ndarray, y: np.ndarray):
 
-        self.input_size = X.shape[2]
+        self.input_size = x.shape[2]
         self.output_size = y.shape[1]
 
         # -- init model
@@ -102,11 +104,11 @@ class Conv1DNN(BaseClass):
         self.input_size = None
         self.output_size = None
 
-    def fit(self, X: np.ndarray, y: np.ndarray, epochs: int = None, reset: bool = False, verbose: int = 0,
+    def fit(self, x: np.ndarray, y: np.ndarray, epochs: int = None, reset: bool = False, verbose: int = 0,
             groupby: SequenceOrScalar = None):
 
         # -- assert
-        X, y = to_keras_3d(x=X, window=self.window, y=y, groupby=groupby)
+        x_array, y = to_keras_3d(x=x, window=self.window, y=y, groupby=groupby)
 
         # -- init
         # - defaults
@@ -115,22 +117,22 @@ class Conv1DNN(BaseClass):
 
         # - reset
         if reset or self.model is None:
-            self.model = self._init_model(X=X, y=y)
+            self.model = self._init_model(x=x_array, y=y)
             self.epochs_trained = 0
 
         # -- main
         # - call member model fit
-        self.model.fit(x=X, y=y, epochs=epochs,
+        self.model.fit(x=x_array, y=y, epochs=epochs,
                        batch_size=self.batch_size, verbose=verbose)
         self.epochs_trained += epochs
 
-    def predict(self, X, groupby: SequenceOrScalar = None):
+    def predict(self, x, groupby: SequenceOrScalar = None):
 
         # -- assert
-        _X = to_keras_3d(X, window=self.window, dropna=False, groupby=groupby)
+        _x_array = to_keras_3d(x, window=self.window, dropna=False, groupby=groupby)
 
         # -- main
         # - call member model predict
-        _y = self.model.predict(x=_X)
+        _y = self.model.predict(x=_x_array)
 
         return _y

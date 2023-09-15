@@ -2,10 +2,12 @@
 tests for hhpy.ds
 """
 
-import pytest
-import hhpy.ds as hds
-import pandas as pd
 import os
+
+import pandas as pd
+import pytest
+
+import hhpy.ds.main as hds
 
 
 # --- fixtures

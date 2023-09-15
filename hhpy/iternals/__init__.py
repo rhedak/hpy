@@ -1,0 +1,1 @@
+from docstring_processor import make_docstring_decorator

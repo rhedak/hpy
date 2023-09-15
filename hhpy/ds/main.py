@@ -1,404 +1,64 @@
 """
-hhpy.ds.py
+hhpy.plotting_main.py
 ~~~~~~~~~~
 
 Contains DataScience functions extending on pandas and sklearn
 
 """
+import warnings
+
+# --- third party imports
+from copy import deepcopy
+from datetime import datetime
+from io import StringIO
+from typing import Any, Callable, List, Mapping, Optional, Sequence, Tuple, Union
+
 # ---- imports
 # --- standard imports
 import numpy as np
 import pandas as pd
-import warnings
-import os
-
-# --- third party imports
-from copy import deepcopy
-from scipy import stats, signal
+from scipy import signal, stats
 from scipy.spatial import distance
-from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error, median_absolute_error
+from sklearn.metrics import mean_absolute_error, mean_squared_error, median_absolute_error, r2_score
 from sklearn.preprocessing import StandardScaler
-from typing import Mapping, Sequence, Callable, Union, List, Optional, Tuple, Any
-from io import StringIO
-from datetime import datetime
-from docrep import DocstringProcessor
+
+from hhpy.ds.df_mapping import DFMapping
+from hhpy.iternals.constants import GROUPBY_DUMMY, ROW_DUMMY, STRING_NAN
+from hhpy.iternals.docstring_processor import make_docstring_decorator
+from hhpy.iternals.dtype_mapping import dtype_mapping
 
 # --- local imports
-from hhpy.main import export, BaseClass, assert_list, tprint, progressbar, qformat, list_intersection, round_signif, \
-    is_list_like, dict_list, append_to_dict_list, concat_cols, reformat_string, dict_inv, \
-    list_exclude, docstr as docstr_main, SequenceOfScalars, SequenceOrScalar, STRING_NAN, is_scalar, GROUPBY_DUMMY, \
-    assert_scalar, list_merge
+from hhpy.main import (
+    SequenceOfScalars,
+    SequenceOrScalar,
+    append_to_dict_list,
+    assert_list,
+    assert_scalar,
+    concat_cols,
+    dict_list,
+    is_list_like,
+    is_scalar,
+    list_intersection,
+    list_merge,
+    progressbar,
+    qformat,
+    round_signif,
+    tprint,
+)
 
 # ---- variables
-# --- constants
-ROW_DUMMY = '__row__'
 # --- validations
 validations = {
     'DFMapping__from_df__return_type': ['self', 'tuple'],
     'DFMapping__to_excel__if_exists': ['error', 'replace', 'append']
 }
 # --- docstr
-docstr = DocstringProcessor(
-    # - general
-    df='Pandas DataFrame containing the data, other objects are implicitly cast to DataFrame',
-    x='Main variable, name of a column in the DataFrame or vector data',
-    hue='Name of the column to split by level [optional]',
-    top_nr='Number of unique levels to keep when applying :func:`~top_n_coding` [optional]',
-    other_name='Name of the levels grouped inside other [optional]',
-    other_to_na='Whether to cast all other elements to NaN [optional]',
-    inplace='Whether to modify the DataFrame inplace [optional]',
-    printf='The function used for printing in-function messages. Set to None or False to suppress printing [optional]',
-    groupby='The columns used for grouping, passed to pandas.DataFrame.groupby [optional]',
-    window='Size of the rolling window, see pandas.Series.rolling [optional]',
-    # - specific
-    DFMapping__col_names='Whether to transform the column names [optional]',
-    DFMapping__values='Whether to transform the column values [optional]',
-    DFMapping__columns='Columns to transform, defaults to all columns [optional]',
-    # - imported
-    warn=docstr_main.params['warn'],
-    # - validations
+docstr = make_docstring_decorator(
     **validations
 )
-# --- dtypes
-dtypes = {
-    'Int': ['Int8', 'Int16', 'Int32', 'Int64', 'UInt8', 'UInt16', 'UInt32', 'UInt64'],
-    'UInt': ['UInt8', 'UInt16', 'UInt32', 'UInt64'],
-    'int': ['int8', 'int16', 'int32', 'int64', 'uint8', 'uint16', 'uint32', 'uint64'],
-    'uint': ['uint8', 'uint16', 'uint32', 'uint64'],
-    'float': ['float8', 'float16', 'float32', 'float64'],
-    'string': ['string'],
-    'object': ['object'],
-    'boolean': ['boolean'],
-    'category': ['category'],
-    'datetime': ['datetime64[ns]'],
-    'datetimez': ['datetime64[ns, <tz>]'],
-    'period': ['period[<freq>]']
-}
-dtypes['Iint'] = dtypes['Int'] + dtypes['int']
-dtypes['number'] = dtypes['Iint'] + dtypes['float']
-dtypes['datetime64'] = dtypes['datetime']
-
-
-# ---- classes
-@export
-class DFMapping(BaseClass):
-    """
-        Mapping object bound to a pandas DataFrame that standardizes column names and values according to the chosen
-        conventions. Also implements google translation. Can be used like a sklearn scalar object.
-        The mapping can be saved and later used to restore the original shape of the DataFrame.
-        Note that the index is exempt.
-
-        :param name: name of the object [Optional]
-        :param df: a DataFrame to init on or path to a saved DFMapping object [Optional]
-        :param kwargs: other arguments passed to the respective init function
-    """
-
-    # --- globals
-    __name__ = 'DFMapping'
-    __attributes__ = ['col_mapping', 'value_mapping']
-
-    # --- functions
-    def __init__(self, df: Union[pd.DataFrame, dict, str] = None, **kwargs) -> None:
-
-        self.col_mapping = {}
-        self.value_mapping = {}
-
-        # -- defaults
-        # - if the function is called with only one argument attempt to parse its type and act accordingly
-        # DataFrame is passed: init from it
-        if isinstance(df, pd.DataFrame):
-            self.from_df(df, **kwargs)
-        # Dict is passed: init from it
-        elif isinstance(df, dict):
-            self.from_dict(df)
-        # path to excel or pickle file is passed: init from it
-        elif isinstance(df, str):
-            if '.xlsx' in df:
-                self.from_excel(df)
-            else:
-                self.from_pickle(df)
-
-    @docstr
-    def from_df(self, df: pd.DataFrame, col_names: bool = True, values: bool = True,
-                columns: Optional[List[str]] = None, return_type: str = 'self', printf: Callable = tprint,
-                duplicate_limit: int = 10, warn: bool = True, **kwargs) -> Optional[Tuple[dict, dict]]:
-        """
-        Initialize the DFMapping from a pandas DataFrame.
-
-        :param df: %(df)s
-        :param col_names: %(DFMapping__col_names)s
-        :param values:  %(DFMapping__values)s
-        :param columns: %(DFMapping__columns)s
-        :param return_type: if 'self': writes to self, 'tuple' returns (col_mapping, value_mapping) [optional]
-        :param printf: %(printf)s
-        :param duplicate_limit: allowed number of reformated duplicates per column, each duplicate is suffixed with '_'
-            but if you have too many you likely have a column of non-allowed character strings and the mapping
-            would take a very long time. The duplicate handling therefore stops and a warning is triggered
-            since the transformation is no longer invertible. Consider excluding the column or using cat codes
-            [optional]
-        :param warn: %(warn)s
-        :param kwargs: Other keyword arguments passed to :func:`~hhpy.main.reformat_string` [optional]
-        :return: see return_type
-        """
-
-        # -- assert
-        df = assert_df(df)
-
-        # -- init
-        # assert
-        if return_type not in validations['DFMapping__from_df__return_type']:
-            if warn:
-                warnings.warn(
-                    f'Unknown return_type {return_type}, falling back to self')
-            return_type = 'self'
-
-        # -- main
-        # extract columns
-        if columns:
-            _columns = columns
-        else:
-            _columns = df.columns
-
-        # init mappings
-        _col_mapping = {}
-        _value_mapping = {}
-        _str_columns = df.select_dtypes(['object', 'category']).columns
-
-        # loop columns
-        for _it, _column in enumerate(_columns):
-            # progressbar
-            if printf:
-                progressbar(_it, len(_columns), printf=printf,
-                            print_prefix=f'{_column}: ')
-            # map col name
-            if col_names:
-                _reformated_column = reformat_string(_column, **kwargs)
-                # careful: it is possible that the reformated string is a duplicate, in this case we append '_' to the
-                # string until it is no longer a duplicate
-                _it_ = 0
-                while _reformated_column in _col_mapping.values():
-                    _reformated_column += '_'
-                    _it_ += 1
-                    if _it_ == duplicate_limit:
-                        if warn:
-                            warnings.warn(
-                                'too many reformated duplicates in column names')
-                        break
-                # assign to dict
-                _col_mapping[_column] = _reformated_column
-            # check if column is string like
-            if _column in _str_columns:
-                # get unique values
-                _uniques = df[_column].drop_duplicates().values
-                # map
-                if values:
-                    _value_mapping[_column] = {}
-                    _it_u_max = len(_uniques)
-                    for _it_u, _unique in enumerate(_uniques):
-                        # progressbar
-                        if printf:
-                            progressbar(_it, len(_columns), printf=printf,
-                                        print_prefix=f'{_column}: {_it_u} / {_it_u_max}')
-                        # reformat
-                        _reformated_unique = reformat_string(_unique, **kwargs)
-                        # careful: it is possible that the reformated string is a duplicate, in this case we
-                        # append '_' to the string until it is no longer a duplicate
-                        _it_ = 0
-                        while _reformated_unique in _value_mapping[_column].values():
-                            _reformated_unique += '_'
-                            _it_ += 1
-                            if _it_ == duplicate_limit:
-                                if warn:
-                                    warnings.warn(
-                                        f'too many reformated duplicates in column {_column}')
-                                break
-                        # assign to dict
-                        _value_mapping[_column][_unique] = _reformated_unique
-        # progressbar 100%
-        if printf:
-            progressbar(printf=printf)
-
-        if return_type == 'self':
-            self.col_mapping = _col_mapping
-            self.value_mapping = _value_mapping
-        else:  # return_type == 'tuple'
-            return self.col_mapping, self.value_mapping
-
-    def fit(self, *args, **kwargs) -> Optional[Tuple[dict, dict]]:
-        """
-        Alias for :meth:`~DFMapping.from_df` to be inline with sklearn conventions
-
-        :param args: passed to from_df
-        :param kwargs: passed to from_df
-        :return: see from_df
-        """
-
-    @docstr
-    def transform(self, df: pd.DataFrame, col_names: bool = True, values: bool = True,
-                  columns: Optional[List[str]] = None, inverse: bool = False,
-                  inplace: bool = False) -> Optional[pd.DataFrame]:
-        """
-        Apply a mapping created using :func:`~create_df_mapping`. Intended to make a DataFrame standardized and
-        human readable. The same mapping can also be applied with inverse=True to restore the original form
-        of the transformed DataFrame.
-
-        :param df: %(df)s
-        :param col_names: %(DFMapping__col_names)s
-        :param values:  %(DFMapping__values)s
-        :param columns: %(DFMapping__columns)s
-        :param inverse: Whether to apply the mapping in inverse order to restore the original form of the DataFrame
-            [optional]
-        :param inplace: %(inplace)s
-        :return: if inplace: None, else: Transformed DataFrame
-        """
-        # -- init
-        # handle inplace
-        if not inplace:
-            df = assert_df(df)
-        # get helpers
-        if col_names:
-            _col_mapping = self.col_mapping
-        else:
-            _col_mapping = {}
-        if values:
-            _value_mapping = self.value_mapping
-        else:
-            _value_mapping = {}
-        if columns:
-            _columns = columns
-        else:
-            _columns = df.columns
-
-        # -- main
-        # if inverse: rename columns first
-        if _col_mapping:
-            if inverse:
-                _col_mapping = dict_inv(_col_mapping, duplicates='drop')
-                df.columns = [_col_mapping.get(_, _) for _ in _columns]
-            else:
-                _columns = [_col_mapping.get(_, _) for _ in _columns]
-
-        # replace values
-        for _key, _mapping in _value_mapping.items():
-
-            # if applicable: inverse mapping
-            if inverse:
-                _mapping = dict_inv(_mapping, duplicates='drop')
-            # replace column values
-            df[_key] = df[_key].replace(_mapping)
-
-        # if not inverse: rename columns last
-        if not inverse:
-            df.columns = _columns
-
-        # -- return
-        if inplace:
-            # noinspection PyProtectedMember
-            df._update_inplace(df)
-        else:
-            return df
-
-    def inverse_transform(self, *args, **kwargs) -> Optional[pd.DataFrame]:
-        """
-        wrapper for :meth:`DFMapping.transform` with inverse=True
-
-        :param args: passed to transform
-        :param kwargs: passed to transform
-        :return: see transform
-        """
-
-        return self.transform(*args, inverse=True, **kwargs)
-
-    @docstr
-    def fit_transform(self, df: pd.DataFrame, col_names: bool = True, values: bool = True,
-                      columns: Optional[List[str]] = None, kwargs_fit: Mapping = None,
-                      **kwargs) -> Optional[pd.DataFrame]:
-        """
-        First applies :meth:`DFMapping.from_df` (which has alias fit) and then :meth:`DFMapping.transform`
-
-        :param df: pandas DataFrame to fit against and then transform.
-        :param col_names: %(DFMapping__col_names)s
-        :param values:  %(DFMapping__values)s
-        :param columns: %(DFMapping__columns)s
-        :param kwargs: passed to transform
-        :param kwargs_fit: passed to fit
-        :return: see transform
-        """
-        if kwargs_fit is None:
-            kwargs_fit = {}
-        self.fit(df=df, col_names=col_names, values=values,
-                 columns=columns, **kwargs_fit)
-        return self.transform(df=df, col_names=col_names, values=values, columns=columns, **kwargs)
-
-    def to_excel(self, path: str, if_exists: str = 'error') -> None:
-        """
-        Save the DFMapping object as an excel file. Useful if you want to edit the results of the automatically
-        generated object to fit your specific needs.
-
-        :param path: Path to save the excel file to
-        :param if_exists: One of %(DFMapping__to_excel__if_exists)s, if 'error' raises exception, if 'replace' replaces
-            existing files and if 'append' appends to file (while checking for duplicates)
-        :return: None
-        """
-        # -- functions
-        def _write_excel_sheet(writer, mapping, sheet_name):
-            # create DataFrame and transpose
-            _df_mapping = pd.DataFrame(mapping, index=[0]).T
-            # handle append
-            if (if_exists == 'append') and (sheet_name in _sheet_names):
-                # new mapping data comes below existing ones, duplicates are dropped (keep old)
-                _df_mapping = pd.read_excel(path, sheet_name, index_col=0).append(_df_mapping)\
-                    .pipe(drop_duplicate_indices)
-            # write excel
-            _df_mapping.to_excel(writer, sheet_name=sheet_name)
-        # -- init
-        # - assert
-        if if_exists not in validations['DFMapping__to_excel__if_exists']:
-            raise ValueError(
-                f"if_exists must be one of {validations['DFMapping__to_excel__if_exists']}")
-        # - handle if_exists
-        _sheet_names = []
-        if os.path.exists(path):
-            if if_exists == 'error':
-                raise FileExistsError('file already exists, please specify if_exists as one of')
-            elif if_exists == 'append':
-                _sheet_names = pd.ExcelFile(path).sheet_names
-        # -- main
-        # pandas ExcelWriter object (saves on close)
-        with pd.ExcelWriter(path) as _writer:
-            # col mapping
-            _write_excel_sheet(
-                writer=_writer, mapping=self.col_mapping, sheet_name='__columns__')
-            # value mappings
-            for _key, _mapping in self.value_mapping.items():
-                _write_excel_sheet(
-                    writer=_writer, mapping=_mapping, sheet_name=_key)
-
-    def from_excel(self, path: str) -> None:
-        """
-        Init the DFMapping object from an excel file. For example you could auto generate a DFMapping using googletrans
-        and then adjust the translations you feel are inappropriate in the excel file. Then regenerate the object
-        from the edited excel file.
-
-        :param path: Path to the excel file
-        :return: None
-        """
-
-        def _read_excel(xls, sheet_name):
-            return pd.read_excel(xls, sheet_name, index_col=0).T.to_dict(orient='records')[0]
-
-        # open ExcelFile
-        with pd.ExcelFile(path) as _xls:
-            self.col_mapping = _read_excel(xls=_xls, sheet_name='__columns__')
-            self.value_mapping = {}
-            for _sheet_name in list_exclude(_xls.sheet_names, '__columns__'):
-                self.value_mapping[_sheet_name] = _read_excel(
-                    xls=_xls, sheet_name=_sheet_name)
 
 
 # ---- functions
-# --- export
-@export
 def assert_df(df: Any, groupby: Union[SequenceOrScalar, bool] = False, name: str = 'df',
               ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, List]]:
     """
@@ -431,22 +91,22 @@ def assert_df(df: Any, groupby: Union[SequenceOrScalar, bool] = False, name: str
     return df, groupby
 
 
-@export
 def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_cat: bool = True, cat_frac: float = .5,
                 convert_dtypes: bool = True, drop_all_na_cols: bool = False) -> pd.DataFrame:
     """
-    optimize memory usage of a pandas df, automatically downcast all var types and converts objects to categories
+    optimize memory usage of a pandas df, automatically downcast all var types and converts objects to categorize
 
     :param df: pandas DataFrame to be optimized. Other objects are implicitly cast to DataFrame
     :param c_int: Whether to downcast integers [optional]
     :param c_float: Whether to downcast floats [optional]
-    :param c_cat: Whether to cast objects to categories. Uses cat_frac as condition [optional]
+    :param c_cat: Whether to cast objects to categorize. Uses cat_frac as condition [optional]
     :param cat_frac: If c_cat: If the column has less than cat_frac percent unique values it will be cast to category
         [optional]
     :param convert_dtypes: Whether to call convert dtypes (pandas 1.0.0+) [optional]
     :param drop_all_na_cols: Whether to drop columns that contain only missing values [optional]
     :return: the optimized pandas DataFrame
     """
+
     # -- func
     # noinspection PyShadowingNames
     def _do_downcast(df, cols, downcast):
@@ -491,7 +151,7 @@ def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_ca
 
     # casting
     if c_int:
-        _include = dtypes['int']
+        _include = dtype_mapping['int']
         # Int does not support downcasting as of pandas 1.0.0 -> check again later
         # if _pandas_version_1_plus:
         #     _include += dtypes_Int
@@ -533,7 +193,6 @@ def optimize_pd(df: pd.DataFrame, c_int: bool = True, c_float: bool = True, c_ca
     return df
 
 
-@export
 def get_df_corr(df: pd.DataFrame, columns: List[str] = None, target: str = None,
                 groupby: Union[str, list] = None) -> pd.DataFrame:
     """
@@ -570,7 +229,7 @@ def get_df_corr(df: pd.DataFrame, columns: List[str] = None, target: str = None,
                 _df_corr_i[_col].index <= _i, np.nan, _df_corr_i[_col])
         # gather / melt
         _df_corr_i = pd.melt(_df_corr_i, id_vars=[
-                             'col_0'], var_name='col_1', value_name='corr').dropna()
+            'col_0'], var_name='col_1', value_name='corr').dropna()
         # drop self correlation
         _df_corr_i = _df_corr_i[_df_corr_i['col_0'] != _df_corr_i['col_1']]
         # get identifier
@@ -608,19 +267,22 @@ def get_df_corr(df: pd.DataFrame, columns: List[str] = None, target: str = None,
     return _df_corr
 
 
-@export
 def drop_zero_cols(df: pd.DataFrame) -> pd.DataFrame:
     """
     Drop columns with all 0 or None Values from DataFrame. Useful after applying one hot encoding.
 
-    :param df: pandas DataFrame
-    :return: pandas DataFrame without 0 columns.
+    Parameters
+    ----------
+    df: pandas DataFrame
+
+    Returns
+    -------
+    pandas DataFrame without 0 columns.
     """
     # noinspection PyUnresolvedReferences
     return df[df.columns[(df != 0).any()]]
 
 
-@export
 def get_duplicate_indices(df: pd.DataFrame) -> pd.Series:
     """
     Returns duplicate indices from a pandas DataFrame
@@ -631,7 +293,6 @@ def get_duplicate_indices(df: pd.DataFrame) -> pd.Series:
     return df.index[df.index.duplicated()]
 
 
-@export
 def get_duplicate_cols(df: pd.DataFrame) -> pd.Series:
     """
     Returns names of duplicate columns from a pandas DataFrame
@@ -642,7 +303,6 @@ def get_duplicate_cols(df: pd.DataFrame) -> pd.Series:
     return df.columns[df.columns.duplicated()]
 
 
-@export
 def drop_duplicate_indices(df: pd.DataFrame, warn: bool = True) -> pd.DataFrame:
     """
     Drop duplicate indices from pandas DataFrame
@@ -658,7 +318,6 @@ def drop_duplicate_indices(df: pd.DataFrame, warn: bool = True) -> pd.DataFrame:
     return df.loc[~df.index.duplicated(), :]
 
 
-@export
 def drop_duplicate_cols(df: pd.DataFrame, warn: bool = True) -> pd.DataFrame:
     """
     Drop duplicate columns from pandas DataFrame
@@ -674,7 +333,6 @@ def drop_duplicate_cols(df: pd.DataFrame, warn: bool = True) -> pd.DataFrame:
     return df.loc[:, ~df.columns.duplicated()]
 
 
-@export
 def change_span(s: pd.Series, steps: int = 5) -> pd.Series:
     """
     return a True/False series around a changepoint, used for filtering stepwise data series in a pandas df
@@ -687,16 +345,15 @@ def change_span(s: pd.Series, steps: int = 5) -> pd.Series:
     return pd.Series(s.shift(-steps).ffill() != s.shift(steps).bfill())
 
 
-@export
 def outlier_to_nan(df: pd.DataFrame, col: str, groupby: Union[list, str] = None, std_cutoff: np.number = 3,
                    reps: int = 1, do_print: bool = False) -> pd.DataFrame:
     """
-    this algorithm cuts off all points whose DELTA (avg diff to the prev and next point) is outside of the n std range
+    this algorithm cuts off all points whose DELTA (avg diff to the prev and next point) is outside the n std range
 
     :param df: pandas DataFrame
     :param col: column to be filtered
     :param groupby: if provided: applies std filter by group
-    :param std_cutoff: the number of standard deviations outside of which to set values to None
+    :param std_cutoff: the number of standard deviations outside which to set values to None
     :param reps: how many times to repeat the algorithm
     :param do_print: whether to print steps to console
     :return: pandas Series with outliers set to nan
@@ -716,8 +373,8 @@ def outlier_to_nan(df: pd.DataFrame, col: str, groupby: Union[list, str] = None,
 
         # calculate delta (mean of diff to previous and next value)
         _delta = .5 * (
-            (df[col] - _df_grouped[col].shift(1).bfill()).abs() +
-            (df[col] - _df_grouped[col].shift(-1).ffill()).abs()
+                (df[col] - _df_grouped[col].shift(1).bfill()).abs() +
+                (df[col] - _df_grouped[col].shift(-1).ffill()).abs()
         )
 
         df[col] = df[col].where(
@@ -729,7 +386,6 @@ def outlier_to_nan(df: pd.DataFrame, col: str, groupby: Union[list, str] = None,
     return df[col]
 
 
-@export
 def butter_pass_filter(data: pd.Series, cutoff: int, fs: int, order: int, btype: str = None, shift: bool = False):
     """
     Implementation of a highpass / lowpass filter using scipy.signal.butter
@@ -772,7 +428,6 @@ def butter_pass_filter(data: pd.Series, cutoff: int, fs: int, order: int, btype:
     return _y
 
 
-@export
 def pass_by_group(df: pd.DataFrame, col: str, groupby: Union[str, list], btype: str, shift: bool = False,
                   cutoff: int = 1, fs: int = 20, order: int = 5):
     """
@@ -802,7 +457,6 @@ def pass_by_group(df: pd.DataFrame, col: str, groupby: Union[str, list], btype: 
     return df
 
 
-@export
 def lfit(x: SequenceOrScalar, y: SequenceOrScalar = None, w: SequenceOrScalar = None, df: pd.DataFrame = None,
          groupby: SequenceOrScalar = None, do_print: bool = True, catch_error: bool = False, return_df: bool = False,
          extrapolate: int = None) -> Union[pd.Series, pd.DataFrame]:
@@ -929,10 +583,9 @@ def lfit(x: SequenceOrScalar, y: SequenceOrScalar = None, w: SequenceOrScalar = 
 
 
 @docstr
-@export
 def rolling_lfit(x: SequenceOrScalar, window: int, df: pd.DataFrame = None, groupby: SequenceOrScalar = None):
     """
-    Rolling version of lfit: for each row of the DataFrame / Series look at the previous window rows, then perform an
+    Rolling version of lfit: for each row of the DataFrame / Series look at the previous window rows, then perform a
     lfit and use this value as a prediction for this row. Useful as naive predictor for time series Data.
 
     :param x: %(x)s
@@ -966,7 +619,7 @@ def rolling_lfit(x: SequenceOrScalar, window: int, df: pd.DataFrame = None, grou
     for _, _df_i in df.groupby(groupby):
         # get _x_i
         _x_i = _df_i[x]
-        for _row, (_x_index, __) in enumerate(_x_i.iteritems()):
+        for _row, (_x_index, __) in enumerate(_x_i.items()):
             # need at least 2 entries to lfit -> first two entries become na
             if _row < 2:
                 _x_lfit[_x_index] = np.nan
@@ -985,18 +638,22 @@ def rolling_lfit(x: SequenceOrScalar, window: int, df: pd.DataFrame = None, grou
     return _x_lfit
 
 
-@export
 def qf(df: pd.DataFrame, fltr: Union[pd.DataFrame, pd.Series, Mapping], rem_unused_categories: bool = True,
        reset_index: bool = False):
     """
     quickly filter a DataFrame based on equal criteria. All columns of fltr present in df are filtered
     to be equal to the first entry in filter_df.
 
-    :param df: pandas DataFrame to be filtered
-    :param fltr: filter condition as DataFrame or Mapping or Series
-    :param rem_unused_categories: whether to remove unused categories from categorical dtype after filtering
-    :param reset_index: whether to reset index after filtering
-    :return: filtered pandas DataFrame
+    Parameters
+    ----------
+    df: pandas DataFrame to be filtered
+    fltr: filter condition as DataFrame or Mapping or Series
+    rem_unused_categories: whether to remove unused categories from categorical dtype after filtering
+    reset_index: whether to reset index after filtering
+
+    Returns
+    -------
+    filtered pandas DataFrame
     """
     _df = df.copy()
     del df
@@ -1024,7 +681,7 @@ def qf(df: pd.DataFrame, fltr: Union[pd.DataFrame, pd.Series, Mapping], rem_unus
     # logical and filter for all columns in filter df
     for _col in _filter_df.columns:
         _filter_condition = _filter_condition & (
-            _df[_col] == _filter_iloc[_col])
+                _df[_col] == _filter_iloc[_col])
 
     # create filtered df
     _df = _df[_filter_condition]
@@ -1040,7 +697,6 @@ def qf(df: pd.DataFrame, fltr: Union[pd.DataFrame, pd.Series, Mapping], rem_unus
     return _df
 
 
-@export
 def quantile_split(s: pd.Series, n: int, signif: int = 2, na_to_med: bool = False):
     """
     splits a numerical column into n quantiles. Useful for mapping numerical columns to categorical columns
@@ -1094,7 +750,7 @@ def quantile_split(s: pd.Series, n: int, signif: int = 2, na_to_med: bool = Fals
                                           round_signif(__q_max, signif))
 
         _s_out = np.where((_s >= __q_min) & (
-            _s < __q_max_adj), _q_name, _s_out)
+                _s < __q_max_adj), _q_name, _s_out)
 
     # get back the old properties of the series (or you'll screw the index)
     _s_out = pd.Series(_s_out)
@@ -1107,7 +763,6 @@ def quantile_split(s: pd.Series, n: int, signif: int = 2, na_to_med: bool = Fals
     return _s_out
 
 
-@export
 def acc(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None) -> float:
     """
     calculate accuracy for a categorical label
@@ -1131,7 +786,6 @@ def acc(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.Dat
     return _acc
 
 
-@export
 def rel_acc(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None,
             target_class: str = None):
     """
@@ -1177,7 +831,6 @@ def rel_acc(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd
     return _acc - _acc_mc
 
 
-@export
 def cm(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None) -> pd.DataFrame:
     """
     confusion matrix from pandas df
@@ -1214,7 +867,6 @@ def cm(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.Data
     return _cm
 
 
-@export
 def f1_pr(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None, target: str = None
           ) -> pd.DataFrame:
     """
@@ -1314,7 +966,7 @@ def f1_pr(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.D
             _f1 = np.nan
         else:
             _f1 = 200 * (_precision / 100. * _recall / 100.) / \
-                (_precision / 100. + _recall / 100.)
+                  (_precision / 100. + _recall / 100.)
 
         # to df
         _cm_target = pd.DataFrame({
@@ -1328,7 +980,6 @@ def f1_pr(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.D
     return _f1_pr
 
 
-@export
 def f_score(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd.DataFrame = None, dropna: bool = True,
             f: Callable = r2_score, groupby: Union[list, str] = None, f_name: str = None) -> Union[pd.DataFrame, float]:
     """
@@ -1390,7 +1041,7 @@ def f_score(y_true: Union[pd.Series, str], y_pred: Union[pd.Series, str], df: pd
 
 
 # shorthand r2
-@export
+
 def r2(*args, **kwargs) -> Union[pd.DataFrame, float]:
     """
     wrapper for f_score using sklearn.metrics.r2_score
@@ -1402,7 +1053,6 @@ def r2(*args, **kwargs) -> Union[pd.DataFrame, float]:
     return f_score(*args, f=r2_score, **kwargs)
 
 
-@export
 def rmse(*args, **kwargs) -> Union[pd.DataFrame, float]:
     """
     wrapper for f_score using numpy.sqrt(sklearn.metrics.mean_squared_error)
@@ -1418,7 +1068,6 @@ def rmse(*args, **kwargs) -> Union[pd.DataFrame, float]:
     return f_score(*args, f=_f_rmse, **kwargs)
 
 
-@export
 def mae(*args, **kwargs) -> Union[pd.DataFrame, float]:
     """
     wrapper for f_score using sklearn.metrics.mean_absolute_error
@@ -1430,7 +1079,6 @@ def mae(*args, **kwargs) -> Union[pd.DataFrame, float]:
     return f_score(*args, f=mean_absolute_error, **kwargs)
 
 
-@export
 def stdae(*args, **kwargs) -> Union[pd.DataFrame, float]:
     """
     wrapper for f_score using the standard deviation of the absolute error
@@ -1446,7 +1094,6 @@ def stdae(*args, **kwargs) -> Union[pd.DataFrame, float]:
     return f_score(*args, f=_f_stdae, **kwargs)
 
 
-@export
 def medae(*args, **kwargs) -> Union[pd.DataFrame, float]:
     """
     wrapper for f_score using sklearn.metrics.median_absolute_error
@@ -1458,26 +1105,25 @@ def medae(*args, **kwargs) -> Union[pd.DataFrame, float]:
     return f_score(*args, f=median_absolute_error, **kwargs)
 
 
-@export
 def maep(*args, times_hundred: bool = True, **kwargs) -> Union[pd.DataFrame, float]:
     """
     Wrapper for f_score using mean absolute error over mean (mean absolute error in percent).
 
     :param args: passed to f_score
-    :param times_hundred: Whether to multiply by 100 for human readable percentages
+    :param times_hundred: Whether to multiply by 100 for human-readable percentages
     :param kwargs: passed to f_score
     :return: if groupby is supplied: pandas DataFrame, else: scalar value
     """
-    def _maep(y_true, y_pred):
 
+    def _maep(y_true, y_pred):
         _score = np.mean(np.abs(y_true - y_pred)) / np.mean(y_true)
         if times_hundred:
             _score *= 100
         return _score
+
     return f_score(*args, f=_maep, **kwargs)
 
 
-@export
 def mpae(*args, times_hundred: bool = True, pmax: int = 999, epsilon: float = None,
          **kwargs) -> Union[pd.DataFrame, float]:
     """
@@ -1485,7 +1131,7 @@ def mpae(*args, times_hundred: bool = True, pmax: int = 999, epsilon: float = No
       if epsilon is not specified)
 
     :param args: passed to f_score
-    :param times_hundred: Whether to multiply by 100 for human readable percentages
+    :param times_hundred: Whether to multiply by 100 for human-readable percentages
     :param pmax: Max value for the percentage absolute error, used as a fallback because pae can go to infinity as
         y_true approaches zero
     :param epsilon: A small value to prevent infinite values, if specified this is used instead of zero. If not
@@ -1493,6 +1139,7 @@ def mpae(*args, times_hundred: bool = True, pmax: int = 999, epsilon: float = No
     :param kwargs: passed to f_score
     :return: if groupby is supplied: pandas DataFrame, else: scalar value
     """
+
     def _mpae(y_true, y_pred):
 
         # check for epsilon
@@ -1506,11 +1153,12 @@ def mpae(*args, times_hundred: bool = True, pmax: int = 999, epsilon: float = No
         _score = np.nanmean(_frac)
         # apply pmax
         _score = np.where(_score > pmax, pmax, _score)
-        # apply times hundred (if applicable)
+        # apply times a hundred (if applicable)
         if times_hundred:
             _score *= 100
         # return
         return _score
+
     # return f_score
     return f_score(*args, f=_mpae, **kwargs)
 
@@ -1521,7 +1169,6 @@ def pae(*args, **kwargs):
     return mpae(*args, **kwargs)
 
 
-@export
 def corr(*args, **kwargs) -> Union[pd.DataFrame, float]:
     """
     wrapper for f_score using pandas.Series.corr
@@ -1537,7 +1184,6 @@ def corr(*args, **kwargs) -> Union[pd.DataFrame, float]:
     return f_score(*args, f=_f_corr, **kwargs)
 
 
-@export
 def df_score(df: pd.DataFrame, y_true: SequenceOrScalar, y_pred: SequenceOrScalar = None, pred_suffix: list = None,
              scores: List[Callable] = None, pivot: bool = True, scale: Union[dict, list, int] = None,
              groupby: Union[list, str] = None, multi: int = None, dropna: bool = True,
@@ -1549,7 +1195,7 @@ def df_score(df: pd.DataFrame, y_true: SequenceOrScalar, y_pred: SequenceOrScala
     :param y_true: name of the true variable(s) inside df
     :param y_pred: name of the pred variable(s) inside df, specify either this or pred_suffix
     :param pred_suffix: name of the predicted variable suffixes. Supports multiple predictions.
-        By default assumed suffix 'pred' [optional]
+        By default, assumed suffix 'pred' [optional]
     :param scores: scoring functions to be used [optional]
     :param pivot: whether to pivot the DataFrame for easier readability [optional]
     :param scale: a scale for multiplying the scores, default 1 [optional]
@@ -1693,7 +1339,6 @@ def df_score(df: pd.DataFrame, y_true: SequenceOrScalar, y_pred: SequenceOrScala
     return _df_score
 
 
-@export
 def rmsd(x: str, df: pd.DataFrame, group: str, return_df_paired: bool = False, agg_func: str = 'median',
          standardize: bool = False, to_abs: bool = False) -> Union[float, pd.DataFrame]:
     """
@@ -1743,7 +1388,7 @@ def rmsd(x: str, df: pd.DataFrame, group: str, return_df_paired: bool = False, a
 
 # get a data frame showing the root mean squared difference by group type
 # noinspection PyShadowingNames
-@export
+
 def df_rmsd(x: str, df: pd.DataFrame, groups: Union[list, str] = None, hue: str = None, hue_order: list = None,
             sort_by_hue: bool = True, n_quantiles: int = 10, signif: int = 2, include_rmsd: bool = True,
             **kwargs) -> pd.DataFrame:
@@ -1870,7 +1515,6 @@ def df_rmsd(x: str, df: pd.DataFrame, groups: Union[list, str] = None, hue: str 
     return _df_rmsd
 
 
-@export
 def df_p(x: str, group: str, df: pd.DataFrame, hue: str = None, agg_func: str = 'mean', agg: bool = False,
          n_quantiles: int = 10):
     """
@@ -1966,8 +1610,7 @@ def df_agg(x, group, df, hue=None, agg=None, n_quantiles=10, na_to_med=False, p=
                      df=_df, agg_func=p_test, agg=True)
         _df_agg = pd.merge(_df_agg, _df_p, on=_groupby)
 
-    _df_agg.columns = _groupby_names + \
-        [_col for _col in _df_agg.columns if _col not in _groupby]
+    _df_agg.columns = _groupby_names + [_col for _col in _df_agg.columns if _col not in _groupby]
 
     return _df_agg
 
@@ -2025,13 +1668,15 @@ def df_group_hue(df, group, hue=None, x=None, n_quantiles=10, na_to_med=False, k
                 _df[hue], n_quantiles, na_to_med=na_to_med)
         _df[_hue] = _df[_hue].astype('category').cat.remove_unused_categories()
         _df['_label'] = concat_cols(_df, [_group, _hue]).astype('category')
-        _df_levels = _df[[_group, _hue, '_label']
-                         ].drop_duplicates().reset_index(drop=True)
+        _df_levels = _df[
+            [_group, _hue, '_label']
+        ].drop_duplicates().reset_index(drop=True)
         _levels = _df_levels['_label']
     else:
         _df['_label'] = _df[_group]
-        _df_levels = _df[[_group, '_label']
-                         ].drop_duplicates().reset_index(drop=True)
+        _df_levels = _df[
+            [_group, '_label']
+        ].drop_duplicates().reset_index(drop=True)
         _levels = _df_levels['_label']
 
     return _df, _groupby, _groupby_names, _vars, _df_levels, _levels
@@ -2045,9 +1690,8 @@ def df_precision_filter(df, col, precision):
     return df[(np.abs(df[col] - df[col].round(precision)) < (1 / (2 * 10 ** (precision + 1))))]
 
 
-# grouped iterpolate method (avoids .apply failing if one sub group fails)
+# grouped iterpolate method (avoids .apply failing if one subgroup fails)
 def grouped_interpolate(df, col, groupby, method=None):
-
     _dfs_i = []
 
     for _index_i, _df_i in df.groupby(groupby):
@@ -2086,7 +1730,7 @@ def time_reg(df, t='t', y='y', t_unit='D', window=10, slope_diff_cutoff=.1, int_
     _t_min = _df[t].min()
     _t_max = _df[t].max()
 
-    if isinstance(_df[t].iloc[0], pd.datetime):
+    if isinstance(_df[t].iloc[0], datetime):
         _df[_t_i] = (_df[t] - _t_min) / np.timedelta64(1, t_unit)
         _t_i_min = 0
         _t_i_max = (_df[t].max() - _t_min) / np.timedelta64(1, t_unit)
@@ -2186,7 +1830,6 @@ def time_reg(df, t='t', y='y', t_unit='D', window=10, slope_diff_cutoff=.1, int_
 
 
 @docstr
-@export
 def col_to_front(df: pd.DataFrame, cols: SequenceOfScalars, inplace: bool = False) -> pd.DataFrame:
     """
     Brings one or more columns to the front (first n positions) of a DataFrame
@@ -2230,7 +1873,7 @@ def lr(df, x, y, groupby=None, t_unit='D', do_print=True):
     _df_out = dict_list(
         groupby + [_y_slope, _y_int, 'r2', 'rmse', 'error_mean', 'error_std', 'error_abs_mean', 'error_abs_std'])
 
-    if isinstance(_df[x].iloc[0], pd.datetime):
+    if isinstance(_df[x].iloc[0], datetime):
         _df[_x_i] = (_df[x] - _df[x].min()) / np.timedelta64(1, t_unit)
     else:
         _df[_x_i] = _df[x]
@@ -2293,7 +1936,6 @@ def flatten(lst):
     return list(_flatten_generator(lst))
 
 
-@export
 def df_split(df: pd.DataFrame, split_by: Union[List[str], str], return_type: str = 'dict', print_key: bool = False,
              sep: str = '_', key_sep: str = '==') -> Union[list, dict]:
     """
@@ -2339,7 +1981,6 @@ def concat(obj, ignore_index=True, sort=False, **kwargs):
 
 
 @docstr
-@export
 def rank(df: pd.DataFrame, rankby: SequenceOrScalar, groupby: SequenceOrScalar = None,
          rank_ascending: bool = True, sortby: SequenceOrScalar = None,
          sortby_ascending: Union[bool, List[bool]] = None) -> pd.Series:
@@ -2493,7 +2134,6 @@ def qagg(df: pd.DataFrame, groupby, columns=None, agg=None, reset_index=True):
     return _df_agg
 
 
-@export
 def mahalanobis(point: Union[pd.DataFrame, pd.Series, np.ndarray], df: pd.DataFrame = None, params: List[str] = None,
                 do_print: bool = True) -> Union[float, List[float]]:
     """
@@ -2625,7 +2265,6 @@ def resample(df, rule=1, on=None, groupby=None, agg='mean', columns=None, adj_co
 
 
 @docstr
-@export
 def df_count(x: str, df: pd.DataFrame, hue: Optional[str] = None, sort_by_count: bool = True, top_nr: int = 5,
              x_base: Optional[float] = None, x_min: Optional[float] = None, x_max: Optional[float] = None,
              other_name: str = 'other', other_to_na: bool = False, na: Union[bool, str] = 'drop') -> pd.DataFrame:
@@ -2816,7 +2455,6 @@ def numeric_to_group(pd_series, step=None, outer_limit=4, suffix=None, use_abs=F
     return _series
 
 
-@export
 def top_n(s: Sequence, n: Union[int, str] = None, w: Optional[Sequence] = None, n_max: int = 20) -> list:
     """
     Select n elements form a categorical pandas series with the highest counts. Ties are broken by sorting
@@ -2839,7 +2477,7 @@ def top_n(s: Sequence, n: Union[int, str] = None, w: Optional[Sequence] = None, 
             return list(_df_count.sort_values(by=[_df_count.columns[1], 'index'], ascending=[False, True])['index'][:n])
         else:
             return pd.DataFrame({'s': s, 'w': w}).groupby('s').agg({'w': 'sum'}) \
-                .sort_values(by='w', ascending=False).index.tolist()[:n]
+                       .sort_values(by='w', ascending=False).index.tolist()[:n]
     # -- case str (percent)
     elif isinstance(n, str):
         if '%' not in n:
@@ -2866,7 +2504,6 @@ def top_n(s: Sequence, n: Union[int, str] = None, w: Optional[Sequence] = None, 
 
 
 @docstr
-@export
 def top_n_coding(s: Sequence, n: int, other_name: str = 'other', na_to_other: bool = False,
                  other_to_na: bool = False, w: Optional[Sequence] = None) -> pd.Series:
     """
@@ -2881,7 +2518,7 @@ def top_n_coding(s: Sequence, n: int, other_name: str = 'other', na_to_other: bo
     :return: Adjusted pandas Series
     """
 
-    # we have to cast to string so we can set the other name
+    # we have to cast to string, so we can set the other name
     _s = pd.Series(s).astype('str')
     _top_n = top_n(_s, n, w=w)
     if other_to_na:
@@ -2903,7 +2540,6 @@ def top_n_coding(s: Sequence, n: int, other_name: str = 'other', na_to_other: bo
     return _s
 
 
-@export
 def k_split(df: pd.DataFrame, k: SequenceOrScalar = 5, groupby: Union[Sequence, str] = None,
             sortby: Union[Sequence, str] = None, random_state: int = None, do_print: bool = True,
             return_type: Union[str, int] = 0) -> Union[pd.Series, tuple]:
@@ -2912,7 +2548,7 @@ def k_split(df: pd.DataFrame, k: SequenceOrScalar = 5, groupby: Union[Sequence, 
 
     :param df: pandas DataFrame to be split
     :param k: if integer: how many (equal sized) parts to split the DataFrame into
-      if string: (timestamp) value where to split, requires sortby [optional]
+      if a string: (timestamp) value where to split, requires sortby [optional]
     :param groupby: passed to pandas.DataFrame.groupby before splitting,
         ensures that each group will be represented equally in each split part [optional]
     :param sortby: if True the DataFrame is ordered by these column(s) and then sliced into parts from the top
@@ -2998,7 +2634,6 @@ def k_split(df: pd.DataFrame, k: SequenceOrScalar = 5, groupby: Union[Sequence, 
 
 
 @docstr
-@export
 def remove_unused_categories(df: pd.DataFrame, inplace: bool = False) -> Optional[pd.DataFrame]:
     """
     Remove unused categories from all categorical columns in the DataFrame
@@ -3018,7 +2653,6 @@ def remove_unused_categories(df: pd.DataFrame, inplace: bool = False) -> Optiona
         return df
 
 
-@export
 def read_csv(path: str, nrows: int = None, encoding: str = None, errors: str = 'replace', kws_open: Mapping = None,
              **kwargs):
     """
@@ -3052,7 +2686,6 @@ def read_csv(path: str, nrows: int = None, encoding: str = None, errors: str = '
 
 
 @docstr
-@export
 def get_columns(df: pd.DataFrame, dtype: Union[SequenceOrScalar, np.number] = None,
                 to_list: bool = False) -> Union[list, pd.Index]:
     """
@@ -3104,7 +2737,6 @@ def get_columns(df: pd.DataFrame, dtype: Union[SequenceOrScalar, np.number] = No
 
 
 @docstr
-@export
 def reformat_columns(df: pd.DataFrame, printf: Callable = None, **kwargs) -> pd.DataFrame:
     """
     A quick way to clean the column names of a DataFrame

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+
 from setuptools import setup
 
 # get key package details from py_pkg/__version__.py
@@ -12,6 +13,10 @@ with open(os.path.join(here, 'hhpy', '__version__.py')) as f:
 # load the README file and use it as the long_description for PyPI
 with open('README.md', 'r') as f:
     readme = f.read()
+
+# get requirements from requirements.txt
+with open('requirements.txt', errors='replace') as f:
+    requires = f.readlines()
 
 # package configuration - for reference see:
 # https://setuptools.readthedocs.io/en/latest/setuptools.html#id9
@@ -27,8 +32,7 @@ setup(
     packages=['hhpy'],
     include_package_data=True,
     python_requires=">=3.8",
-    install_requires=['numpy', 'pandas', 'scipy', 'matplotlib', 'scikit-learn', 'seaborn', 'colour', 'pytest',
-                      'requests', 'IPython', 'docrep', 'h5py', 'openpyxl', 'xlrd'],
+    install_requires=requires,
     license=about['__license__'],
     zip_safe=False,
     entry_points={
@@ -37,7 +41,7 @@ setup(
     classifiers=[
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.10',
     ],
     keywords='package development template'
 )

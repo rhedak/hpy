@@ -1,5 +1,5 @@
 """
-hhpy.modelling.py
+hhpy.plotting_main.py
 ~~~~~~~~~~~~~~~~~
 
 Contains a model class that is based on pandas DataFrames and wraps around sklearn and other frameworks
@@ -11,15 +11,18 @@ to provide convenient train test functions.
 # --- standard imports
 import itertools
 import warnings
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 # --- third party imports
-from typing import Sequence, Mapping, Union, Callable, Optional, Any, Tuple, List
+from typing import Any, Callable, List, Mapping, Optional, Sequence, Tuple, Union
 
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
+from docrep import DocstringProcessor
 from sklearn.exceptions import DataConversionWarning
+
+from hhpy.iternals.constants import GROUPBY_DUMMY
 
 # ---- optional imports
 try:
@@ -27,12 +30,24 @@ try:
 except ImportError:
     display = print
 
-# --- local imports
-from hhpy.main import GROUPBY_DUMMY, export, BaseClass, is_list_like, assert_list, tprint, DocstringProcessor, \
-    SequenceOrScalar, DFOrArray, list_exclude, list_merge, list_intersection, silentcopy
-from hhpy.ds import docstr as docstr_ds, assert_df, k_split, df_score, drop_duplicate_cols, top_n, concat_cols
-from hhpy.plotting import ax_as_list, legend_outside, rcParams as hpt_rcParams, docstr as docstr_hpt
+from hhpy.ds.main import assert_df, concat_cols, df_score, drop_duplicate_cols, k_split, top_n
+from hhpy.ds.main import docstr as docstr_ds
 from hhpy.ipython import display_df
+
+# --- local imports
+from hhpy.main import (
+    BaseClass,
+    DFOrArray, SequenceOrScalar,
+    assert_list,
+    is_list_like,
+    list_exclude,
+    list_intersection,
+    list_merge,
+    silentcopy, tprint,
+)
+from hhpy.plotting import ax_as_list, legend_outside
+from hhpy.plotting import docstr as docstr_hpt
+from hhpy.plotting import rc_params as hpt_rc_params
 
 # ---- variables
 # --- validations
@@ -85,7 +100,6 @@ docstr = DocstringProcessor(
 # ---- classes
 # noinspection PyPep8Naming
 @docstr
-@export
 class Model(BaseClass):
     """
     A unified modeling class that is extended from sklearn, accepts any model that implements .fit and .predict
@@ -396,7 +410,7 @@ class Model(BaseClass):
             _y_pred.columns = _y_ref_pred
             # bring back dropped nans
             if handle_na:
-                _y_pred = pd.concat([_y_pred, pd.DataFrame(np.nan, index=_na_indices, columns=_y_pred.columns)])\
+                _y_pred = pd.concat([_y_pred, pd.DataFrame(np.nan, index=_na_indices, columns=_y_pred.columns)]) \
                     .sort_index()
 
             # feed back to df
@@ -482,7 +496,6 @@ class Model(BaseClass):
 
 # noinspection PyPep8Naming
 @docstr
-@export
 class Models(BaseClass):
     """
     Collection of Models that allow for fitting and predicting with multiple Models at once,
@@ -738,7 +751,7 @@ class Models(BaseClass):
         # return_type
         _valid_return_types = ['self', 'df', 'df_full', 'DataFrame']
         assert (
-            return_type in _valid_return_types), f"return_type must be one of {_valid_return_types}"
+                return_type in _valid_return_types), f"return_type must be one of {_valid_return_types}"
         # fit_type
         if not self.fit_type:
             raise ValueError('Model is not fit yet')
@@ -881,7 +894,7 @@ class Models(BaseClass):
 
         # -- assert
         _valid_return_types = ['self', 'df', 'df_full', 'DataFrame']
-        assert (return_type in _valid_return_types),\
+        assert (return_type in _valid_return_types), \
             f"return_type must be one of {_valid_return_types}"
         groupby = assert_list(groupby)
         _df = self.df.copy()
@@ -992,7 +1005,7 @@ class Models(BaseClass):
         :param palette: %(palette)s
         :param width: %(subplot_width)s
         :param height: %(subplot_height)s
-        :param scale: scale the values [optional
+        :param scale: scale the values [optional]
         :param query: query to be passed to pd.DataFrame.query before plotting [optional]
         :param return_fig_ax: %(return_fig_ax)s
         :param kwargs: other keyword arguments passed to sns.barplot
@@ -1005,7 +1018,7 @@ class Models(BaseClass):
         if hue_order is None:
             hue_order = self.model_names
         if palette is None:
-            palette = hpt_rcParams['palette']
+            palette = hpt_rc_params['palette']
         _row_order = assert_list(row_order)
 
         fig, ax = plt.subplots(nrows=len(_row_order), figsize=(
@@ -1066,9 +1079,12 @@ class Models(BaseClass):
 
 
 # ---- functions
-@export
-def assert_array(a: Any, return_name: bool = False, name_default: str = 'name') -> Union[Tuple[np.ndarray, str],
-                                                                                         np.ndarray]:
+
+def assert_array(
+        a: Any,
+        return_name: bool = False,
+        name_default: str = 'name'
+) -> Union[Tuple[np.ndarray, str], np.ndarray]:
     """
     Take any python object and turn it into a 2d numpy array (if possible). Useful for training neural networks.
 
@@ -1093,7 +1109,6 @@ def assert_array(a: Any, return_name: bool = False, name_default: str = 'name') 
         return a
 
 
-@export
 def dict_to_model(dic: Mapping) -> Model:
     """
     restore a Model object from a dictionary
@@ -1112,15 +1127,18 @@ def dict_to_model(dic: Mapping) -> Model:
     return _model
 
 
-@export
 def assert_model(model: Any) -> Model:
     """
     takes any Model, model object or dictionary and converts to Model
 
-    :param model: Mapping or object containing  a model
-    :return: Model
-    """
+    Parameters
+    ----------
+    model: Mapping or object containing a model
 
+    Returns
+    -------
+    Model
+    """
     if not isinstance(model, Mapping):
         if not isinstance(model, Model):
             return Model(model)
@@ -1143,7 +1161,6 @@ def force_model(*args, **kwargs):
     return assert_model(*args, **kwargs)
 
 
-@export
 def get_coefs(model: Any, y: SequenceOrScalar):
     """
     get coefficients of a linear regression in a sorted data frame
@@ -1158,8 +1175,8 @@ def get_coefs(model: Any, y: SequenceOrScalar):
     else:
         _model = model
 
-    assert (hasattr(_model, 'coef_')
-            ), 'Attribute coef_ not available, did you specify a linear model?'
+    if not hasattr(_model, 'coef_'):
+        raise ValueError('Attribute coef_ not available, did you specify a linear model?')
 
     _coef = _model.coef_.tolist()
     _coef.append(model.intercept_)
@@ -1172,7 +1189,6 @@ def get_coefs(model: Any, y: SequenceOrScalar):
     return _df
 
 
-@export
 def get_feature_importance(
         model: object, predictors: Union[Sequence, str], features_to_sum: Mapping = None
 ) -> pd.DataFrame:
@@ -1248,7 +1264,7 @@ def get_feature_importance(
     try:
         # noinspection PyTypeChecker
         _df = _get_feature_importance_rf(model, predictors, features_to_sum)
-        # this is supposed to also work for XGBoost but it was broken in a recent release
+        # this is supposed to also work for XGBoost, but it was broken in a recent release
         # so below serves as fallback
     except ValueError:
         # noinspection PyTypeChecker
@@ -1257,9 +1273,8 @@ def get_feature_importance(
     return _df
 
 
-@export
 def to_keras_3d(x: DFOrArray, window: int, y: DFOrArray = None, groupby: SequenceOrScalar = None,
-                groupby_to_dummy: bool = False, dropna: bool = True, reshape: bool = True)\
+                groupby_to_dummy: bool = False, dropna: bool = True, reshape: bool = True) \
         -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
     """
     reformat a DataFrame / 2D array to become a keras compatible 3D array. If dropna is True the first window

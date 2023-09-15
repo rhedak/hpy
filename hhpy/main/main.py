@@ -1,43 +1,36 @@
 """
-hhpy.main.py
+hhpy.plotting_main.py
 ~~~~~~~~~~~~
 
 Contains basic calculation functions that are used in the more specialized versions of the package but can also be used
 on their own
 
 """
+import contextlib
+import datetime
+import functools
+import os
+import re
+import warnings
+from collections import defaultdict
+from copy import deepcopy
+from json import JSONDecodeError
+from time import sleep
+from types import FunctionType
+
+# --- third party imports
+from typing import AbstractSet, Any, Callable, Iterable, List, Mapping, Optional, Sequence, Set, Union, ValuesView
+
+import h5py
+
 # ---- imports
 # --- standard imports
 import numpy as np
 import pandas as pd
-import warnings
-import os
-import sys
-import datetime
-import h5py
-import pickle
-import re
-import functools
-import contextlib
-# --- third party imports
-from typing import Any, Callable, Union, Sequence, Mapping, List, Optional, Iterable, AbstractSet, ValuesView, Dict, Set
-from types import FunctionType
 from docrep import DocstringProcessor
-from collections import defaultdict
-from copy import deepcopy
-from time import sleep
-from json import JSONDecodeError
-# --- optional imports
-try:
-    # noinspection PyPackageRequirements
-    from googletrans import Translator
-except ImportError:
-    Translator = None
-try:
-    # noinspection PyPackageRequirements
-    import emoji
-except ImportError:
-    emoji = None
+
+from hhpy.iternals.constants import GROUPBY_DUMMY
+from hhpy.main.base_class import BaseClass
 
 # ---- init
 pd.plotting.register_matplotlib_converters()
@@ -58,10 +51,6 @@ rcParams = {
     'tprint.r_loc': 'front',
 }
 
-# ---- constants
-# --- true constants
-STRING_NAN = ['nan', 'nat', 'NaN', 'NaT']
-GROUPBY_DUMMY = '__groupby__'
 # --- validations
 validations = {
     'reformat_string__case': ['lower', 'upper'],
@@ -78,168 +67,6 @@ docstr = DocstringProcessor(
 )
 
 
-# ---- decorators
-def export(fn):
-    # based on https://stackoverflow.com/questions/41895077/export-decorator-that-manages-all
-    mod = sys.modules[fn.__module__]
-    if hasattr(mod, '__all__'):
-        mod.__all__.append(fn.__name__)
-    else:
-        mod.__all__ = [fn.__name__]
-    return fn
-
-
-# ---- classes
-@export
-class BaseClass:
-    """
-        Base class for various classes deriving from this. Implements __repr__, converting to dict as well as
-        saving to pickle and restoring from pickle.
-        Does NOT provide __init__ since it cannot be used by itself
-    """
-
-    # --- globals
-    __name__ = 'BaseClass'
-    __attributes__ = []
-    __attributes_no_repr__ = []
-    __dependent_classes__ = []
-
-    # --- functions
-    def __repr__(self):
-        return get_repr(self)
-
-    @property
-    def __dict___(self) -> dict:
-        return self.to_dict()
-
-    def __getstate__(self):
-        return self.__dict___
-
-    def __setstate__(self, dct):
-        return self.from_dict(dct=dct)
-
-    def to_dict(self, recursive: bool = False):
-        """
-        Converts self to a dictionary
-
-        :recursive: Whether to recursively propagate to_dict to children
-        :return: Dictionary
-        """
-
-        if len(self.__attributes__) == 0:
-            warnings.warn(
-                'self.__attributes__ has length zero, did you declare it?')
-
-        _dict = {}
-        for _attr_name in list_merge('__name__', self.__attributes__):
-            _attr = self.__getattribute__(_attr_name)
-
-            # - call to children's to_dict
-            if recursive:
-                if not isinstance(_attr, pd.DataFrame) and hasattr(_attr, 'to_dict'):
-                    _attr = _attr.to_dict()
-                elif is_list_like(_attr):
-                    if isinstance(_attr, Mapping):
-                        for _key, _value in _attr.items():
-                            if hasattr(_value, 'to_dict'):
-                                # noinspection PyUnresolvedReferences
-                                _attr[_key] = _value.to_dict()
-                    else:
-                        for _i in range(len(_attr)):
-                            if hasattr(_attr[_i], 'to_dict'):
-                                print(_attr[_i])
-                                _attr[_i] = _attr[_i].to_dict()
-
-            _dict[_attr_name] = _attr
-
-        return _dict
-
-    def from_dict(self, dct: Mapping, recursive: bool = False, classes: Any = None):
-        """
-        Restores self from a dictionary
-
-        :param dct: Dictionary created from :meth:`~BaseClass.to_dict`
-        :param recursive: Whether to recursively call from_dict of children
-        :param classes: Classes required to load objects
-        :return: None
-        """
-        # -- functions
-        def _f_eval(attr, attr_value):
-
-            # check for passed classes
-            _attr_evaluated = None
-            for _cla in _classes:
-                if hasattr(_cla, '__name__') and attr == _cla.__name__:
-                    _attr_evaluated = _cla()
-            # if no passed class fits the name assume a default name
-            if _attr_evaluated is None:
-                _attr_evaluated = eval(attr + '()')
-            # check if the evaluated object has a from dict function
-            if hasattr(_attr_evaluated, 'from_dict'):
-                # check if we can pass classes to the sub-function
-                _varnames = _attr_evaluated.from_dict.__code__.co_varnames
-                _kws = {}
-                if 'classes' in _varnames:
-                    _kws['classes'] = _classes
-                # call sub-function
-                _attr_evaluated.from_dict(attr_value, **_kws)
-
-            return _attr_evaluated
-
-        # -- init
-        _classes = assert_list(self.__dependent_classes__, default=[
-        ]) + assert_list(classes, default=[])
-
-        # -- main
-        if len(self.__attributes__) == 0:
-            warnings.warn(
-                'self.__attributes__ has length zero, did you declare it?')
-
-        for _attr_name in list_merge('__name__', self.__attributes__):
-            if _attr_name not in dct.keys():
-                continue
-            _attr = dct[_attr_name]
-
-            # - call to children's from_dict
-            if recursive:
-                if is_list_like(_attr):
-                    if isinstance(_attr, Dict):  # Dict
-                        if '__name__' in _attr.keys():
-                            _attr = _f_eval(_attr['__name__'], _attr)  # eval
-                        else:
-                            for _attr_key, _attr_value in _attr.items():
-                                if isinstance(_attr_value, Dict) and '__name__' in _attr_value.keys():
-                                    _attr[_attr_key] = _f_eval(
-                                        _attr_value['__name__'], _attr_value)  # eval
-                    else:  # List
-                        for _i in range(len(_attr)):
-                            _attr_value = _attr[_i]
-                            if isinstance(_attr_value, Mapping) and '__name__' in _attr_value.keys():
-                                _attr[_i] = _f_eval(
-                                    _attr_value['__name__'], _attr_value)  # eval
-
-            self.__setattr__(_attr_name, _attr)
-        # -- return
-        return self
-
-    def to_pickle(self, filename: str):
-        """
-        Save self to pickle file
-
-        :param filename: filename (path) to be used
-        :return: None
-        """
-        pickle.dump(self, open(filename, 'wb'))
-
-    def copy(self):
-        """
-        Uses `copy.deepcopy <https://docs.python.org/3/library/copy.html>`_ to return a copy of the object
-
-        :return: Copy of self
-        """
-        return deepcopy(self)
-
-
 # ---- functions
 # --- internal functions
 def get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = True, map_dict: bool = True) -> str:
@@ -252,6 +79,7 @@ def get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = T
     :param map_dict: Whether to map the rules to dictionary elements
     :return: str
     """
+
     def _get_repr_i(value: Any) -> str:
 
         __repr_i = repr(value)
@@ -350,7 +178,6 @@ def get_repr(obj: Any, rules: Mapping[type, Callable] = None, map_list: bool = T
 
 
 # --- exported functions
-@export
 def today(date_format: str = '%Y_%m_%d') -> str:
     """
     Returns today's date as string
@@ -367,10 +194,9 @@ def today(date_format: str = '%Y_%m_%d') -> str:
     return datetime.datetime.today().strftime(date_format)
 
 
-@export
 def size(byte: int, unit: str = 'MB', dec: int = 2) -> str:
     """
-    Formats bytes as human readable string
+    Formats bytes as human-readable string
 
     :param byte: The byte amount to be formated
     :param unit: The unit to display the output in, supports 'KB', 'MB', 'GB' and 'TB'
@@ -394,7 +220,6 @@ def size(byte: int, unit: str = 'MB', dec: int = 2) -> str:
     return '{} {}'.format(np.round(byte / (1024 ** _power), dec), unit)
 
 
-@export
 def mem_usage(pandas_obj, *args, **kwargs) -> str:
     """
     Get memory usage of a pandas object
@@ -421,7 +246,6 @@ def mem_usage(pandas_obj, *args, **kwargs) -> str:
     return size(_usage_b, *args, **kwargs)
 
 
-@export
 def tprint(*args, sep: str = ' ', r_loc: str = rcParams['tprint.r_loc'], **kwargs):
     """
     Wrapper for print() but with a carriage return at the end.
@@ -488,7 +312,6 @@ def tprint(*args, sep: str = ' ', r_loc: str = rcParams['tprint.r_loc'], **kwarg
     global_tprint_len = _arg_len
 
 
-@export
 def fprint(*args, file: str = '_fprint.txt', sep: str = ' ', mode: str = 'replace', append_sep: str = '\n',
            timestamp: bool = True, do_print: bool = False, do_tprint: bool = False):
     """
@@ -552,7 +375,6 @@ def fprint(*args, file: str = '_fprint.txt', sep: str = ' ', mode: str = 'replac
         _txt.write(_string)
 
 
-@export
 def elapsed_time_init() -> None:
     """
     Resets reference time for elapsed_time()
@@ -567,7 +389,6 @@ def elapsed_time_init() -> None:
     global_t = datetime.datetime.now()
 
 
-@export
 def elapsed_time(do_return: bool = True, ref_t: datetime.datetime = None) -> datetime.timedelta:
     """
     Get the elapsed time since reference time ref_time.
@@ -602,7 +423,6 @@ def elapsed_time(do_return: bool = True, ref_t: datetime.datetime = None) -> dat
         tprint(str(_delta_t)[:-5])
 
 
-@export
 def total_time(i: int, i_max: int) -> datetime.timedelta:
     """
     Estimates total time of running operation by linear extrapolation using iteration counters.
@@ -617,7 +437,6 @@ def total_time(i: int, i_max: int) -> datetime.timedelta:
     return _total_time
 
 
-@export
 def remaining_time(i: int, i_max: int) -> datetime.timedelta:
     """
     Estimates remaining time of running operation by linear extrapolation using iteration counters.
@@ -633,7 +452,6 @@ def remaining_time(i: int, i_max: int) -> datetime.timedelta:
 
 
 @docstr
-@export
 def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', empty_symbol: str = '_', mid: str = None,
                 mode: str = 'perc', print_prefix: str = '', p_step: int = 1, printf: Callable = tprint,
                 persist: bool = False, **kwargs):
@@ -670,8 +488,7 @@ def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', empty_symbol: str
     if _perc <= 50:
 
         _right = empty_symbol * (50 // p_step)
-        _left = symbol * int(np.ceil(_perc / p_step)) + \
-            empty_symbol * ((50 - _perc) // p_step)
+        _left = symbol * int(np.ceil(_perc / p_step)) + empty_symbol * ((50 - _perc) // p_step)
 
     else:
 
@@ -721,7 +538,6 @@ def progressbar(i: int = 1, i_max: int = 1, symbol: str = '=', empty_symbol: str
         print('')
 
 
-@export
 def time_to_str(t: datetime.datetime, time_format: str = '%Y-%m-%d') -> str:
     """
     Wrapper for strftime
@@ -733,7 +549,6 @@ def time_to_str(t: datetime.datetime, time_format: str = '%Y-%m-%d') -> str:
     return pd.to_datetime(t).strftime(time_format)
 
 
-@export
 def cf_vec(x: Any, func: Callable, to_list: bool = True, *args, **kwargs) -> Any:
     """
     Pandas compatible vectorize function. In case a DataFrame is passed the function is applied to all columns.
@@ -771,7 +586,6 @@ def cf_vec(x: Any, func: Callable, to_list: bool = True, *args, **kwargs) -> Any
     return _out
 
 
-@export
 def round_signif_i(x: np.number, digits: int = 1) -> float:
     """
     Round to significant number of digits for a Scalar number
@@ -789,7 +603,6 @@ def round_signif_i(x: np.number, digits: int = 1) -> float:
         return round(float(x), _scale)
 
 
-@export
 def round_signif(x: Any, *args, **kwargs) -> Any:
     """
     Round to significant number of digits
@@ -802,7 +615,6 @@ def round_signif(x: Any, *args, **kwargs) -> Any:
     return cf_vec(x, round_signif_i, *args, **kwargs)
 
 
-@export
 def floor_signif(x: Any, digits: int = 1) -> Any:
     """
     Floor to significant number of digits
@@ -822,7 +634,6 @@ def floor_signif(x: Any, digits: int = 1) -> Any:
             return round_signif_x - 1 / np.power(10., _scale)
 
 
-@export
 def ceil_signif(x: Any, digits: int = 1) -> Any:
     """
     Ceil to significant number of digits
@@ -842,7 +653,6 @@ def ceil_signif(x: Any, digits: int = 1) -> Any:
             return round_signif_x + 1 / np.power(10., _scale)
 
 
-@export
 def concat_cols(df: pd.DataFrame, columns: list, sep: str = '_', to_int: bool = False) -> pd.Series:
     """
     Concat a number of columns of a pandas DataFrame
@@ -873,7 +683,6 @@ def concat_cols(df: pd.DataFrame, columns: list, sep: str = '_', to_int: bool = 
     return _df['_out']
 
 
-@export
 def list_unique(lst: Any) -> list:
     """
     Returns unique elements from a list (dropping duplicates)
@@ -887,7 +696,6 @@ def list_unique(lst: Any) -> list:
     return _lst
 
 
-@export
 def list_duplicate(lst: Any) -> list:
     """
     Returns only duplicate elements from a list
@@ -900,7 +708,6 @@ def list_duplicate(lst: Any) -> list:
     return list_unique(_ind[_ind.duplicated()].tolist())
 
 
-@export
 def list_flatten(lst: Any) -> list:
     """
     Flatten a list of lists
@@ -911,14 +718,13 @@ def list_flatten(lst: Any) -> list:
     return list(np.array(assert_list(lst)).flat)
 
 
-@export
 def list_merge(*args: Any, unique: bool = True, flatten: bool = False) -> list:
     """
     Merges n lists together
 
     :param args: The lists to be merged together
     :param unique: if True then duplicate elements will be dropped
-    :param flatten: if True then the individual lists will be flatten before merging
+    :param flatten: if True then the individual lists will be flattened before merging
     :return: The merged list
     """
     _list = []
@@ -941,7 +747,6 @@ def list_merge(*args: Any, unique: bool = True, flatten: bool = False) -> list:
     return _list
 
 
-@export
 def list_intersection(lst: SequenceOrScalar, *args: SequenceOrScalar) -> list:
     """
     Returns common elements of n lists
@@ -960,7 +765,6 @@ def list_intersection(lst: SequenceOrScalar, *args: SequenceOrScalar) -> list:
     return _list_out
 
 
-@export
 def list_exclude(lst: SequenceOrScalar, *args: SequenceOrScalar) -> list:
     """
     Returns a list that includes only those elements from the first list that are not in any subsequent list.
@@ -987,7 +791,6 @@ def list_exclude(lst: SequenceOrScalar, *args: SequenceOrScalar) -> list:
     return _list_out
 
 
-@export
 def rand(shape: tuple = None, lower: int = None, upper: int = None, step: int = None, seed: int = None) -> np.array:
     """
     A seedable wrapper for numpy.random.random_sample that allows for boundaries and steps
@@ -1026,14 +829,18 @@ def rand(shape: tuple = None, lower: int = None, upper: int = None, step: int = 
     return _samples
 
 
-@export
 def dict_list(*args, dict_type: str = 'defaultdict') -> dict:
     """
     Creates a dictionary of empty named lists. Useful for iteratively creating a pandas DataFrame
 
-    :param args: The names of the lists
-    :param dict_type: Whether to use a 'regular' or 'defaultdict' (default to empty list) type dictionary
-    :return: Dictionary of empty named lists
+    Parameters
+    ----------
+    args: The names of the lists
+    dict_type: Whether to use a 'regular' or 'defaultdict' (default to empty list) type dictionary
+
+    Returns
+    -------
+    Dictionary of empty named lists
     """
     if dict_type == 'regular':
         _dict = {}
@@ -1047,7 +854,6 @@ def dict_list(*args, dict_type: str = 'defaultdict') -> dict:
     return _dict
 
 
-@export
 def append_to_dict_list(dct: Union[dict, defaultdict], append: Union[dict, list],
                         inplace: bool = True) -> Optional[dict]:
     """
@@ -1084,7 +890,6 @@ def append_to_dict_list(dct: Union[dict, defaultdict], append: Union[dict, list]
         return dct
 
 
-@export
 def is_scalar(obj: Any) -> bool:
     """
     Checks if a given python object is scalar, i.e. one of int, float, str, bytes
@@ -1096,7 +901,6 @@ def is_scalar(obj: Any) -> bool:
     return isinstance(obj, Scalar.__args__)
 
 
-@export
 def is_list_like(obj: Any) -> bool:
     """
     Checks if a given python object is list like. The conditions must be satisfied:
@@ -1136,7 +940,6 @@ def is_list_like(obj: Any) -> bool:
     return False
 
 
-@export
 def assert_list(*args: Any, default: SequenceOrScalar = None) -> list:
     """
     Takes any python object(s) and turns them into an iterable list.
@@ -1190,7 +993,6 @@ def assert_list(*args: Any, default: SequenceOrScalar = None) -> list:
     return args
 
 
-@export
 def assert_tuple(*args: Any, **kwargs) -> tuple:
     """
     Takes any python object(s) and turns them into an iterable tuple.
@@ -1209,7 +1011,6 @@ def force_list(*args, **kwargs):
     return assert_list(*args, **kwargs)
 
 
-@export
 def assert_scalar(obj: Any, warn: bool = True, default: Scalar = None) -> Scalar:
     """
     Takes any python object and turns it into a scalar object.
@@ -1240,20 +1041,24 @@ def force_scalar(*args, **kwargs):
     return assert_scalar(*args, **kwargs)
 
 
-@export
 def qformat(value: Any, int_format: str = ',', float_format: str = ',.2f', datetime_format: str = '%Y-%m-%d',
             sep: str = ' - ', key_sep: str = ': ', print_key: bool = True) -> str:
     """
-    Creates a human readable representation of a generic python object
+    Quick format: Creates a human-readable representation of a generic python object
 
-    :param value: Any python object
-    :param int_format: Format string for integer
-    :param float_format: Format string for float
-    :param datetime_format: Format string for datetime
-    :param sep: Separator
-    :param key_sep: Separator used between key and value if print_key is True
-    :param print_key: Whether to print keys as well as values (if object has keys)
-    :return: Formated string
+    Parameters
+    ----------
+    value: Any python object
+    int_format: Format string for integer
+    float_format: Format string for float
+    datetime_format: Format string for datetime
+    sep: Separator to use
+    key_sep: Separator used between key and value if print_key is True
+    print_key: Whether to print keys as well as values (if object has keys)
+
+    Returns
+    -------
+    Formated string
     """
 
     def _qformat(_value_i: Any) -> str:
@@ -1307,7 +1112,7 @@ def qformat(value: Any, int_format: str = ',', float_format: str = ',.2f', datet
 
 
 # noinspection PyShadowingBuiltins
-@export
+
 def to_hdf(df: pd.DataFrame, file: str, groupby: Union[str, List[str]] = None, write_groupby: bool = True,
            key: str = None, replace: bool = False, format: str = 'table', do_print=True, **kwargs) -> None:
     """
@@ -1327,7 +1132,7 @@ def to_hdf(df: pd.DataFrame, file: str, groupby: Union[str, List[str]] = None, w
     :return: None
     """
     assert (groupby is not None) or (
-        key is not None), "You must supply either groupby or key"
+            key is not None), "You must supply either groupby or key"
 
     # -- init
     # - no inplace
@@ -1372,10 +1177,9 @@ def to_hdf(df: pd.DataFrame, file: str, groupby: Union[str, List[str]] = None, w
         tprint('{}saved to {}'.format('\n', file))
 
 
-@export
 def get_hdf_keys(file: str) -> List[str]:
     """
-    Reads all keys from an hdf file and returns as list
+    Reads all keys from a hdf file and returns as list
 
     :param file: The path of the file to read the keys of
     :return: List of keys
@@ -1387,7 +1191,6 @@ def get_hdf_keys(file: str) -> List[str]:
     return _keys
 
 
-@export
 def read_hdf(file: str, key: Union[str, List[str]] = None, sample: int = None, random_state: int = None,
              key_to_col: Union[bool, str] = False, do_print: bool = True, catch_error: bool = True,
              **kwargs) -> pd.DataFrame:
@@ -1430,7 +1233,7 @@ def read_hdf(file: str, key: Union[str, List[str]] = None, sample: int = None, r
 
         if do_print:
             tprint('reading {} - key {} / {} : {}...'.format(file,
-                   _it + 1, len(_keys), _key))
+                                                             _it + 1, len(_keys), _key))
         if catch_error:
             try:
                 _df_i = pd.read_hdf(file, key=_key, **kwargs)
@@ -1468,7 +1271,6 @@ def read_hdf(file: str, key: Union[str, List[str]] = None, sample: int = None, r
     return _df
 
 
-@export
 def rounddown(x: Any, digits: int) -> Any:
     """
     convenience wrapper for np.floor with digits option
@@ -1478,10 +1280,9 @@ def rounddown(x: Any, digits: int) -> Any:
     :return: rounded x
     """
 
-    return np.floor(x * 10**digits) / 10**digits
+    return np.floor(x * 10 ** digits) / 10 ** digits
 
 
-@export
 def roundup(x: Any, digits: int) -> Any:
     """
     convenience wrapper for np.ceil with digits option
@@ -1491,11 +1292,10 @@ def roundup(x: Any, digits: int) -> Any:
     :return: rounded x
     """
 
-    return np.ceil(x * 10**digits) / 10**digits
+    return np.ceil(x * 10 ** digits) / 10 ** digits
 
 
 @docstr
-@export
 def reformat_string(string: str, case: Optional[str] = 'lower', replace: Optional[Mapping[str, str]] = None,
                     lstrip: Optional[str] = ' ', rstrip: Optional[str] = ' ', demojize: bool = True,
                     trans: bool = False, trans_dest: Optional[str] = 'en', trans_src: Optional[str] = 'auto',
@@ -1535,18 +1335,15 @@ def reformat_string(string: str, case: Optional[str] = 'lower', replace: Optiona
 
     # -- demojize: (needs to come before trans)
     if demojize:
-        if emoji:
-            string = emoji.demojize(string)
-        else:
-            warnings.warn(
-                'Missing optional dependency emoji, skipping demojize')
+        # noinspection PyPackageRequirements
+        import emoji
+        string = emoji.demojize(string)
 
     # -- trans: (needs to come after demojize but before the rest)
     if trans:
-        if Translator is None:
-            raise ModuleNotFoundError(
-                'Missing optional dependency googletrans, please install it to use trans=True')
 
+        # noinspection PyPackageRequirements
+        from googletrans import Translator
         _translator = Translator()
         try:
             # avoid rate limits
@@ -1589,7 +1386,6 @@ def reformat_string(string: str, case: Optional[str] = 'lower', replace: Optiona
     return string
 
 
-@export
 def dict_inv(dct: Mapping, key_as_str: bool = False, duplicates: str = 'keep') -> dict:
     """
     Returns an inverted copy of a given dictionary (if it is invertible)
@@ -1632,7 +1428,6 @@ def dict_inv(dct: Mapping, key_as_str: bool = False, duplicates: str = 'keep') -
     return _dct_inv
 
 
-@export
 def copy_function(f: FunctionType) -> FunctionType:
     """
     return a copy of a function, based on this StackOverflow answer
@@ -1648,7 +1443,6 @@ def copy_function(f: FunctionType) -> FunctionType:
     return _f
 
 
-@export
 def get_else_key(dct: Mapping, key: Any, exclude: SequenceOrScalar = None) -> Any:
     """
     Returns a value from a dictionary if the key is present, if not returns the key
@@ -1664,7 +1458,6 @@ def get_else_key(dct: Mapping, key: Any, exclude: SequenceOrScalar = None) -> An
         return key
 
 
-@export
 def silentcopy(o: Any) -> Any:
     """
     silently copies an object, some objects print messages during deepcopy. E.g. LightGBMRegressor
